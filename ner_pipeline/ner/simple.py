@@ -11,7 +11,7 @@ class SimpleRegexNER:
 
     def __init__(self, min_len: int = 3):
         self.pattern = re.compile(
-            r"\\b([A-Z][a-zA-Z0-9_-]+(?:\\s+[A-Z][a-zA-Z0-9_-]+)*)\\b"
+            r"\b([A-Z][a-zA-Z0-9_-]+(?:\s+[A-Z][a-zA-Z0-9_-]+)*)\b"
         )
         self.min_len = min_len
 
