@@ -19,6 +19,12 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
 # Local data and cache
 .ner_cache/
 data/*

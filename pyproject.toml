@@ -1,0 +1,38 @@
+[project]
+name = "ner-pipeline"
+version = "0.1.0"
+description = "A modular NER and entity linking pipeline"
+requires-python = ">=3.9"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (requiring model downloads)",
+    "integration: marks tests as integration tests",
+    "requires_spacy: marks tests requiring spaCy models",
+    "requires_transformers: marks tests requiring HuggingFace transformers",
+    "requires_sentence_transformers: marks tests requiring sentence-transformers",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["ner_pipeline"]
+omit = [
+    "ner_pipeline/scripts/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
