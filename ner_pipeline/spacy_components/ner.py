@@ -106,19 +106,63 @@ class LELAGLiNERComponent:
         logger.info(f"LELA GLiNER loaded with labels: {self.labels}")
 
     def __call__(self, doc: Doc) -> Doc:
-        """Process document and add entities."""
+        """Process document and add entities.
+
+        Handles long documents by chunking with overlap to ensure
+        entities near chunk boundaries are not missed.
+        """
         text = doc.text
         if not text or not text.strip():
             return doc
 
-        predictions = self.model.predict_entities(
-            text,
-            labels=self.labels,
-            threshold=self.threshold,
-        )
+        # Chunk long documents to handle GLiNER's token limit
+        # Use ~1500 chars per chunk with 200 char overlap
+        chunk_size = 1500
+        overlap = 200
+
+        all_predictions = []
+
+        if len(text) <= chunk_size:
+            # Short text, process directly
+            all_predictions = self.model.predict_entities(
+                text,
+                labels=self.labels,
+                threshold=self.threshold,
+            )
+        else:
+            # Long text, process in chunks
+            start = 0
+            while start < len(text):
+                end = min(start + chunk_size, len(text))
+
+                # Try to break at sentence boundary
+                if end < len(text):
+                    # Look for sentence end near chunk boundary
+                    for sep in ['. ', '.\n', '? ', '!\n', '\n\n']:
+                        last_sep = text[start:end].rfind(sep)
+                        if last_sep > chunk_size // 2:
+                            end = start + last_sep + len(sep)
+                            break
+
+                chunk_text = text[start:end]
+
+                chunk_predictions = self.model.predict_entities(
+                    chunk_text,
+                    labels=self.labels,
+                    threshold=self.threshold,
+                )
+
+                # Adjust offsets to document-level
+                for pred in chunk_predictions:
+                    pred["start"] += start
+                    pred["end"] += start
+                    all_predictions.append(pred)
+
+                # Move to next chunk with overlap
+                start = end - overlap if end < len(text) else len(text)
 
         spans = []
-        for pred in predictions:
+        for pred in all_predictions:
             start_char = pred["start"]
             end_char = pred["end"]
 
@@ -140,7 +184,7 @@ class LELAGLiNERComponent:
         # Filter overlapping spans (keep longest)
         doc.ents = self._filter_spans(spans)
 
-        logger.debug(f"Extracted {len(doc.ents)} entities from document")
+        logger.debug(f"Extracted {len(doc.ents)} entities from document ({len(text)} chars)")
         return doc
 
     def _filter_spans(self, spans: List[Span]) -> List[Span]:
@@ -369,6 +413,7 @@ class GLiNERComponent:
         "model_name": "dslim/bert-base-NER",
         "context_mode": "sentence",
         "aggregation_strategy": "simple",
+        "stride": 128,
     },
 )
 def create_transformers_ner_component(
@@ -377,6 +422,7 @@ def create_transformers_ner_component(
     model_name: str,
     context_mode: str,
     aggregation_strategy: str,
+    stride: int,
 ):
     """Factory for Transformers NER component."""
     return TransformersNERComponent(
@@ -384,6 +430,7 @@ def create_transformers_ner_component(
         model_name=model_name,
         context_mode=context_mode,
         aggregation_strategy=aggregation_strategy,
+        stride=stride,
     )
 
 
@@ -392,6 +439,7 @@ class TransformersNERComponent:
     HuggingFace Transformers NER component for spaCy.
 
     Uses the transformers pipeline for token classification.
+    Supports long documents via stride-based chunking.
     """
 
     def __init__(
@@ -400,29 +448,44 @@ class TransformersNERComponent:
         model_name: str = "dslim/bert-base-NER",
         context_mode: str = "sentence",
         aggregation_strategy: str = "simple",
+        stride: int = 128,
     ):
         self.nlp = nlp
         self.model_name = model_name
         self.context_mode = context_mode
         self.aggregation_strategy = aggregation_strategy
+        self.stride = stride
 
         if not Span.has_extension("context"):
             Span.set_extension("context", default=None)
 
         # Lazy import transformers
         try:
-            from transformers import pipeline
+            from transformers import pipeline, AutoTokenizer
+
+            # Get the tokenizer to determine max length
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            max_length = getattr(tokenizer, "model_max_length", 512)
+            # Some tokenizers report very large max_length, cap it
+            if max_length > 100000:
+                max_length = 512
+
             self.ner_pipeline = pipeline(
                 "ner",
                 model=model_name,
+                tokenizer=tokenizer,
                 aggregation_strategy=aggregation_strategy,
+                stride=stride,
+                truncation=True,
+                max_length=max_length,
             )
+            self.max_length = max_length
         except ImportError:
             raise ImportError(
                 "transformers package required. Install with: pip install transformers"
             )
 
-        logger.info(f"Loaded Transformers NER model: {model_name}")
+        logger.info(f"Loaded Transformers NER model: {model_name} (max_length={self.max_length}, stride={stride})")
 
     def __call__(self, doc: Doc) -> Doc:
         """Process document and add entities."""
