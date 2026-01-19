@@ -1,4 +1,4 @@
-"""Unit tests for LELABM25CandidateGenerator."""
+"""Unit tests for LELABM25CandidatesComponent."""
 
 import json
 import os
@@ -6,13 +6,15 @@ import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
+import spacy
+from spacy.tokens import Span
 
 from ner_pipeline.types import Candidate, Document, Entity, Mention
 from ner_pipeline.knowledge_bases.lela_jsonl import LELAJSONLKnowledgeBase
 
 
-class TestLELABM25CandidateGenerator:
-    """Tests for LELABM25CandidateGenerator class."""
+class TestLELABM25CandidatesComponent:
+    """Tests for LELABM25CandidatesComponent class."""
 
     @pytest.fixture
     def lela_kb_data(self) -> list[dict]:
@@ -44,18 +46,26 @@ class TestLELABM25CandidateGenerator:
             text="Barack Obama was the 44th President of the United States."
         )
 
-    def test_requires_knowledge_base(self):
-        # Import here to allow mocking
-        with patch("ner_pipeline.candidates.lela_bm25._get_bm25s"):
-            with patch("ner_pipeline.candidates.lela_bm25._get_stemmer"):
-                from ner_pipeline.candidates.lela_bm25 import LELABM25CandidateGenerator
-                with pytest.raises(ValueError, match="requires a knowledge base"):
-                    LELABM25CandidateGenerator(kb=None)
+    @pytest.fixture
+    def nlp(self):
+        return spacy.blank("en")
 
-    @patch("ner_pipeline.candidates.lela_bm25._get_stemmer")
-    @patch("ner_pipeline.candidates.lela_bm25._get_bm25s")
+    def test_requires_knowledge_base(self, nlp):
+        with patch("ner_pipeline.spacy_components.candidates._get_bm25s"):
+            with patch("ner_pipeline.spacy_components.candidates._get_stemmer"):
+                from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+                component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
+                # Component returns doc unchanged when not initialized (logs warning)
+                doc = nlp("Test")
+                doc.ents = [Span(doc, 0, 1, label="ENTITY")]
+                result = component(doc)
+                # Candidates should remain empty since KB not initialized
+                assert result.ents[0]._.candidates == []
+
+    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
     def test_generate_returns_candidates(
-        self, mock_bm25s, mock_stemmer, kb, sample_doc
+        self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp
     ):
         # Setup mocks
         mock_stemmer_instance = MagicMock()
@@ -79,19 +89,22 @@ class TestLELABM25CandidateGenerator:
 
         mock_bm25s.return_value.tokenize.return_value = [["obama"]]
 
-        from ner_pipeline.candidates.lela_bm25 import LELABM25CandidateGenerator
-        generator = LELABM25CandidateGenerator(kb=kb, top_k=5)
+        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
+        component.initialize(kb)
 
-        mention = Mention(start=0, end=12, text="Barack Obama")
-        candidates = generator.generate(mention, sample_doc)
+        doc = nlp("Barack Obama was president.")
+        doc.ents = [Span(doc, 0, 2, label="ENTITY")]
+        doc = component(doc)
 
+        candidates = doc.ents[0]._.candidates
         assert len(candidates) == 2
-        assert all(isinstance(c, Candidate) for c in candidates)
+        assert all(isinstance(c, tuple) and len(c) == 2 for c in candidates)
 
-    @patch("ner_pipeline.candidates.lela_bm25._get_stemmer")
-    @patch("ner_pipeline.candidates.lela_bm25._get_bm25s")
+    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
     def test_candidates_have_entity_ids(
-        self, mock_bm25s, mock_stemmer, kb, sample_doc
+        self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp
     ):
         mock_stemmer_instance = MagicMock()
         mock_stemmer.return_value.Stemmer.return_value = mock_stemmer_instance
@@ -111,18 +124,21 @@ class TestLELABM25CandidateGenerator:
         mock_retriever.retrieve.return_value = mock_results
         mock_bm25s.return_value.tokenize.return_value = [["obama"]]
 
-        from ner_pipeline.candidates.lela_bm25 import LELABM25CandidateGenerator
-        generator = LELABM25CandidateGenerator(kb=kb, top_k=5)
+        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
+        component.initialize(kb)
 
-        mention = Mention(start=0, end=12, text="Barack Obama")
-        candidates = generator.generate(mention, sample_doc)
+        doc = nlp("Barack Obama was president.")
+        doc.ents = [Span(doc, 0, 2, label="ENTITY")]
+        doc = component(doc)
 
-        assert candidates[0].entity_id == "Barack Obama"
+        candidates = doc.ents[0]._.candidates
+        assert candidates[0][0] == "Barack Obama"
 
-    @patch("ner_pipeline.candidates.lela_bm25._get_stemmer")
-    @patch("ner_pipeline.candidates.lela_bm25._get_bm25s")
+    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
     def test_candidates_have_descriptions(
-        self, mock_bm25s, mock_stemmer, kb, sample_doc
+        self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp
     ):
         mock_stemmer_instance = MagicMock()
         mock_stemmer.return_value.Stemmer.return_value = mock_stemmer_instance
@@ -142,18 +158,21 @@ class TestLELABM25CandidateGenerator:
         mock_retriever.retrieve.return_value = mock_results
         mock_bm25s.return_value.tokenize.return_value = [["obama"]]
 
-        from ner_pipeline.candidates.lela_bm25 import LELABM25CandidateGenerator
-        generator = LELABM25CandidateGenerator(kb=kb, top_k=5)
+        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
+        component.initialize(kb)
 
-        mention = Mention(start=0, end=12, text="Barack Obama")
-        candidates = generator.generate(mention, sample_doc)
+        doc = nlp("Barack Obama was president.")
+        doc.ents = [Span(doc, 0, 2, label="ENTITY")]
+        doc = component(doc)
 
-        assert candidates[0].description == "44th US President"
+        candidates = doc.ents[0]._.candidates
+        assert candidates[0][1] == "44th US President"
 
-    @patch("ner_pipeline.candidates.lela_bm25._get_stemmer")
-    @patch("ner_pipeline.candidates.lela_bm25._get_bm25s")
+    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
     def test_empty_tokenization_returns_empty(
-        self, mock_bm25s, mock_stemmer, kb, sample_doc
+        self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp
     ):
         mock_stemmer_instance = MagicMock()
         mock_stemmer.return_value.Stemmer.return_value = mock_stemmer_instance
@@ -168,18 +187,21 @@ class TestLELABM25CandidateGenerator:
         # Empty tokenization
         mock_bm25s.return_value.tokenize.return_value = [[]]
 
-        from ner_pipeline.candidates.lela_bm25 import LELABM25CandidateGenerator
-        generator = LELABM25CandidateGenerator(kb=kb, top_k=5)
+        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
+        component.initialize(kb)
 
-        mention = Mention(start=0, end=3, text="...")
-        candidates = generator.generate(mention, sample_doc)
+        doc = nlp("...")
+        doc.ents = [Span(doc, 0, 1, label="ENTITY")]
+        doc = component(doc)
 
+        candidates = doc.ents[0]._.candidates
         assert candidates == []
 
-    @patch("ner_pipeline.candidates.lela_bm25._get_stemmer")
-    @patch("ner_pipeline.candidates.lela_bm25._get_bm25s")
+    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
     def test_use_context_includes_context_in_query(
-        self, mock_bm25s, mock_stemmer, kb, sample_doc
+        self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp
     ):
         mock_stemmer_instance = MagicMock()
         mock_stemmer.return_value.Stemmer.return_value = mock_stemmer_instance
@@ -202,14 +224,15 @@ class TestLELABM25CandidateGenerator:
             return [[]]
         mock_bm25s.return_value.tokenize.side_effect = capture_tokenize
 
-        from ner_pipeline.candidates.lela_bm25 import LELABM25CandidateGenerator
-        generator = LELABM25CandidateGenerator(kb=kb, top_k=5, use_context=True)
+        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=True)
+        component.initialize(kb)
 
-        mention = Mention(
-            start=0, end=12, text="Barack Obama",
-            context="was the 44th President"
-        )
-        generator.generate(mention, sample_doc)
+        doc = nlp("Barack Obama was the 44th President")
+        doc.ents = [Span(doc, 0, 2, label="ENTITY")]
+        # Set context on the entity
+        doc.ents[0]._.context = "was the 44th President"
+        doc = component(doc)
 
         # Check that context was included in the query
         assert len(tokenize_calls) > 0
@@ -217,10 +240,10 @@ class TestLELABM25CandidateGenerator:
         assert "Barack Obama" in query
         assert "44th President" in query
 
-    @patch("ner_pipeline.candidates.lela_bm25._get_stemmer")
-    @patch("ner_pipeline.candidates.lela_bm25._get_bm25s")
+    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
     def test_use_context_false_excludes_context(
-        self, mock_bm25s, mock_stemmer, kb, sample_doc
+        self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp
     ):
         mock_stemmer_instance = MagicMock()
         mock_stemmer.return_value.Stemmer.return_value = mock_stemmer_instance
@@ -243,23 +266,23 @@ class TestLELABM25CandidateGenerator:
             return [[]]
         mock_bm25s.return_value.tokenize.side_effect = capture_tokenize
 
-        from ner_pipeline.candidates.lela_bm25 import LELABM25CandidateGenerator
-        generator = LELABM25CandidateGenerator(kb=kb, top_k=5, use_context=False)
+        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
+        component.initialize(kb)
 
-        mention = Mention(
-            start=0, end=12, text="Barack Obama",
-            context="was the 44th President"
-        )
-        generator.generate(mention, sample_doc)
+        doc = nlp("Barack Obama was the 44th President")
+        doc.ents = [Span(doc, 0, 2, label="ENTITY")]
+        doc.ents[0]._.context = "was the 44th President"
+        doc = component(doc)
 
         # Context should not be in query when use_context=False
         assert len(tokenize_calls) > 0
         query = tokenize_calls[0][0]
         assert query == "Barack Obama"
 
-    @patch("ner_pipeline.candidates.lela_bm25._get_stemmer")
-    @patch("ner_pipeline.candidates.lela_bm25._get_bm25s")
-    def test_respects_top_k(self, mock_bm25s, mock_stemmer, kb, sample_doc):
+    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
+    def test_respects_top_k(self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp):
         mock_stemmer_instance = MagicMock()
         mock_stemmer.return_value.Stemmer.return_value = mock_stemmer_instance
 
@@ -272,8 +295,9 @@ class TestLELABM25CandidateGenerator:
 
         mock_bm25s.return_value.tokenize.return_value = [["test"]]
 
-        from ner_pipeline.candidates.lela_bm25 import LELABM25CandidateGenerator
-        generator = LELABM25CandidateGenerator(kb=kb, top_k=3)
+        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        component = LELABM25CandidatesComponent(nlp=nlp, top_k=3, use_context=False)
+        component.initialize(kb)
 
         # Check that top_k is stored
-        assert generator.top_k == 3
+        assert component.top_k == 3

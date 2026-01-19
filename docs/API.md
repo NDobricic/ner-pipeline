@@ -1,13 +1,13 @@
 # Python API Reference
 
-This document provides a comprehensive reference for the NER Pipeline Python API.
+This document provides a comprehensive reference for the NER Pipeline Python API, built on spaCy's component architecture.
 
 ## Table of Contents
 
 - [Core Classes](#core-classes)
+- [spaCy Components](#spacy-components)
 - [Data Types](#data-types)
 - [Configuration](#configuration)
-- [Registry System](#registry-system)
 - [Context Extraction](#context-extraction)
 - [Usage Examples](#usage-examples)
 
@@ -15,7 +15,7 @@ This document provides a comprehensive reference for the NER Pipeline Python API
 
 ### NERPipeline
 
-The main orchestrator class that manages the entire entity linking pipeline.
+The main orchestrator class that manages the entity linking pipeline using spaCy.
 
 **Location:** `ner_pipeline/pipeline.py`
 
@@ -34,15 +34,20 @@ NERPipeline(config: PipelineConfig)
 - `config`: A `PipelineConfig` object containing pipeline configuration
 
 **Initialization:**
-- Instantiates all pipeline components (loader, NER, candidate generator, reranker, disambiguator, knowledge base)
+- Instantiates knowledge base and document loader from registries
+- Builds a spaCy `Language` pipeline with configured components
 - Sets up caching directory
-- Configures batch processing
+
+**Internal Structure:**
+- `self.nlp`: The spaCy `Language` instance with pipeline components
+- `self.kb`: Knowledge base instance
+- `self.loader`: Document loader instance
 
 #### Methods
 
 ##### `process_document(doc: Document) -> Dict`
 
-Process a single document through the entire pipeline.
+Process a single document through the spaCy pipeline.
 
 **Parameters:**
 - `doc`: A `Document` object to process
@@ -130,13 +135,233 @@ config = PipelineConfig.from_dict(config_dict)
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `loader` | Dict | Loader configuration |
-| `ner` | Dict | NER model configuration |
+| `ner` | Dict | NER component configuration |
 | `candidate_generator` | Dict | Candidate generator configuration |
 | `reranker` | Dict | Reranker configuration |
 | `disambiguator` | Dict | Disambiguator configuration |
 | `knowledge_base` | Dict | Knowledge base configuration |
 | `cache_dir` | str | Directory for document caching |
 | `batch_size` | int | Batch size for processing |
+
+## spaCy Components
+
+All pipeline components are implemented as spaCy factories and can be used directly with spaCy's `nlp.add_pipe()` method.
+
+### Component Registration
+
+Import the `spacy_components` module to register all factories:
+
+```python
+from ner_pipeline import spacy_components  # Registers all factories
+import spacy
+
+nlp = spacy.blank("en")
+nlp.add_pipe("ner_pipeline_simple")  # Now available
+```
+
+### spaCy Extensions
+
+The pipeline uses custom extensions on `Span` objects:
+
+```python
+from spacy.tokens import Span
+
+# Automatically registered when components are loaded
+Span.set_extension("context", default=None)
+Span.set_extension("candidates", default=[])
+Span.set_extension("resolved_entity", default=None)
+```
+
+### NER Components
+
+#### `ner_pipeline_lela_gliner`
+
+Zero-shot GLiNER NER with LELA defaults.
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model_name` | str | "numind/NuNER_Zero-span" | GLiNER model |
+| `labels` | List[str] | LELA defaults | Entity types |
+| `threshold` | float | 0.5 | Detection threshold |
+| `context_mode` | str | "sentence" | Context extraction mode |
+
+**Example:**
+```python
+nlp.add_pipe("ner_pipeline_lela_gliner", config={
+    "labels": ["person", "organization", "location"],
+    "threshold": 0.4
+})
+```
+
+#### `ner_pipeline_simple`
+
+Lightweight regex-based NER.
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `min_len` | int | 3 | Minimum mention length |
+| `context_mode` | str | "sentence" | Context extraction mode |
+
+**Example:**
+```python
+nlp.add_pipe("ner_pipeline_simple", config={"min_len": 2})
+```
+
+#### `ner_pipeline_gliner`
+
+Standard GLiNER wrapper.
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model_name` | str | "urchade/gliner_base" | GLiNER model |
+| `labels` | List[str] | ["person", "organization", "location"] | Entity types |
+| `threshold` | float | 0.5 | Detection threshold |
+| `context_mode` | str | "sentence" | Context extraction mode |
+
+#### `ner_pipeline_transformers`
+
+HuggingFace transformers NER.
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model_name` | str | "dslim/bert-base-NER" | HuggingFace model |
+| `context_mode` | str | "sentence" | Context extraction mode |
+| `aggregation_strategy` | str | "simple" | Token aggregation |
+
+#### `ner_pipeline_ner_filter`
+
+Post-filter for spaCy's built-in NER (adds context extension).
+
+**Usage:**
+```python
+# Load pretrained spaCy model
+spacy_nlp = spacy.load("en_core_web_sm")
+
+# Copy NER and add filter
+nlp.add_pipe("ner", source=spacy_nlp)
+nlp.add_pipe("ner_pipeline_ner_filter")
+```
+
+### Candidate Generation Components
+
+#### `ner_pipeline_lela_bm25_candidates`
+
+BM25 retrieval using bm25s library with stemming.
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `top_k` | int | 64 | Maximum candidates |
+| `use_context` | bool | True | Include context in query |
+| `stemmer_language` | str | "english" | Stemmer language |
+
+**Requires initialization:**
+```python
+component = nlp.add_pipe("ner_pipeline_lela_bm25_candidates")
+component.initialize(kb)
+```
+
+#### `ner_pipeline_lela_dense_candidates`
+
+Dense retrieval using OpenAI-compatible embeddings and FAISS.
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model_name` | str | LELA default | Embedding model |
+| `top_k` | int | 64 | Maximum candidates |
+| `base_url` | str | "http://localhost" | API endpoint |
+| `port` | int | 8000 | API port |
+| `use_context` | bool | True | Include context in query |
+
+#### `ner_pipeline_fuzzy_candidates`
+
+RapidFuzz string matching.
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `top_k` | int | 20 | Maximum candidates |
+
+#### `ner_pipeline_bm25_candidates`
+
+Standard BM25 using rank-bm25 library.
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `top_k` | int | 20 | Maximum candidates |
+
+### Reranker Components
+
+#### `ner_pipeline_lela_embedder_reranker`
+
+Embedding-based cosine similarity reranking with marked mentions.
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model_name` | str | LELA default | Embedding model |
+| `top_k` | int | 10 | Candidates to keep |
+| `base_url` | str | "http://localhost" | API endpoint |
+| `port` | int | 8000 | API port |
+
+#### `ner_pipeline_cross_encoder_reranker`
+
+Cross-encoder reranking using sentence-transformers.
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model_name` | str | "cross-encoder/ms-marco-MiniLM-L-6-v2" | Model |
+| `top_k` | int | 10 | Candidates to keep |
+
+#### `ner_pipeline_noop_reranker`
+
+Pass-through (no reranking).
+
+**Config Options:** None
+
+### Disambiguator Components
+
+#### `ner_pipeline_lela_vllm_disambiguator`
+
+vLLM-based LLM disambiguation with tournament strategy.
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model_name` | str | "Qwen/Qwen3-8B" | LLM model |
+| `tensor_parallel_size` | int | 1 | GPU parallelism |
+| `max_model_len` | int | None | Max context length |
+| `add_none_candidate` | bool | False | Add "None" option |
+| `add_descriptions` | bool | True | Include descriptions |
+| `disable_thinking` | bool | False | Disable reasoning |
+| `system_prompt` | str | LELA default | Custom prompt |
+| `generation_config` | dict | {} | vLLM generation settings |
+| `self_consistency_k` | int | 1 | Voting samples |
+
+**Requires initialization:**
+```python
+component = nlp.add_pipe("ner_pipeline_lela_vllm_disambiguator")
+component.initialize(kb)
+```
+
+#### `ner_pipeline_first_disambiguator`
+
+Select first candidate.
+
+**Requires initialization:** Yes (needs KB reference)
+
+#### `ner_pipeline_popularity_disambiguator`
+
+Select by highest score (first in sorted list).
+
+**Requires initialization:** Yes (needs KB reference)
 
 ## Data Types
 
@@ -162,31 +387,6 @@ doc = Document(
 | `id` | str | Unique document identifier |
 | `text` | str | Document text content |
 | `meta` | Dict | Optional metadata dictionary |
-
-### Mention
-
-Represents a raw NER output - an entity mention in text.
-
-```python
-from ner_pipeline.types import Mention
-
-mention = Mention(
-    start=0,
-    end=15,
-    text="Albert Einstein",
-    label="PERSON",
-    context="Albert Einstein was born in Germany."
-)
-```
-
-**Attributes:**
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `start` | int | Start character position in text |
-| `end` | int | End character position in text |
-| `text` | str | The mention text |
-| `label` | str | Entity type label (e.g., "PERSON", "ORG") |
-| `context` | Optional[str] | Surrounding context |
 
 ### Entity
 
@@ -232,160 +432,71 @@ candidate = Candidate(
 | `score` | float | Relevance score |
 | `description` | str | Entity description |
 
-### ResolvedMention
+### LELA Candidate Format
 
-Represents a mention with its resolved entity and candidates.
+Internally, spaCy components use LELA format for candidates:
 
 ```python
-from ner_pipeline.types import ResolvedMention
-
-resolved = ResolvedMention(
-    mention=mention,
-    entity=entity,  # Optional - resolved entity
-    candidates=[candidate1, candidate2, candidate3]
-)
+# List of (title, description) tuples
+candidates = [
+    ("Albert Einstein", "German-born theoretical physicist"),
+    ("Einstein Bros. Bagels", "American bagel chain"),
+]
 ```
 
-**Attributes:**
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `mention` | Mention | The original mention |
-| `entity` | Optional[Entity] | The resolved entity |
-| `candidates` | List[Candidate] | List of candidates |
+Convert to Candidate objects for output:
+```python
+from ner_pipeline.types import tuples_to_candidates
+candidates = tuples_to_candidates(tuples_list)
+```
 
 ## Configuration
 
-### Configuration Format
+### Component Options Summary
 
-Pipeline configuration uses JSON format with the following structure:
+#### Config Name → spaCy Factory Mapping
 
-```json
-{
-  "loader": {
-    "name": "<loader_name>",
-    "params": {}
-  },
-  "ner": {
-    "name": "<ner_name>",
-    "params": {}
-  },
-  "candidate_generator": {
-    "name": "<generator_name>",
-    "params": {}
-  },
-  "reranker": {
-    "name": "<reranker_name>",
-    "params": {}
-  },
-  "disambiguator": {
-    "name": "<disambiguator_name>",
-    "params": {}
-  },
-  "knowledge_base": {
-    "name": "<kb_name>",
-    "params": {}
-  },
-  "cache_dir": ".ner_cache",
-  "batch_size": 1
-}
-```
+| Config Name | spaCy Factory |
+|-------------|---------------|
+| **NER** | |
+| `lela_gliner` | `ner_pipeline_lela_gliner` |
+| `simple` | `ner_pipeline_simple` |
+| `gliner` | `ner_pipeline_gliner` |
+| `transformers` | `ner_pipeline_transformers` |
+| `spacy` | Built-in NER + `ner_pipeline_ner_filter` |
+| **Candidate Generators** | |
+| `lela_bm25` | `ner_pipeline_lela_bm25_candidates` |
+| `lela_dense` | `ner_pipeline_lela_dense_candidates` |
+| `fuzzy` | `ner_pipeline_fuzzy_candidates` |
+| `bm25` | `ner_pipeline_bm25_candidates` |
+| **Rerankers** | |
+| `lela_embedder` | `ner_pipeline_lela_embedder_reranker` |
+| `cross_encoder` | `ner_pipeline_cross_encoder_reranker` |
+| `none` | `ner_pipeline_noop_reranker` |
+| **Disambiguators** | |
+| `lela_vllm` | `ner_pipeline_lela_vllm_disambiguator` |
+| `first` | `ner_pipeline_first_disambiguator` |
+| `popularity` | `ner_pipeline_popularity_disambiguator` |
 
-### Component Options
+#### Loaders (Registry-based)
 
-#### Loaders
-| Name | Parameters | Description |
-|------|------------|-------------|
-| `text` | - | Plain text files |
-| `pdf` | - | PDF documents |
-| `docx` | - | Word documents |
-| `html` | - | HTML pages |
-| `json` | - | JSON files |
-| `jsonl` | - | JSON Lines files |
+| Name | Description |
+|------|-------------|
+| `text` | Plain text files |
+| `pdf` | PDF documents |
+| `docx` | Word documents |
+| `html` | HTML pages |
+| `json` | JSON files |
+| `jsonl` | JSON Lines files |
 
-#### NER Models
-| Name | Parameters | Description |
-|------|------------|-------------|
-| `simple` | `min_len`, `context_mode` | Regex-based NER |
-| `spacy` | `model`, `context_mode` | spaCy NER |
-| `gliner` | `model_name`, `labels`, `threshold`, `context_mode` | GLiNER zero-shot NER |
-| `transformers` | `model_name`, `context_mode` | HuggingFace transformers NER |
-| `lela_gliner` | `model_name`, `labels`, `threshold`, `context_mode` | LELA GLiNER with defaults |
+#### Knowledge Bases (Registry-based)
 
-#### Candidate Generators
-| Name | Parameters | Description |
-|------|------------|-------------|
-| `fuzzy` | `top_k` | RapidFuzz string matching |
-| `bm25` | `top_k`, `use_context` | BM25 retrieval |
-| `dense` | `model_name`, `top_k`, `use_context` | Dense retrieval with FAISS |
-| `lela_bm25` | `top_k`, `use_context`, `stemmer_language` | bm25s with stemming |
-| `lela_dense` | `model_name`, `top_k`, `base_url`, `port`, `use_context` | OpenAI-compatible embeddings |
-
-#### Rerankers
-| Name | Parameters | Description |
-|------|------------|-------------|
-| `none` | - | No reranking |
-| `cross_encoder` | `model_name`, `top_k` | Cross-encoder reranking |
-| `lela_embedder` | `model_name`, `top_k`, `base_url`, `port` | LELA embedding reranker |
-
-#### Disambiguators
-| Name | Parameters | Description |
-|------|------------|-------------|
-| `first` | - | Select first candidate |
-| `popularity` | - | Select by highest score |
-| `llm` | `model_name` | HuggingFace zero-shot classification |
-| `lela_vllm` | `model_name`, `tensor_parallel_size`, `max_model_len`, ... | vLLM-based disambiguation |
-
-#### Knowledge Bases
 | Name | Parameters | Description |
 |------|------------|-------------|
 | `custom` | `path` | Custom JSONL KB |
 | `lela_jsonl` | `path`, `title_field`, `description_field` | LELA-format JSONL KB |
 | `wikipedia` | - | Wikipedia API |
 | `wikidata` | - | Wikidata SPARQL |
-
-## Registry System
-
-Components are registered using a decorator-based registry pattern.
-
-**Location:** `ner_pipeline/registry.py`
-
-### Available Registries
-
-```python
-from ner_pipeline.registry import (
-    loaders,
-    ner_models,
-    candidate_generators,
-    rerankers,
-    disambiguators,
-    knowledge_bases
-)
-```
-
-### Registering Custom Components
-
-```python
-from ner_pipeline.registry import ner_models
-
-@ner_models.register("my_custom_ner")
-class MyCustomNER:
-    def __init__(self, param1: str = "default"):
-        self.param1 = param1
-
-    def extract(self, text: str) -> List[Mention]:
-        # Implementation
-        return mentions
-```
-
-### Retrieving Components
-
-```python
-# Get factory function
-factory = ner_models.get("my_custom_ner")
-
-# Instantiate with parameters
-ner = factory(param1="custom_value")
-```
 
 ## Context Extraction
 
@@ -445,7 +556,7 @@ import json
 with open("config.json") as f:
     config = PipelineConfig.from_dict(json.load(f))
 
-# Create pipeline
+# Create pipeline (builds spaCy nlp internally)
 pipeline = NERPipeline(config)
 
 # Process single document
@@ -464,6 +575,36 @@ for entity in result["entities"]:
     print(f"  Candidates: {len(entity['candidates'])}")
 ```
 
+### Direct spaCy Usage
+
+```python
+import spacy
+from ner_pipeline import spacy_components  # Register factories
+from ner_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
+
+# Build custom pipeline
+nlp = spacy.blank("en")
+nlp.add_pipe("ner_pipeline_simple", config={"min_len": 3})
+cand_component = nlp.add_pipe("ner_pipeline_fuzzy_candidates", config={"top_k": 10})
+disamb_component = nlp.add_pipe("ner_pipeline_first_disambiguator")
+
+# Initialize with knowledge base
+kb = CustomJSONLKnowledgeBase(path="kb.jsonl")
+cand_component.initialize(kb)
+disamb_component.initialize(kb)
+
+# Process text
+doc = nlp("Albert Einstein was born in Germany.")
+
+# Access entities and their attributes
+for ent in doc.ents:
+    print(f"Entity: {ent.text} ({ent.label_})")
+    print(f"  Context: {ent._.context}")
+    print(f"  Candidates: {len(ent._.candidates)}")
+    if ent._.resolved_entity:
+        print(f"  Resolved: {ent._.resolved_entity.title}")
+```
+
 ### Processing Multiple Files
 
 ```python
@@ -476,31 +617,6 @@ results = pipeline.run(
 # Results are also returned
 for result in results:
     print(f"Document {result['id']}: {len(result['entities'])} entities")
-```
-
-### Custom Component Integration
-
-```python
-from ner_pipeline.registry import ner_models
-from ner_pipeline.types import Mention
-from typing import List
-
-@ner_models.register("custom_ner")
-class CustomNER:
-    def __init__(self, custom_param: str = "default"):
-        self.custom_param = custom_param
-
-    def extract(self, text: str) -> List[Mention]:
-        # Custom NER logic
-        mentions = []
-        # ... implementation ...
-        return mentions
-
-# Use in configuration
-config_dict = {
-    "ner": {"name": "custom_ner", "params": {"custom_param": "value"}},
-    # ... rest of config
-}
 ```
 
 ### Working with Knowledge Bases
@@ -565,7 +681,7 @@ config_dict = {
 
 ## Output Format
 
-The pipeline outputs JSONL (JSON Lines) format, with one JSON object per line representing each processed document:
+The pipeline outputs JSONL (JSON Lines) format:
 
 ```json
 {

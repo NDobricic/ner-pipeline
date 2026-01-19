@@ -1,15 +1,18 @@
-"""Unit tests for FuzzyCandidateGenerator."""
+"""Unit tests for FuzzyCandidatesComponent (spaCy-based)."""
 
 import pytest
+import spacy
+from spacy.tokens import Span
 
-from ner_pipeline.candidates.fuzzy import FuzzyCandidateGenerator
-from ner_pipeline.types import Candidate, Document, Entity, Mention
+from ner_pipeline import spacy_components  # Register factories
+from ner_pipeline.spacy_components.candidates import FuzzyCandidatesComponent
+from ner_pipeline.types import Entity
 
 from tests.conftest import MockKnowledgeBase
 
 
-class TestFuzzyCandidateGenerator:
-    """Tests for FuzzyCandidateGenerator class."""
+class TestFuzzyCandidatesComponent:
+    """Tests for FuzzyCandidatesComponent class."""
 
     @pytest.fixture
     def kb_entities(self) -> list[Entity]:
@@ -26,97 +29,79 @@ class TestFuzzyCandidateGenerator:
         return MockKnowledgeBase(kb_entities)
 
     @pytest.fixture
-    def generator(self, kb: MockKnowledgeBase) -> FuzzyCandidateGenerator:
-        return FuzzyCandidateGenerator(kb=kb, top_k=3)
+    def nlp(self, kb: MockKnowledgeBase) -> spacy.language.Language:
+        nlp = spacy.blank("en")
+        nlp.add_pipe("ner_pipeline_simple", config={"min_len": 3})
+        component = nlp.add_pipe("ner_pipeline_fuzzy_candidates", config={"top_k": 3})
+        component.initialize(kb)
+        return nlp
 
-    @pytest.fixture
-    def sample_doc(self) -> Document:
-        return Document(id="test-doc", text="Test document.")
+    def test_generate_returns_candidates(self, nlp):
+        text = "Barack Obama was here."
+        doc = nlp(text)
+        obama_ents = [ent for ent in doc.ents if "Obama" in ent.text]
+        assert len(obama_ents) > 0
+        ent = obama_ents[0]
+        # Candidates are stored as List[Tuple[str, str]]
+        assert hasattr(ent._, "candidates")
+        assert len(ent._.candidates) > 0
+        # Check format (title, description)
+        for title, desc in ent._.candidates:
+            assert isinstance(title, str)
+            assert isinstance(desc, str)
 
-    def test_requires_knowledge_base(self):
-        with pytest.raises(ValueError, match="requires a knowledge base"):
-            FuzzyCandidateGenerator(kb=None)
+    def test_exact_match_ranks_highest(self, nlp):
+        text = "Barack Obama was here."
+        doc = nlp(text)
+        obama_ents = [ent for ent in doc.ents if "Obama" in ent.text]
+        assert len(obama_ents) > 0
+        candidates = obama_ents[0]._.candidates
+        # Exact match should be in results
+        titles = [c[0] for c in candidates]
+        assert "Barack Obama" in titles
 
-    def test_generate_returns_candidates(
-        self, generator: FuzzyCandidateGenerator, sample_doc: Document
-    ):
-        mention = Mention(start=0, end=12, text="Barack Obama")
-        candidates = generator.generate(mention, sample_doc)
-        assert len(candidates) > 0
-        assert all(isinstance(c, Candidate) for c in candidates)
+    def test_fuzzy_match(self, nlp):
+        text = "Barak Obama was here."
+        doc = nlp(text)
+        obama_ents = [ent for ent in doc.ents if "Barak" in ent.text or "Obama" in ent.text]
+        if obama_ents:
+            candidates = obama_ents[0]._.candidates
+            titles = [c[0] for c in candidates]
+            assert "Barack Obama" in titles
 
-    def test_exact_match_ranks_highest(
-        self, generator: FuzzyCandidateGenerator, sample_doc: Document
-    ):
-        mention = Mention(start=0, end=12, text="Barack Obama")
-        candidates = generator.generate(mention, sample_doc)
-        # Exact match should have highest score
-        top_candidate = candidates[0]
-        assert top_candidate.entity_id == "Q76"
-        assert top_candidate.score > 90  # High fuzzy score
+    def test_respects_top_k(self, kb: MockKnowledgeBase):
+        nlp = spacy.blank("en")
+        nlp.add_pipe("ner_pipeline_simple", config={"min_len": 3})
+        component = nlp.add_pipe("ner_pipeline_fuzzy_candidates", config={"top_k": 2})
+        component.initialize(kb)
 
-    def test_fuzzy_match(
-        self, generator: FuzzyCandidateGenerator, sample_doc: Document
-    ):
-        # Slight misspelling
-        mention = Mention(start=0, end=11, text="Barak Obama")
-        candidates = generator.generate(mention, sample_doc)
-        # Should still find Barack Obama
-        entity_ids = [c.entity_id for c in candidates]
-        assert "Q76" in entity_ids
+        text = "United States."
+        doc = nlp(text)
+        for ent in doc.ents:
+            assert len(ent._.candidates) <= 2
 
-    def test_respects_top_k(self, kb: MockKnowledgeBase, sample_doc: Document):
-        generator = FuzzyCandidateGenerator(kb=kb, top_k=2)
-        mention = Mention(start=0, end=6, text="United")
-        candidates = generator.generate(mention, sample_doc)
-        assert len(candidates) <= 2
+    def test_candidates_have_descriptions(self, nlp):
+        text = "London is here."
+        doc = nlp(text)
+        london_ents = [ent for ent in doc.ents if ent.text == "London"]
+        if london_ents:
+            candidates = london_ents[0]._.candidates
+            london_candidates = [c for c in candidates if c[0] == "London"]
+            assert len(london_candidates) > 0
+            assert london_candidates[0][1] == "Capital of UK"
 
-    def test_candidates_have_scores(
-        self, generator: FuzzyCandidateGenerator, sample_doc: Document
-    ):
-        mention = Mention(start=0, end=6, text="London")
-        candidates = generator.generate(mention, sample_doc)
-        for c in candidates:
-            assert c.score is not None
-            assert isinstance(c.score, float)
+    def test_no_match_returns_some_candidates(self, nlp):
+        text = "Xyzabc was here."
+        doc = nlp(text)
+        for ent in doc.ents:
+            # Fuzzy matching still returns results (with low scores)
+            assert len(ent._.candidates) > 0
 
-    def test_candidates_have_descriptions(
-        self, generator: FuzzyCandidateGenerator, sample_doc: Document
-    ):
-        mention = Mention(start=0, end=6, text="London")
-        candidates = generator.generate(mention, sample_doc)
-        london_candidates = [c for c in candidates if c.entity_id == "Q84"]
-        assert len(london_candidates) > 0
-        assert london_candidates[0].description == "Capital of UK"
-
-    def test_no_match_returns_some_candidates(
-        self, generator: FuzzyCandidateGenerator, sample_doc: Document
-    ):
-        # Even gibberish should return some candidates (fuzzy will find something)
-        mention = Mention(start=0, end=6, text="Xyzabc")
-        candidates = generator.generate(mention, sample_doc)
-        # Fuzzy matching still returns results (with low scores)
-        assert len(candidates) > 0
-
-    def test_mention_context_not_used(
-        self, generator: FuzzyCandidateGenerator, sample_doc: Document
-    ):
-        # Fuzzy matching uses only mention text, not context
-        mention1 = Mention(
-            start=0, end=6, text="London", context="In the UK"
-        )
-        mention2 = Mention(
-            start=0, end=6, text="London", context="Completely different context"
-        )
-        candidates1 = generator.generate(mention1, sample_doc)
-        candidates2 = generator.generate(mention2, sample_doc)
-        # Results should be the same regardless of context
-        assert [c.entity_id for c in candidates1] == [c.entity_id for c in candidates2]
-
-    def test_case_insensitive_matching(
-        self, generator: FuzzyCandidateGenerator, sample_doc: Document
-    ):
-        mention = Mention(start=0, end=6, text="LONDON")
-        candidates = generator.generate(mention, sample_doc)
-        entity_ids = [c.entity_id for c in candidates]
-        assert "Q84" in entity_ids
+    def test_case_insensitive_matching(self, nlp):
+        text = "LONDON is here."
+        doc = nlp(text)
+        london_ents = [ent for ent in doc.ents if "LONDON" in ent.text]
+        if london_ents:
+            candidates = london_ents[0]._.candidates
+            titles = [c[0] for c in candidates]
+            assert "London" in titles

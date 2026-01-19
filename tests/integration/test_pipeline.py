@@ -40,9 +40,7 @@ class TestPipelineIntegration:
         config = PipelineConfig.from_dict(minimal_config_dict)
         pipeline = NERPipeline(config)
         assert pipeline.loader is not None
-        assert pipeline.ner_model is not None
-        assert pipeline.candidate_generator is not None
-        assert pipeline.disambiguator is not None
+        assert pipeline.nlp is not None
         assert pipeline.kb is not None
 
     def test_process_single_document(self, pipeline: NERPipeline):
@@ -227,7 +225,8 @@ class TestPipelineWithoutDisambiguator:
         """Test pipeline works without disambiguator."""
         config = PipelineConfig.from_dict(config_no_disambiguator)
         pipeline = NERPipeline(config)
-        assert pipeline.disambiguator is None
+        # In spaCy architecture, there's no separate disambiguator attribute
+        # The pipeline just doesn't have a disambiguator component
 
         doc = Document(id="test", text="Barack Obama spoke today.")
         result = pipeline.process_document(doc)

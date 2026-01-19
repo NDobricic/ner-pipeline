@@ -1,6 +1,6 @@
 # Command-Line Interface (CLI) Documentation
 
-The NER Pipeline provides a command-line interface for processing documents from the terminal.
+The NER Pipeline provides a command-line interface for processing documents. Under the hood, the CLI uses spaCy's pipeline architecture for all NER and entity linking operations.
 
 ## Table of Contents
 
@@ -50,7 +50,7 @@ python cli.py --config <config_file> --input <input_files...> [--output <output_
 
 ## Configuration File
 
-The CLI requires a JSON configuration file that specifies all pipeline components.
+The CLI uses a JSON configuration file that maps to spaCy pipeline components.
 
 ### Configuration Structure
 
@@ -85,6 +85,32 @@ The CLI requires a JSON configuration file that specifies all pipeline component
 }
 ```
 
+### Config to spaCy Factory Mapping
+
+The configuration names map to spaCy component factories:
+
+| Config Name | spaCy Factory | Description |
+|-------------|---------------|-------------|
+| **NER** | | |
+| `simple` | `ner_pipeline_simple` | Regex-based NER |
+| `spacy` | Built-in + filter | spaCy's pretrained NER |
+| `gliner` | `ner_pipeline_gliner` | GLiNER zero-shot |
+| `transformers` | `ner_pipeline_transformers` | HuggingFace NER |
+| `lela_gliner` | `ner_pipeline_lela_gliner` | LELA GLiNER |
+| **Candidate Generators** | | |
+| `fuzzy` | `ner_pipeline_fuzzy_candidates` | RapidFuzz matching |
+| `bm25` | `ner_pipeline_bm25_candidates` | rank-bm25 retrieval |
+| `lela_bm25` | `ner_pipeline_lela_bm25_candidates` | bm25s retrieval |
+| `lela_dense` | `ner_pipeline_lela_dense_candidates` | Dense retrieval |
+| **Rerankers** | | |
+| `none` | `ner_pipeline_noop_reranker` | No reranking |
+| `cross_encoder` | `ner_pipeline_cross_encoder_reranker` | Cross-encoder |
+| `lela_embedder` | `ner_pipeline_lela_embedder_reranker` | Embedding reranker |
+| **Disambiguators** | | |
+| `first` | `ner_pipeline_first_disambiguator` | Select first |
+| `popularity` | `ner_pipeline_popularity_disambiguator` | Select by score |
+| `lela_vllm` | `ner_pipeline_lela_vllm_disambiguator` | vLLM disambiguation |
+
 ### Example Configurations
 
 #### Minimal Configuration (Simple NER + Fuzzy Matching)
@@ -111,7 +137,7 @@ The CLI requires a JSON configuration file that specifies all pipeline component
   },
   "candidate_generator": {
     "name": "bm25",
-    "params": {"top_k": 20, "use_context": true}
+    "params": {"top_k": 20}
   },
   "reranker": {
     "name": "cross_encoder",

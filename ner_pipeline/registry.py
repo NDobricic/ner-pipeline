@@ -1,3 +1,11 @@
+"""
+Component registry for NER pipeline.
+
+Provides pluggable component registration for document loaders
+and knowledge bases. NER, candidate generation, reranking, and
+disambiguation components are spaCy factories (see spacy_components/).
+"""
+
 from typing import Any, Callable, Dict, TypeVar
 
 T = TypeVar("T")
@@ -28,11 +36,6 @@ class ComponentRegistry:
         return dict(self._registry)
 
 
-# Registries per component type
+# Registries for custom components (loaders and KBs only)
 loaders = ComponentRegistry()
-ner_models = ComponentRegistry()
-candidate_generators = ComponentRegistry()
-rerankers = ComponentRegistry()
-disambiguators = ComponentRegistry()
 knowledge_bases = ComponentRegistry()
-

@@ -76,12 +76,18 @@ class MockKnowledgeBase:
 
     def __init__(self, entities: Optional[List[Entity]] = None):
         self._entities: Dict[str, Entity] = {}
+        self._by_title: Dict[str, Entity] = {}
         if entities:
             for e in entities:
                 self._entities[e.id] = e
+                self._by_title[e.title] = e
 
     def get_entity(self, entity_id: str) -> Optional[Entity]:
-        return self._entities.get(entity_id)
+        # Try by ID first, then by title (for LELA compatibility)
+        result = self._entities.get(entity_id)
+        if result is None:
+            result = self._by_title.get(entity_id)
+        return result
 
     def search(self, query: str, top_k: int = 10) -> List[Entity]:
         # Simple substring match for testing

@@ -1,12 +1,12 @@
 # LELA Integration Documentation
 
-LELA (LLM-based Entity Linking Approach) is a methodology for entity linking that leverages the reasoning capabilities of large language models without requiring fine-tuning. This document describes the LELA integration in the NER Pipeline.
+LELA (LLM-based Entity Linking Approach) is a methodology for entity linking that leverages the reasoning capabilities of large language models without requiring fine-tuning. This document describes the LELA integration in the NER Pipeline, implemented as spaCy components.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [LELA Methodology](#lela-methodology)
-- [LELA Components](#lela-components)
+- [LELA spaCy Components](#lela-spacy-components)
 - [Configuration](#configuration)
 - [LELA Module Structure](#lela-module-structure)
 - [Usage Examples](#usage-examples)
@@ -75,9 +75,9 @@ Output: [Paris (city), Paris (novel), Paris (Texas), Paris Hilton, ...]
 ```
 
 LELA is retriever-agnostic and supports:
-- BM25 (keyword-based)
-- Dense retrieval (semantic embeddings)
-- Fuzzy matching (string similarity)
+- BM25 (keyword-based) → `ner_pipeline_lela_bm25_candidates`
+- Dense retrieval (semantic embeddings) → `ner_pipeline_lela_dense_candidates`
+- Fuzzy matching (string similarity) → `ner_pipeline_fuzzy_candidates`
 
 #### Stage 2: Candidate Selection (Disambiguation)
 
@@ -88,6 +88,8 @@ Input: Context + Mention + Candidates
 LLM Reasoning: "The mention 'Paris' appears in context about Olympics in France..."
 Output: Paris (city)
 ```
+
+Implemented via: `ner_pipeline_lela_vllm_disambiguator`
 
 ### Tournament Strategy
 
@@ -131,11 +133,11 @@ Candidates:
 Answer:
 ```
 
-## LELA Components
+## LELA spaCy Components
 
-The pipeline includes LELA-specific implementations for each stage.
+All LELA components are implemented as spaCy pipeline factories.
 
-### LELA NER: `lela_gliner`
+### LELA NER: `ner_pipeline_lela_gliner`
 
 Zero-shot NER using GLiNER with LELA defaults.
 
@@ -150,6 +152,16 @@ Zero-shot NER using GLiNER with LELA defaults.
 - product
 
 **Configuration:**
+```python
+nlp.add_pipe("ner_pipeline_lela_gliner", config={
+    "model_name": "numind/NuNER_Zero-span",
+    "labels": ["person", "organization", "location"],
+    "threshold": 0.5,
+    "context_mode": "sentence"
+})
+```
+
+**JSON Config:**
 ```json
 {
   "name": "lela_gliner",
@@ -163,7 +175,7 @@ Zero-shot NER using GLiNER with LELA defaults.
 
 ### LELA Candidate Generation
 
-#### `lela_bm25`
+#### `ner_pipeline_lela_bm25_candidates`
 
 Fast BM25 retrieval using bm25s library with stemming.
 
@@ -172,7 +184,17 @@ Fast BM25 retrieval using bm25s library with stemming.
 - Language-specific stemming (PyStemmer)
 - Context integration
 
-**Configuration:**
+**spaCy Usage:**
+```python
+cand = nlp.add_pipe("ner_pipeline_lela_bm25_candidates", config={
+    "top_k": 64,
+    "use_context": True,
+    "stemmer_language": "english"
+})
+cand.initialize(kb)
+```
+
+**JSON Config:**
 ```json
 {
   "name": "lela_bm25",
@@ -184,7 +206,7 @@ Fast BM25 retrieval using bm25s library with stemming.
 }
 ```
 
-#### `lela_dense`
+#### `ner_pipeline_lela_dense_candidates`
 
 Dense retrieval using OpenAI-compatible embedding API.
 
@@ -197,7 +219,19 @@ from the knowledge base that the mention refers to.
 Query: {mention_text}
 ```
 
-**Configuration:**
+**spaCy Usage:**
+```python
+cand = nlp.add_pipe("ner_pipeline_lela_dense_candidates", config={
+    "model_name": "Qwen/Qwen3-Embedding-4B",
+    "top_k": 64,
+    "base_url": "http://localhost",
+    "port": 8000,
+    "use_context": True
+})
+cand.initialize(kb)
+```
+
+**JSON Config:**
 ```json
 {
   "name": "lela_dense",
@@ -210,7 +244,7 @@ Query: {mention_text}
 }
 ```
 
-### LELA Reranking: `lela_embedder`
+### LELA Reranking: `ner_pipeline_lela_embedder_reranker`
 
 Cosine similarity reranking with marked mentions.
 
@@ -230,7 +264,17 @@ refers to.
 Query: France hosted the Olympics in [Paris].
 ```
 
-**Configuration:**
+**spaCy Usage:**
+```python
+nlp.add_pipe("ner_pipeline_lela_embedder_reranker", config={
+    "model_name": "Qwen/Qwen3-Embedding-4B",
+    "top_k": 10,
+    "base_url": "http://localhost",
+    "port": 8000
+})
+```
+
+**JSON Config:**
 ```json
 {
   "name": "lela_embedder",
@@ -243,7 +287,7 @@ Query: France hosted the Olympics in [Paris].
 }
 ```
 
-### LELA Disambiguation: `lela_vllm`
+### LELA Disambiguation: `ner_pipeline_lela_vllm_disambiguator`
 
 LLM-based disambiguation using vLLM for efficient inference.
 
@@ -255,7 +299,20 @@ LLM-based disambiguation using vLLM for efficient inference.
 - "None" candidate option
 - Structured output parsing
 
-**Configuration:**
+**spaCy Usage:**
+```python
+disamb = nlp.add_pipe("ner_pipeline_lela_vllm_disambiguator", config={
+    "model_name": "Qwen/Qwen3-8B",
+    "tensor_parallel_size": 1,
+    "add_none_candidate": True,
+    "add_descriptions": True,
+    "disable_thinking": False,
+    "self_consistency_k": 1
+})
+disamb.initialize(kb)
+```
+
+**JSON Config:**
 ```json
 {
   "name": "lela_vllm",
@@ -280,7 +337,7 @@ LELA-format JSONL knowledge base where title serves as ID.
 {"title": "Paris", "description": "Capital city of France"}
 ```
 
-**Configuration:**
+**JSON Config:**
 ```json
 {
   "name": "lela_jsonl",
@@ -431,7 +488,7 @@ Singleton pools for resource management.
 
 ## Usage Examples
 
-### Python API with LELA
+### Python API with LELA (via NERPipeline)
 
 ```python
 from ner_pipeline.config import PipelineConfig
@@ -453,6 +510,49 @@ pipeline = NERPipeline(config)
 
 # Process document
 results = pipeline.run(["document.txt"], output_path="results.jsonl")
+```
+
+### Direct spaCy Usage with LELA Components
+
+```python
+import spacy
+from ner_pipeline import spacy_components  # Register factories
+from ner_pipeline.knowledge_bases.lela import LELAJSONLKnowledgeBase
+
+# Build LELA pipeline manually
+nlp = spacy.blank("en")
+
+# Add LELA NER
+nlp.add_pipe("ner_pipeline_lela_gliner", config={
+    "threshold": 0.5,
+    "labels": ["person", "organization", "location"]
+})
+
+# Add BM25 candidates
+cand = nlp.add_pipe("ner_pipeline_lela_bm25_candidates", config={
+    "top_k": 64,
+    "use_context": True
+})
+
+# Add reranker (optional)
+nlp.add_pipe("ner_pipeline_noop_reranker")
+
+# Add disambiguator
+disamb = nlp.add_pipe("ner_pipeline_first_disambiguator")
+
+# Initialize with KB
+kb = LELAJSONLKnowledgeBase(path="kb.jsonl")
+cand.initialize(kb)
+disamb.initialize(kb)
+
+# Process text
+doc = nlp("Albert Einstein was born in Germany.")
+for ent in doc.ents:
+    print(f"Entity: {ent.text}")
+    print(f"  Context: {ent._.context}")
+    print(f"  Candidates: {len(ent._.candidates)}")
+    if ent._.resolved_entity:
+        print(f"  Resolved: {ent._.resolved_entity.title}")
 ```
 
 ### CLI with LELA

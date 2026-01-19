@@ -1,4 +1,4 @@
-"""Unit tests for LELADenseCandidateGenerator."""
+"""Unit tests for LELADenseCandidatesComponent."""
 
 import json
 import os
@@ -7,13 +7,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import numpy as np
+import spacy
+from spacy.tokens import Span
 
 from ner_pipeline.types import Candidate, Document, Mention
 from ner_pipeline.knowledge_bases.lela_jsonl import LELAJSONLKnowledgeBase
 
 
-class TestLELADenseCandidateGenerator:
-    """Tests for LELADenseCandidateGenerator class."""
+class TestLELADenseCandidatesComponent:
+    """Tests for LELADenseCandidatesComponent class."""
 
     @pytest.fixture
     def lela_kb_data(self) -> list[dict]:
@@ -40,16 +42,25 @@ class TestLELADenseCandidateGenerator:
     def sample_doc(self) -> Document:
         return Document(id="test-doc", text="Test document about Obama.")
 
-    @patch("ner_pipeline.candidates.lela_dense._get_faiss")
-    @patch("ner_pipeline.candidates.lela_dense.embedder_pool")
-    def test_requires_knowledge_base(self, mock_pool, mock_faiss):
-        from ner_pipeline.candidates.lela_dense import LELADenseCandidateGenerator
-        with pytest.raises(ValueError, match="requires a knowledge base"):
-            LELADenseCandidateGenerator(kb=None)
+    @pytest.fixture
+    def nlp(self):
+        return spacy.blank("en")
 
-    @patch("ner_pipeline.candidates.lela_dense._get_faiss")
-    @patch("ner_pipeline.candidates.lela_dense.embedder_pool")
-    def test_initialization_embeds_entities(self, mock_pool, mock_faiss, kb):
+    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
+    @patch("ner_pipeline.spacy_components.candidates.embedder_pool")
+    def test_requires_knowledge_base(self, mock_pool, mock_faiss, nlp):
+        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
+        # Component returns doc unchanged when not initialized (logs warning)
+        doc = nlp("Test")
+        doc.ents = [Span(doc, 0, 1, label="ENTITY")]
+        result = component(doc)
+        # Candidates should remain empty since KB not initialized
+        assert result.ents[0]._.candidates == []
+
+    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
+    @patch("ner_pipeline.spacy_components.candidates.embedder_pool")
+    def test_initialization_embeds_entities(self, mock_pool, mock_faiss, kb, nlp):
         # Setup mocks
         mock_faiss_module = MagicMock()
         mock_faiss.return_value = mock_faiss_module
@@ -64,8 +75,9 @@ class TestLELADenseCandidateGenerator:
             [0.7, 0.8, 0.9],
         ]
 
-        from ner_pipeline.candidates.lela_dense import LELADenseCandidateGenerator
-        generator = LELADenseCandidateGenerator(kb=kb, top_k=5)
+        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
+        component.initialize(kb)
 
         # Should have called embed with entity texts
         mock_pool.embed.assert_called_once()
@@ -75,9 +87,9 @@ class TestLELADenseCandidateGenerator:
         # Index should have been created
         mock_faiss_module.IndexFlatIP.assert_called_once_with(3)  # dim=3
 
-    @patch("ner_pipeline.candidates.lela_dense._get_faiss")
-    @patch("ner_pipeline.candidates.lela_dense.embedder_pool")
-    def test_generate_returns_candidates(self, mock_pool, mock_faiss, kb, sample_doc):
+    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
+    @patch("ner_pipeline.spacy_components.candidates.embedder_pool")
+    def test_generate_returns_candidates(self, mock_pool, mock_faiss, kb, sample_doc, nlp):
         mock_faiss_module = MagicMock()
         mock_faiss.return_value = mock_faiss_module
 
@@ -91,8 +103,9 @@ class TestLELADenseCandidateGenerator:
             [0.7, 0.8, 0.9],
         ]
 
-        from ner_pipeline.candidates.lela_dense import LELADenseCandidateGenerator
-        generator = LELADenseCandidateGenerator(kb=kb, top_k=5)
+        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
+        component.initialize(kb)
 
         # Query embedding
         mock_pool.embed.return_value = [[0.2, 0.3, 0.4]]
@@ -103,15 +116,17 @@ class TestLELADenseCandidateGenerator:
             np.array([[0, 1]]),  # indices
         )
 
-        mention = Mention(start=0, end=5, text="Obama")
-        candidates = generator.generate(mention, sample_doc)
+        doc = nlp("Obama was president.")
+        doc.ents = [Span(doc, 0, 1, label="ENTITY")]
+        doc = component(doc)
 
+        candidates = doc.ents[0]._.candidates
         assert len(candidates) == 2
-        assert all(isinstance(c, Candidate) for c in candidates)
+        assert all(isinstance(c, tuple) and len(c) == 2 for c in candidates)
 
-    @patch("ner_pipeline.candidates.lela_dense._get_faiss")
-    @patch("ner_pipeline.candidates.lela_dense.embedder_pool")
-    def test_candidates_have_scores(self, mock_pool, mock_faiss, kb, sample_doc):
+    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
+    @patch("ner_pipeline.spacy_components.candidates.embedder_pool")
+    def test_candidates_have_descriptions(self, mock_pool, mock_faiss, kb, sample_doc, nlp):
         mock_faiss_module = MagicMock()
         mock_faiss.return_value = mock_faiss_module
 
@@ -120,34 +135,9 @@ class TestLELADenseCandidateGenerator:
 
         mock_pool.embed.return_value = [[0.1, 0.2, 0.3]] * 3
 
-        from ner_pipeline.candidates.lela_dense import LELADenseCandidateGenerator
-        generator = LELADenseCandidateGenerator(kb=kb, top_k=5)
-
-        mock_pool.embed.return_value = [[0.2, 0.3, 0.4]]
-        mock_index.search.return_value = (
-            np.array([[0.95, 0.85]]),
-            np.array([[0, 1]]),
-        )
-
-        mention = Mention(start=0, end=5, text="Obama")
-        candidates = generator.generate(mention, sample_doc)
-
-        assert candidates[0].score == pytest.approx(0.95, rel=0.01)
-        assert candidates[1].score == pytest.approx(0.85, rel=0.01)
-
-    @patch("ner_pipeline.candidates.lela_dense._get_faiss")
-    @patch("ner_pipeline.candidates.lela_dense.embedder_pool")
-    def test_candidates_have_descriptions(self, mock_pool, mock_faiss, kb, sample_doc):
-        mock_faiss_module = MagicMock()
-        mock_faiss.return_value = mock_faiss_module
-
-        mock_index = MagicMock()
-        mock_faiss_module.IndexFlatIP.return_value = mock_index
-
-        mock_pool.embed.return_value = [[0.1, 0.2, 0.3]] * 3
-
-        from ner_pipeline.candidates.lela_dense import LELADenseCandidateGenerator
-        generator = LELADenseCandidateGenerator(kb=kb, top_k=5)
+        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
+        component.initialize(kb)
 
         mock_pool.embed.return_value = [[0.2, 0.3, 0.4]]
         mock_index.search.return_value = (
@@ -155,16 +145,18 @@ class TestLELADenseCandidateGenerator:
             np.array([[0]]),  # First entity
         )
 
-        mention = Mention(start=0, end=5, text="Obama")
-        candidates = generator.generate(mention, sample_doc)
+        doc = nlp("Obama was president.")
+        doc.ents = [Span(doc, 0, 1, label="ENTITY")]
+        doc = component(doc)
 
+        candidates = doc.ents[0]._.candidates
         # First entity is "Barack Obama"
-        assert candidates[0].entity_id == "Barack Obama"
-        assert candidates[0].description == "44th US President"
+        assert candidates[0][0] == "Barack Obama"
+        assert candidates[0][1] == "44th US President"
 
-    @patch("ner_pipeline.candidates.lela_dense._get_faiss")
-    @patch("ner_pipeline.candidates.lela_dense.embedder_pool")
-    def test_query_includes_task_instruction(self, mock_pool, mock_faiss, kb, sample_doc):
+    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
+    @patch("ner_pipeline.spacy_components.candidates.embedder_pool")
+    def test_query_includes_task_instruction(self, mock_pool, mock_faiss, kb, sample_doc, nlp):
         mock_faiss_module = MagicMock()
         mock_faiss.return_value = mock_faiss_module
 
@@ -177,13 +169,15 @@ class TestLELADenseCandidateGenerator:
             return [[0.1, 0.2, 0.3]] * len(texts)
         mock_pool.embed.side_effect = capture_embed
 
-        from ner_pipeline.candidates.lela_dense import LELADenseCandidateGenerator
-        generator = LELADenseCandidateGenerator(kb=kb, top_k=5)
+        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
+        component.initialize(kb)
 
         mock_index.search.return_value = (np.array([[0.9]]), np.array([[0]]))
 
-        mention = Mention(start=0, end=5, text="Obama")
-        generator.generate(mention, sample_doc)
+        doc = nlp("Obama was president.")
+        doc.ents = [Span(doc, 0, 1, label="ENTITY")]
+        doc = component(doc)
 
         # Second call is the query embedding
         query_text = embed_calls[1][0]
@@ -191,9 +185,9 @@ class TestLELADenseCandidateGenerator:
         assert "Query:" in query_text
         assert "Obama" in query_text
 
-    @patch("ner_pipeline.candidates.lela_dense._get_faiss")
-    @patch("ner_pipeline.candidates.lela_dense.embedder_pool")
-    def test_use_context_includes_context(self, mock_pool, mock_faiss, kb, sample_doc):
+    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
+    @patch("ner_pipeline.spacy_components.candidates.embedder_pool")
+    def test_use_context_includes_context(self, mock_pool, mock_faiss, kb, sample_doc, nlp):
         mock_faiss_module = MagicMock()
         mock_faiss.return_value = mock_faiss_module
 
@@ -206,24 +200,24 @@ class TestLELADenseCandidateGenerator:
             return [[0.1, 0.2, 0.3]] * len(texts)
         mock_pool.embed.side_effect = capture_embed
 
-        from ner_pipeline.candidates.lela_dense import LELADenseCandidateGenerator
-        generator = LELADenseCandidateGenerator(kb=kb, top_k=5, use_context=True)
+        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=True)
+        component.initialize(kb)
 
         mock_index.search.return_value = (np.array([[0.9]]), np.array([[0]]))
 
-        mention = Mention(
-            start=0, end=5, text="Obama",
-            context="was the 44th President"
-        )
-        generator.generate(mention, sample_doc)
+        doc = nlp("Obama was the 44th President")
+        doc.ents = [Span(doc, 0, 1, label="ENTITY")]
+        doc.ents[0]._.context = "was the 44th President"
+        doc = component(doc)
 
         query_text = embed_calls[1][0]
         assert "Obama" in query_text
         assert "44th President" in query_text
 
-    @patch("ner_pipeline.candidates.lela_dense._get_faiss")
-    @patch("ner_pipeline.candidates.lela_dense.embedder_pool")
-    def test_respects_top_k(self, mock_pool, mock_faiss, kb, sample_doc):
+    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
+    @patch("ner_pipeline.spacy_components.candidates.embedder_pool")
+    def test_respects_top_k(self, mock_pool, mock_faiss, kb, sample_doc, nlp):
         mock_faiss_module = MagicMock()
         mock_faiss.return_value = mock_faiss_module
 
@@ -232,8 +226,9 @@ class TestLELADenseCandidateGenerator:
 
         mock_pool.embed.return_value = [[0.1, 0.2, 0.3]] * 3
 
-        from ner_pipeline.candidates.lela_dense import LELADenseCandidateGenerator
-        generator = LELADenseCandidateGenerator(kb=kb, top_k=2)
+        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        component = LELADenseCandidatesComponent(nlp=nlp, top_k=2, use_context=False)
+        component.initialize(kb)
 
         mock_pool.embed.return_value = [[0.2, 0.3, 0.4]]
         mock_index.search.return_value = (
@@ -241,8 +236,9 @@ class TestLELADenseCandidateGenerator:
             np.array([[0, 1]]),
         )
 
-        mention = Mention(start=0, end=5, text="Obama")
-        generator.generate(mention, sample_doc)
+        doc = nlp("Obama was president.")
+        doc.ents = [Span(doc, 0, 1, label="ENTITY")]
+        doc = component(doc)
 
         # Check search was called with correct k
         mock_index.search.assert_called_once()

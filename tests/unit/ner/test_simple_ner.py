@@ -1,119 +1,114 @@
-"""Unit tests for SimpleRegexNER."""
+"""Unit tests for SimpleNERComponent (spaCy-based)."""
 
 import pytest
+import spacy
+from spacy.tokens import Span
 
-from ner_pipeline.ner.simple import SimpleRegexNER
-from ner_pipeline.types import Mention
+from ner_pipeline import spacy_components  # Register factories
+from ner_pipeline.spacy_components.ner import SimpleNERComponent
 
 
-class TestSimpleRegexNER:
-    """Tests for SimpleRegexNER class."""
+class TestSimpleNERComponent:
+    """Tests for SimpleNERComponent class."""
 
     @pytest.fixture
-    def ner(self) -> SimpleRegexNER:
-        return SimpleRegexNER(min_len=3)
+    def nlp(self) -> spacy.language.Language:
+        nlp = spacy.blank("en")
+        nlp.add_pipe("ner_pipeline_simple", config={"min_len": 3})
+        return nlp
 
-    def test_extract_capitalized_words(self, ner: SimpleRegexNER):
+    def test_extract_capitalized_words(self, nlp):
         text = "Barack Obama is the president."
-        mentions = ner.extract(text)
-        texts = [m.text for m in mentions]
+        doc = nlp(text)
+        texts = [ent.text for ent in doc.ents]
         assert "Barack Obama" in texts
 
-    def test_extract_single_capitalized_word(self, ner: SimpleRegexNER):
+    def test_extract_single_capitalized_word(self, nlp):
         text = "London is a great city."
-        mentions = ner.extract(text)
-        texts = [m.text for m in mentions]
+        doc = nlp(text)
+        texts = [ent.text for ent in doc.ents]
         assert "London" in texts
 
     def test_min_length_filter(self):
-        ner = SimpleRegexNER(min_len=5)
+        nlp = spacy.blank("en")
+        nlp.add_pipe("ner_pipeline_simple", config={"min_len": 5})
         text = "Al is here. Barack is too."
-        mentions = ner.extract(text)
-        texts = [m.text for m in mentions]
+        doc = nlp(text)
+        texts = [ent.text for ent in doc.ents]
         assert "Al" not in texts  # Too short
         assert "Barack" in texts  # Long enough
 
-    def test_returns_mention_objects(self, ner: SimpleRegexNER):
+    def test_returns_span_objects(self, nlp):
         text = "Obama spoke."
-        mentions = ner.extract(text)
-        assert len(mentions) > 0
-        assert all(isinstance(m, Mention) for m in mentions)
+        doc = nlp(text)
+        assert len(doc.ents) > 0
+        assert all(isinstance(ent, Span) for ent in doc.ents)
 
-    def test_mention_offsets_are_correct(self, ner: SimpleRegexNER):
-        # Note: regex matches consecutive capitalized words together
-        # "Hello Barack Obama" would be one match, so use lowercase prefix
+    def test_mention_offsets_are_correct(self, nlp):
         text = "the Barack Obama there."
-        mentions = ner.extract(text)
-        obama_mentions = [m for m in mentions if "Barack Obama" in m.text]
-        assert len(obama_mentions) == 1
-        m = obama_mentions[0]
-        assert text[m.start:m.end] == m.text
+        doc = nlp(text)
+        obama_ents = [ent for ent in doc.ents if "Barack Obama" in ent.text]
+        assert len(obama_ents) == 1
+        ent = obama_ents[0]
+        assert text[ent.start_char:ent.end_char] == ent.text
 
-    def test_all_mentions_have_label(self, ner: SimpleRegexNER):
+    def test_all_entities_have_label(self, nlp):
         text = "Barack Obama visited London."
-        mentions = ner.extract(text)
-        for m in mentions:
-            assert m.label == "ENT"
+        doc = nlp(text)
+        for ent in doc.ents:
+            assert ent.label_ == "ENT"
 
-    def test_all_mentions_have_context(self, ner: SimpleRegexNER):
+    def test_all_entities_have_context(self, nlp):
         text = "Barack Obama was the president. He lived in Washington."
-        mentions = ner.extract(text)
-        for m in mentions:
-            assert m.context is not None
-            assert m.text in m.context or m.context != ""
+        doc = nlp(text)
+        for ent in doc.ents:
+            assert hasattr(ent._, "context")
+            assert ent._.context is not None
 
-    def test_no_mentions_in_lowercase_text(self, ner: SimpleRegexNER):
+    def test_no_entities_in_lowercase_text(self, nlp):
         text = "this is all lowercase text without any entities."
-        mentions = ner.extract(text)
-        assert len(mentions) == 0
+        doc = nlp(text)
+        assert len(doc.ents) == 0
 
-    def test_hyphenated_names(self, ner: SimpleRegexNER):
+    def test_hyphenated_names(self, nlp):
         text = "Mary-Jane went home."
-        mentions = ner.extract(text)
-        texts = [m.text for m in mentions]
+        doc = nlp(text)
+        texts = [ent.text for ent in doc.ents]
         assert "Mary-Jane" in texts
 
-    def test_consecutive_capitals(self, ner: SimpleRegexNER):
-        # Note: regex matches consecutive capitalized words together
-        # "The CIA" is one match since both start with capitals
+    def test_consecutive_capitals(self, nlp):
         text = "The CIA is an agency. FBI too."
-        mentions = ner.extract(text)
-        texts = [m.text for m in mentions]
-        # "The CIA" is matched as one entity, "FBI" as another
+        doc = nlp(text)
+        texts = [ent.text for ent in doc.ents]
         assert any("CIA" in t for t in texts)
         assert "FBI" in texts
 
-    def test_sentence_start_detection(self, ner: SimpleRegexNER):
-        # Words at sentence start that are capitalized but not entities
-        # The regex is simple and will match them anyway
+    def test_sentence_start_detection(self, nlp):
         text = "The president spoke."
-        mentions = ner.extract(text)
-        texts = [m.text for m in mentions]
+        doc = nlp(text)
+        texts = [ent.text for ent in doc.ents]
         assert "The" in texts  # Simple regex matches this
 
     def test_context_mode_parameter(self):
-        ner = SimpleRegexNER(min_len=3, context_mode="window")
-        # Use lowercase padding to ensure "Barack Obama" is a separate match
+        nlp = spacy.blank("en")
+        nlp.add_pipe("ner_pipeline_simple", config={"min_len": 3, "context_mode": "window"})
         text = "aaa aaa aaa " + "Barack Obama" + " bbb bbb bbb"
-        mentions = ner.extract(text)
-        obama_mentions = [m for m in mentions if "Barack Obama" in m.text]
-        assert len(obama_mentions) == 1
-        # Window mode should produce context
+        doc = nlp(text)
+        obama_ents = [ent for ent in doc.ents if "Barack Obama" in ent.text]
+        assert len(obama_ents) == 1
 
-    def test_empty_text(self, ner: SimpleRegexNER):
-        mentions = ner.extract("")
-        assert len(mentions) == 0
+    def test_empty_text(self, nlp):
+        doc = nlp("")
+        assert len(doc.ents) == 0
 
-    def test_whitespace_only_text(self, ner: SimpleRegexNER):
-        mentions = ner.extract("   \n\t  ")
-        assert len(mentions) == 0
+    def test_whitespace_only_text(self, nlp):
+        doc = nlp("   \n\t  ")
+        assert len(doc.ents) == 0
 
-    def test_multiple_mentions_same_entity(self, ner: SimpleRegexNER):
-        # Use lowercase words after periods to ensure "Obama" is extracted separately
+    def test_multiple_mentions_same_entity(self, nlp):
         text = "Obama said hello. then Obama left."
-        mentions = ner.extract(text)
-        obama_mentions = [m for m in mentions if m.text == "Obama"]
-        assert len(obama_mentions) == 2
-        # Different offsets
-        offsets = [(m.start, m.end) for m in obama_mentions]
+        doc = nlp(text)
+        obama_ents = [ent for ent in doc.ents if ent.text == "Obama"]
+        assert len(obama_ents) == 2
+        offsets = [(ent.start_char, ent.end_char) for ent in obama_ents]
         assert len(set(offsets)) == 2

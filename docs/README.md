@@ -1,6 +1,6 @@
 # NER Pipeline Documentation
 
-A modular, swappable Named Entity Recognition (NER) and Entity Linking pipeline implemented in Python. This project provides a complete solution for extracting named entities from documents and linking them to entities in a knowledge base.
+A modular Named Entity Recognition (NER) and Entity Linking pipeline built on **spaCy's component architecture**. This project provides a complete solution for extracting named entities from documents and linking them to entities in a knowledge base.
 
 ## Table of Contents
 
@@ -13,9 +13,10 @@ A modular, swappable Named Entity Recognition (NER) and Entity Linking pipeline 
 
 ## Overview
 
-The NER Pipeline is a configurable system that processes documents through multiple stages to identify named entities and resolve them to a knowledge base. It features:
+The NER Pipeline leverages spaCy's native pipeline system to create a configurable entity linking solution. It features:
 
-- **Modular Architecture**: Each pipeline stage is pluggable and can be swapped independently
+- **spaCy Integration**: All core components (NER, candidate generation, reranking, disambiguation) are implemented as spaCy pipeline components
+- **Modular Architecture**: Each pipeline stage is a pluggable spaCy component that can be swapped independently
 - **Multiple Interfaces**: CLI, Python API, and Web UI (Gradio)
 - **LELA Integration**: Advanced entity linking components based on the LELA research methodology
 - **Flexible Input**: Supports text, PDF, DOCX, HTML, JSON, and JSONL documents
@@ -38,7 +39,7 @@ The pipeline identifies "Paris" as a mention and links it to the correct entity 
 
 ## Architecture
 
-The pipeline follows a multi-stage processing architecture:
+The pipeline uses spaCy's component system where each stage is a registered factory:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -50,36 +51,40 @@ The pipeline follows a multi-stage processing architecture:
 ┌─────────────────────────────────────────────────────────────────┐
 │                         LOADER                                   │
 │     Parse document format and extract text content               │
-│     Implementations: text, pdf, docx, html, json, jsonl          │
+│     (Registry-based: text, pdf, docx, html, json, jsonl)        │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                        NER MODEL                                 │
-│          Extract named entity mentions from text                 │
-│  Implementations: simple, spacy, gliner, transformers,          │
-│                   lela_gliner                                    │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   CANDIDATE GENERATOR                            │
-│        Find potential KB matches for each mention                │
-│   Implementations: fuzzy, bm25, dense, lela_bm25, lela_dense    │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       RERANKER                                   │
-│         Reorder candidates by relevance (optional)               │
-│    Implementations: none, cross_encoder, lela_embedder          │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     DISAMBIGUATOR                                │
-│        Select the final entity from candidates                   │
-│   Implementations: first, popularity, llm, lela_vllm            │
+│                    spaCy Pipeline (nlp)                         │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │  NER Component (doc.ents populated)                     │     │
+│  │  Factories: ner_pipeline_lela_gliner, _simple, _gliner, │     │
+│  │            _transformers, or spaCy's built-in NER       │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                              │                                   │
+│                              ▼                                   │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │  Candidate Generator (ent._.candidates populated)       │     │
+│  │  Factories: ner_pipeline_lela_bm25_candidates,          │     │
+│  │            _lela_dense_candidates, _fuzzy_candidates,   │     │
+│  │            _bm25_candidates                             │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                              │                                   │
+│                              ▼                                   │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │  Reranker (ent._.candidates reordered)                  │     │
+│  │  Factories: ner_pipeline_lela_embedder_reranker,        │     │
+│  │            _cross_encoder_reranker, _noop_reranker      │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                              │                                   │
+│                              ▼                                   │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │  Disambiguator (ent._.resolved_entity set)              │     │
+│  │  Factories: ner_pipeline_lela_vllm_disambiguator,       │     │
+│  │            _first_disambiguator, _popularity_disamb...  │     │
+│  └────────────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
@@ -89,6 +94,16 @@ The pipeline follows a multi-stage processing architecture:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+### spaCy Extensions
+
+The pipeline uses spaCy's custom extension system on `Span` objects:
+
+| Extension | Type | Description |
+|-----------|------|-------------|
+| `ent._.context` | `str` | Surrounding context for the entity mention |
+| `ent._.candidates` | `List[Tuple[str, str]]` | Candidate entities as (title, description) tuples |
+| `ent._.resolved_entity` | `Entity` | The final resolved entity object |
+
 ## Project Structure
 
 ```
@@ -97,18 +112,21 @@ ner-pipeline/
 │   ├── __init__.py            # Package exports
 │   ├── types.py               # Data models (Document, Mention, Entity, etc.)
 │   ├── config.py              # PipelineConfig for configuration parsing
-│   ├── registry.py            # Component registries
-│   ├── pipeline.py            # Main NERPipeline orchestrator
+│   ├── registry.py            # Component registries (loaders, KBs)
+│   ├── pipeline.py            # Main NERPipeline orchestrator (spaCy-based)
 │   ├── context.py             # Context extraction utilities
 │   ├── cli.py                 # CLI entry point
 │   │
-│   ├── loaders/               # Document input handlers
-│   ├── ner/                   # NER implementations
-│   ├── candidates/            # Candidate generation
-│   ├── rerankers/             # Candidate reranking
-│   ├── disambiguators/        # Final entity selection
-│   ├── knowledge_bases/       # Entity knowledge bases
-│   ├── lela/                  # LELA integration module
+│   ├── spacy_components/      # spaCy pipeline components
+│   │   ├── __init__.py        # Factory registration
+│   │   ├── ner.py             # NER components
+│   │   ├── candidates.py      # Candidate generation components
+│   │   ├── rerankers.py       # Reranking components
+│   │   └── disambiguators.py  # Disambiguation components
+│   │
+│   ├── loaders/               # Document input handlers (registry-based)
+│   ├── knowledge_bases/       # Entity knowledge bases (registry-based)
+│   ├── lela/                  # LELA configuration and utilities
 │   └── scripts/               # Utility scripts
 │
 ├── app.py                     # Gradio web UI
@@ -131,7 +149,7 @@ cd ner-pipeline
 # Install dependencies
 pip install -r requirements.txt
 
-# For spaCy models
+# For spaCy models (optional - only if using spaCy NER)
 python -m spacy download en_core_web_sm
 ```
 
@@ -160,6 +178,31 @@ pipeline = NERPipeline(config)
 results = pipeline.run(["document.txt"], output_path="results.jsonl")
 ```
 
+**Using spaCy directly (advanced):**
+```python
+import spacy
+from ner_pipeline import spacy_components  # Register factories
+
+# Build custom pipeline
+nlp = spacy.blank("en")
+nlp.add_pipe("ner_pipeline_simple", config={"min_len": 3})
+nlp.add_pipe("ner_pipeline_fuzzy_candidates", config={"top_k": 10})
+nlp.add_pipe("ner_pipeline_first_disambiguator")
+
+# Initialize components with KB
+from ner_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
+kb = CustomJSONLKnowledgeBase(path="kb.jsonl")
+
+for name, component in nlp.pipeline:
+    if hasattr(component, "initialize"):
+        component.initialize(kb)
+
+# Process text
+doc = nlp("Albert Einstein was born in Germany.")
+for ent in doc.ents:
+    print(f"{ent.text}: {ent._.resolved_entity}")
+```
+
 **Using the Web UI:**
 ```bash
 python app.py --port 7860
@@ -183,15 +226,16 @@ python app.py --port 7860
 
 | Document | Description |
 |----------|-------------|
-| [API.md](API.md) | Python API reference, data types, and programmatic usage |
+| [API.md](API.md) | Python API reference, spaCy components, and programmatic usage |
 | [CLI.md](CLI.md) | Command-line interface documentation |
 | [WEB_APP.md](WEB_APP.md) | Gradio web application guide |
-| [PIPELINE.md](PIPELINE.md) | Detailed pipeline architecture and component documentation |
+| [PIPELINE.md](PIPELINE.md) | Detailed pipeline architecture and spaCy component documentation |
 | [LELA.md](LELA.md) | LELA methodology and integration |
 
 ## Requirements
 
 - Python 3.9+
+- spaCy 3.0+
 - PyTorch 2.6.0+
 - See `requirements.txt` for full dependency list
 
@@ -199,4 +243,4 @@ python app.py --port 7860
 
 - **GPU Support**: CUDA 11.8+ for GPU acceleration
 - **vLLM**: Required for LELA vLLM disambiguator
-- **spaCy Models**: Required for spaCy NER
+- **spaCy Models**: Required for spaCy's built-in NER

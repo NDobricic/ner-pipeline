@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -49,3 +49,37 @@ class ResolvedMention:
     entity: Optional[Entity]
     candidates: List[Candidate] = field(default_factory=list)
 
+
+# ============================================================================
+# Conversion Utilities for LELA Format
+# ============================================================================
+
+def candidates_to_tuples(candidates: List[Candidate]) -> List[Tuple[str, str]]:
+    """
+    Convert Candidate list to LELA tuple format.
+
+    LELA format uses (title, description) tuples for candidates.
+
+    Args:
+        candidates: List of Candidate objects
+
+    Returns:
+        List of (entity_id/title, description) tuples
+    """
+    return [(c.entity_id, c.description or "") for c in candidates]
+
+
+def tuples_to_candidates(tuples: List[Tuple[str, str]]) -> List[Candidate]:
+    """
+    Convert LELA tuple format to Candidate list.
+
+    Args:
+        tuples: List of (title, description) tuples
+
+    Returns:
+        List of Candidate objects
+    """
+    return [
+        Candidate(entity_id=title, score=None, description=description)
+        for title, description in tuples
+    ]

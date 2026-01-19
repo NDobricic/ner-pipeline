@@ -1,60 +1,89 @@
-"""Unit tests for LELAGLiNERNER."""
+"""Unit tests for LELAGLiNERComponent."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
+import spacy
 
 from ner_pipeline.types import Mention
 
 
-class TestLELAGLiNERNER:
-    """Tests for LELAGLiNERNER class with mocked GLiNER."""
+class TestLELAGLiNERComponent:
+    """Tests for LELAGLiNERComponent class with mocked GLiNER."""
 
-    @patch("ner_pipeline.ner.lela_gliner._get_gliner")
-    def test_initialization_loads_model(self, mock_get_gliner):
+    @pytest.fixture
+    def nlp(self):
+        return spacy.blank("en")
+
+    @patch("ner_pipeline.spacy_components.ner._get_gliner")
+    def test_initialization_loads_model(self, mock_get_gliner, nlp):
         mock_gliner_class = MagicMock()
         mock_model = MagicMock()
         mock_gliner_class.from_pretrained.return_value = mock_model
         mock_get_gliner.return_value = mock_gliner_class
 
-        from ner_pipeline.ner.lela_gliner import LELAGLiNERNER
-        ner = LELAGLiNERNER()
+        from ner_pipeline.spacy_components.ner import LELAGLiNERComponent
+        component = LELAGLiNERComponent(
+            nlp=nlp,
+            model_name="test/model",
+            labels=["person"],
+            threshold=0.5,
+            context_mode="sentence",
+        )
 
         mock_gliner_class.from_pretrained.assert_called_once()
 
-    @patch("ner_pipeline.ner.lela_gliner._get_gliner")
-    def test_initialization_with_custom_model(self, mock_get_gliner):
+    @patch("ner_pipeline.spacy_components.ner._get_gliner")
+    def test_initialization_with_custom_model(self, mock_get_gliner, nlp):
         mock_gliner_class = MagicMock()
         mock_get_gliner.return_value = mock_gliner_class
 
-        from ner_pipeline.ner.lela_gliner import LELAGLiNERNER
-        ner = LELAGLiNERNER(model_name="custom/model")
+        from ner_pipeline.spacy_components.ner import LELAGLiNERComponent
+        component = LELAGLiNERComponent(
+            nlp=nlp,
+            model_name="custom/model",
+            labels=["person"],
+            threshold=0.5,
+            context_mode="sentence",
+        )
 
         mock_gliner_class.from_pretrained.assert_called_once_with("custom/model")
 
-    @patch("ner_pipeline.ner.lela_gliner._get_gliner")
-    def test_initialization_with_custom_labels(self, mock_get_gliner):
+    @patch("ner_pipeline.spacy_components.ner._get_gliner")
+    def test_initialization_with_custom_labels(self, mock_get_gliner, nlp):
         mock_gliner_class = MagicMock()
         mock_get_gliner.return_value = mock_gliner_class
 
-        from ner_pipeline.ner.lela_gliner import LELAGLiNERNER
+        from ner_pipeline.spacy_components.ner import LELAGLiNERComponent
         custom_labels = ["person", "company"]
-        ner = LELAGLiNERNER(labels=custom_labels)
+        component = LELAGLiNERComponent(
+            nlp=nlp,
+            model_name="test/model",
+            labels=custom_labels,
+            threshold=0.5,
+            context_mode="sentence",
+        )
 
-        assert ner.labels == custom_labels
+        assert component.labels == custom_labels
 
-    @patch("ner_pipeline.ner.lela_gliner._get_gliner")
-    def test_initialization_with_custom_threshold(self, mock_get_gliner):
+    @patch("ner_pipeline.spacy_components.ner._get_gliner")
+    def test_initialization_with_custom_threshold(self, mock_get_gliner, nlp):
         mock_gliner_class = MagicMock()
         mock_get_gliner.return_value = mock_gliner_class
 
-        from ner_pipeline.ner.lela_gliner import LELAGLiNERNER
-        ner = LELAGLiNERNER(threshold=0.7)
+        from ner_pipeline.spacy_components.ner import LELAGLiNERComponent
+        component = LELAGLiNERComponent(
+            nlp=nlp,
+            model_name="test/model",
+            labels=["person"],
+            threshold=0.7,
+            context_mode="sentence",
+        )
 
-        assert ner.threshold == 0.7
+        assert component.threshold == 0.7
 
-    @patch("ner_pipeline.ner.lela_gliner._get_gliner")
-    def test_extract_returns_mentions(self, mock_get_gliner):
+    @patch("ner_pipeline.spacy_components.ner._get_gliner")
+    def test_call_returns_doc_with_entities(self, mock_get_gliner, nlp):
         mock_gliner_class = MagicMock()
         mock_model = MagicMock()
         mock_gliner_class.from_pretrained.return_value = mock_model
@@ -65,16 +94,23 @@ class TestLELAGLiNERNER:
             {"start": 0, "end": 12, "text": "Barack Obama", "label": "person"},
         ]
 
-        from ner_pipeline.ner.lela_gliner import LELAGLiNERNER
-        ner = LELAGLiNERNER()
+        from ner_pipeline.spacy_components.ner import LELAGLiNERComponent
+        component = LELAGLiNERComponent(
+            nlp=nlp,
+            model_name="test/model",
+            labels=["person"],
+            threshold=0.5,
+            context_mode="sentence",
+        )
 
-        mentions = ner.extract("Barack Obama was president.")
+        doc = nlp("Barack Obama was president.")
+        doc = component(doc)
 
-        assert len(mentions) == 1
-        assert all(isinstance(m, Mention) for m in mentions)
+        assert len(doc.ents) == 1
+        assert doc.ents[0].text == "Barack Obama"
 
-    @patch("ner_pipeline.ner.lela_gliner._get_gliner")
-    def test_mention_has_correct_fields(self, mock_get_gliner):
+    @patch("ner_pipeline.spacy_components.ner._get_gliner")
+    def test_entity_has_correct_label(self, mock_get_gliner, nlp):
         mock_gliner_class = MagicMock()
         mock_model = MagicMock()
         mock_gliner_class.from_pretrained.return_value = mock_model
@@ -84,19 +120,22 @@ class TestLELAGLiNERNER:
             {"start": 0, "end": 12, "text": "Barack Obama", "label": "person"},
         ]
 
-        from ner_pipeline.ner.lela_gliner import LELAGLiNERNER
-        ner = LELAGLiNERNER()
+        from ner_pipeline.spacy_components.ner import LELAGLiNERComponent
+        component = LELAGLiNERComponent(
+            nlp=nlp,
+            model_name="test/model",
+            labels=["person"],
+            threshold=0.5,
+            context_mode="sentence",
+        )
 
-        mentions = ner.extract("Barack Obama was president.")
+        doc = nlp("Barack Obama was president.")
+        doc = component(doc)
 
-        mention = mentions[0]
-        assert mention.start == 0
-        assert mention.end == 12
-        assert mention.text == "Barack Obama"
-        assert mention.label == "person"
+        assert doc.ents[0].label_ == "person"
 
-    @patch("ner_pipeline.ner.lela_gliner._get_gliner")
-    def test_mention_has_context(self, mock_get_gliner):
+    @patch("ner_pipeline.spacy_components.ner._get_gliner")
+    def test_entity_has_context_extension(self, mock_get_gliner, nlp):
         mock_gliner_class = MagicMock()
         mock_model = MagicMock()
         mock_gliner_class.from_pretrained.return_value = mock_model
@@ -106,16 +145,23 @@ class TestLELAGLiNERNER:
             {"start": 0, "end": 12, "text": "Barack Obama", "label": "person"},
         ]
 
-        from ner_pipeline.ner.lela_gliner import LELAGLiNERNER
-        ner = LELAGLiNERNER()
+        from ner_pipeline.spacy_components.ner import LELAGLiNERComponent
+        component = LELAGLiNERComponent(
+            nlp=nlp,
+            model_name="test/model",
+            labels=["person"],
+            threshold=0.5,
+            context_mode="sentence",
+        )
 
-        mentions = ner.extract("Barack Obama was president.")
+        doc = nlp("Barack Obama was president.")
+        doc = component(doc)
 
         # Context should be extracted
-        assert mentions[0].context is not None
+        assert doc.ents[0]._.context is not None
 
-    @patch("ner_pipeline.ner.lela_gliner._get_gliner")
-    def test_extract_multiple_entities(self, mock_get_gliner):
+    @patch("ner_pipeline.spacy_components.ner._get_gliner")
+    def test_extract_multiple_entities(self, mock_get_gliner, nlp):
         mock_gliner_class = MagicMock()
         mock_model = MagicMock()
         mock_gliner_class.from_pretrained.return_value = mock_model
@@ -126,55 +172,63 @@ class TestLELAGLiNERNER:
             {"start": 30, "end": 43, "text": "United States", "label": "location"},
         ]
 
-        from ner_pipeline.ner.lela_gliner import LELAGLiNERNER
-        ner = LELAGLiNERNER()
+        from ner_pipeline.spacy_components.ner import LELAGLiNERComponent
+        component = LELAGLiNERComponent(
+            nlp=nlp,
+            model_name="test/model",
+            labels=["person", "location"],
+            threshold=0.5,
+            context_mode="sentence",
+        )
 
-        mentions = ner.extract("Barack Obama was president of United States.")
+        doc = nlp("Barack Obama was president of United States.")
+        doc = component(doc)
 
-        assert len(mentions) == 2
-        assert mentions[0].text == "Barack Obama"
-        assert mentions[1].text == "United States"
+        assert len(doc.ents) == 2
+        assert doc.ents[0].text == "Barack Obama"
+        assert doc.ents[1].text == "United States"
 
-    @patch("ner_pipeline.ner.lela_gliner._get_gliner")
-    def test_extract_empty_text(self, mock_get_gliner):
+    @patch("ner_pipeline.spacy_components.ner._get_gliner")
+    def test_extract_empty_text(self, mock_get_gliner, nlp):
         mock_gliner_class = MagicMock()
         mock_model = MagicMock()
         mock_gliner_class.from_pretrained.return_value = mock_model
         mock_get_gliner.return_value = mock_gliner_class
 
-        from ner_pipeline.ner.lela_gliner import LELAGLiNERNER
-        ner = LELAGLiNERNER()
+        from ner_pipeline.spacy_components.ner import LELAGLiNERComponent
+        component = LELAGLiNERComponent(
+            nlp=nlp,
+            model_name="test/model",
+            labels=["person"],
+            threshold=0.5,
+            context_mode="sentence",
+        )
 
-        mentions = ner.extract("")
+        doc = nlp("")
+        doc = component(doc)
 
-        assert mentions == []
+        assert len(doc.ents) == 0
         # Should not call predict on empty text
         mock_model.predict_entities.assert_not_called()
 
-    @patch("ner_pipeline.ner.lela_gliner._get_gliner")
-    def test_context_mode_parameter(self, mock_get_gliner):
+    @patch("ner_pipeline.spacy_components.ner._get_gliner")
+    def test_context_mode_parameter(self, mock_get_gliner, nlp):
         mock_gliner_class = MagicMock()
         mock_get_gliner.return_value = mock_gliner_class
 
-        from ner_pipeline.ner.lela_gliner import LELAGLiNERNER
-        ner = LELAGLiNERNER(context_mode="window")
+        from ner_pipeline.spacy_components.ner import LELAGLiNERComponent
+        component = LELAGLiNERComponent(
+            nlp=nlp,
+            model_name="test/model",
+            labels=["person"],
+            threshold=0.5,
+            context_mode="window",
+        )
 
-        assert ner.context_mode == "window"
+        assert component.context_mode == "window"
 
-    @patch("ner_pipeline.ner.lela_gliner._get_gliner")
-    def test_default_labels_from_config(self, mock_get_gliner):
-        mock_gliner_class = MagicMock()
-        mock_get_gliner.return_value = mock_gliner_class
-
-        from ner_pipeline.ner.lela_gliner import LELAGLiNERNER
-        from ner_pipeline.lela.config import NER_LABELS
-
-        ner = LELAGLiNERNER()
-
-        assert ner.labels == list(NER_LABELS)
-
-    @patch("ner_pipeline.ner.lela_gliner._get_gliner")
-    def test_threshold_passed_to_predict(self, mock_get_gliner):
+    @patch("ner_pipeline.spacy_components.ner._get_gliner")
+    def test_threshold_passed_to_predict(self, mock_get_gliner, nlp):
         mock_gliner_class = MagicMock()
         mock_model = MagicMock()
         mock_gliner_class.from_pretrained.return_value = mock_model
@@ -182,10 +236,17 @@ class TestLELAGLiNERNER:
 
         mock_model.predict_entities.return_value = []
 
-        from ner_pipeline.ner.lela_gliner import LELAGLiNERNER
-        ner = LELAGLiNERNER(threshold=0.7, labels=["person"])
+        from ner_pipeline.spacy_components.ner import LELAGLiNERComponent
+        component = LELAGLiNERComponent(
+            nlp=nlp,
+            model_name="test/model",
+            labels=["person"],
+            threshold=0.7,
+            context_mode="sentence",
+        )
 
-        ner.extract("Test text")
+        doc = nlp("Test text")
+        doc = component(doc)
 
         mock_model.predict_entities.assert_called_once_with(
             "Test text",

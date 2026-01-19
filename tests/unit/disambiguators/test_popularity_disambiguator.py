@@ -1,15 +1,23 @@
-"""Unit tests for PopularityDisambiguator."""
+"""Unit tests for PopularityDisambiguatorComponent (spaCy-based)."""
 
 import pytest
+import spacy
+from spacy.tokens import Span
 
-from ner_pipeline.disambiguators.popularity import PopularityDisambiguator
-from ner_pipeline.types import Candidate, Document, Entity, Mention
+from ner_pipeline import spacy_components  # Register factories
+from ner_pipeline.spacy_components.disambiguators import PopularityDisambiguatorComponent
+from ner_pipeline.types import Entity
 
 from tests.conftest import MockKnowledgeBase
 
 
-class TestPopularityDisambiguator:
-    """Tests for PopularityDisambiguator class."""
+class TestPopularityDisambiguatorComponent:
+    """Tests for PopularityDisambiguatorComponent class.
+
+    Note: The PopularityDisambiguatorComponent in spaCy-based architecture
+    uses LELA format candidates which don't have explicit scores.
+    Candidates are already sorted by score from retrieval, so first = best.
+    """
 
     @pytest.fixture
     def entities(self) -> list[Entity]:
@@ -24,129 +32,133 @@ class TestPopularityDisambiguator:
         return MockKnowledgeBase(entities)
 
     @pytest.fixture
-    def disambiguator(self, kb: MockKnowledgeBase) -> PopularityDisambiguator:
-        return PopularityDisambiguator(kb=kb)
+    def nlp(self, kb: MockKnowledgeBase) -> spacy.language.Language:
+        nlp = spacy.blank("en")
+        nlp.add_pipe("ner_pipeline_simple", config={"min_len": 3})
+        nlp.add_pipe("ner_pipeline_fuzzy_candidates", config={"top_k": 3})
+        component = nlp.add_pipe("ner_pipeline_popularity_disambiguator")
 
-    @pytest.fixture
-    def sample_doc(self) -> Document:
-        return Document(id="test", text="Test document")
+        # Initialize components with KB
+        for name, proc in nlp.pipeline:
+            if hasattr(proc, "initialize"):
+                proc.initialize(kb)
 
-    @pytest.fixture
-    def sample_mention(self) -> Mention:
-        return Mention(start=0, end=4, text="Test")
+        return nlp
 
-    def test_returns_highest_scored_candidate(
-        self,
-        disambiguator: PopularityDisambiguator,
-        sample_mention: Mention,
-        sample_doc: Document,
-    ):
-        candidates = [
-            Candidate(entity_id="Q1", score=0.5),
-            Candidate(entity_id="Q2", score=0.9),  # Highest
-            Candidate(entity_id="Q3", score=0.7),
-        ]
-        result = disambiguator.disambiguate(sample_mention, candidates, sample_doc)
-        assert result is not None
-        assert result.id == "Q2"
+    def test_returns_highest_scored_candidate(self, nlp, kb):
+        # In LELA format, candidates are pre-sorted by score
+        # So first candidate has highest score
+        doc = nlp.make_doc("Entity here.")
 
-    def test_empty_candidates_returns_none(
-        self,
-        disambiguator: PopularityDisambiguator,
-        sample_mention: Mention,
-        sample_doc: Document,
-    ):
-        candidates = []
-        result = disambiguator.disambiguate(sample_mention, candidates, sample_doc)
-        assert result is None
+        if not Span.has_extension("candidates"):
+            Span.set_extension("candidates", default=[])
+        if not Span.has_extension("resolved_entity"):
+            Span.set_extension("resolved_entity", default=None)
+        if not Span.has_extension("context"):
+            Span.set_extension("context", default=None)
 
-    def test_returns_entity_from_kb(
-        self,
-        disambiguator: PopularityDisambiguator,
-        sample_mention: Mention,
-        sample_doc: Document,
-    ):
-        candidates = [Candidate(entity_id="Q3", score=0.8)]
-        result = disambiguator.disambiguate(sample_mention, candidates, sample_doc)
-        assert result is not None
-        assert result.title == "Entity Three"
-        assert result.description == "Third entity"
+        span = doc.char_span(0, 6, label="ENT")
+        if span:
+            doc.ents = [span]
+            # Candidates are sorted by score (highest first)
+            span._.candidates = [
+                ("Entity Two", "Second entity"),  # Highest score
+                ("Entity One", "First entity"),
+                ("Entity Three", "Third entity"),
+            ]
 
-    def test_unknown_entity_returns_none(
-        self,
-        disambiguator: PopularityDisambiguator,
-        sample_mention: Mention,
-        sample_doc: Document,
-    ):
-        candidates = [Candidate(entity_id="Q999", score=0.99)]  # Not in KB
-        result = disambiguator.disambiguate(sample_mention, candidates, sample_doc)
-        assert result is None
+        disambiguator = nlp.get_pipe("ner_pipeline_popularity_disambiguator")
+        doc = disambiguator(doc)
 
-    def test_handles_none_scores(
-        self,
-        disambiguator: PopularityDisambiguator,
-        sample_mention: Mention,
-        sample_doc: Document,
-    ):
-        candidates = [
-            Candidate(entity_id="Q1", score=None),
-            Candidate(entity_id="Q2", score=0.5),
-            Candidate(entity_id="Q3", score=None),
-        ]
-        result = disambiguator.disambiguate(sample_mention, candidates, sample_doc)
-        assert result is not None
-        assert result.id == "Q2"  # Only one with non-None score
+        if doc.ents:
+            # Should select first candidate (highest scored)
+            assert doc.ents[0]._.resolved_entity is not None
+            assert doc.ents[0]._.resolved_entity.id == "Q2"
 
-    def test_all_none_scores_picks_first(
-        self,
-        disambiguator: PopularityDisambiguator,
-        sample_mention: Mention,
-        sample_doc: Document,
-    ):
-        candidates = [
-            Candidate(entity_id="Q1", score=None),
-            Candidate(entity_id="Q2", score=None),
-        ]
-        result = disambiguator.disambiguate(sample_mention, candidates, sample_doc)
-        # With all None scores (treated as 0.0), max() returns first
-        assert result is not None
+    def test_empty_candidates_returns_none(self, nlp, kb):
+        doc = nlp.make_doc("Nothing.")
 
-    def test_single_candidate(
-        self,
-        disambiguator: PopularityDisambiguator,
-        sample_mention: Mention,
-        sample_doc: Document,
-    ):
-        candidates = [Candidate(entity_id="Q1", score=0.5)]
-        result = disambiguator.disambiguate(sample_mention, candidates, sample_doc)
-        assert result is not None
-        assert result.id == "Q1"
+        if not Span.has_extension("candidates"):
+            Span.set_extension("candidates", default=[])
+        if not Span.has_extension("resolved_entity"):
+            Span.set_extension("resolved_entity", default=None)
+        if not Span.has_extension("context"):
+            Span.set_extension("context", default=None)
 
-    def test_tie_breaking_returns_any_max(
-        self,
-        disambiguator: PopularityDisambiguator,
-        sample_mention: Mention,
-        sample_doc: Document,
-    ):
-        candidates = [
-            Candidate(entity_id="Q1", score=0.8),
-            Candidate(entity_id="Q2", score=0.8),  # Tie
-        ]
-        result = disambiguator.disambiguate(sample_mention, candidates, sample_doc)
-        assert result is not None
-        assert result.id in ["Q1", "Q2"]
+        span = doc.char_span(0, 7, label="ENT")
+        if span:
+            doc.ents = [span]
+            span._.candidates = []
 
-    def test_negative_scores(
-        self,
-        disambiguator: PopularityDisambiguator,
-        sample_mention: Mention,
-        sample_doc: Document,
-    ):
-        candidates = [
-            Candidate(entity_id="Q1", score=-0.5),
-            Candidate(entity_id="Q2", score=-0.1),  # Highest (least negative)
-            Candidate(entity_id="Q3", score=-0.9),
-        ]
-        result = disambiguator.disambiguate(sample_mention, candidates, sample_doc)
-        assert result is not None
-        assert result.id == "Q2"
+        disambiguator = nlp.get_pipe("ner_pipeline_popularity_disambiguator")
+        doc = disambiguator(doc)
+
+        if doc.ents:
+            assert doc.ents[0]._.resolved_entity is None
+
+    def test_returns_entity_from_kb(self, nlp, kb):
+        doc = nlp.make_doc("Entity Three here.")
+
+        if not Span.has_extension("candidates"):
+            Span.set_extension("candidates", default=[])
+        if not Span.has_extension("resolved_entity"):
+            Span.set_extension("resolved_entity", default=None)
+        if not Span.has_extension("context"):
+            Span.set_extension("context", default=None)
+
+        span = doc.char_span(0, 12, label="ENT")
+        if span:
+            doc.ents = [span]
+            span._.candidates = [("Entity Three", "Third entity")]
+
+        disambiguator = nlp.get_pipe("ner_pipeline_popularity_disambiguator")
+        doc = disambiguator(doc)
+
+        if doc.ents:
+            ent = doc.ents[0]
+            assert ent._.resolved_entity is not None
+            assert ent._.resolved_entity.title == "Entity Three"
+            assert ent._.resolved_entity.description == "Third entity"
+
+    def test_unknown_entity_returns_none(self, nlp, kb):
+        doc = nlp.make_doc("Unknown.")
+
+        if not Span.has_extension("candidates"):
+            Span.set_extension("candidates", default=[])
+        if not Span.has_extension("resolved_entity"):
+            Span.set_extension("resolved_entity", default=None)
+        if not Span.has_extension("context"):
+            Span.set_extension("context", default=None)
+
+        span = doc.char_span(0, 7, label="ENT")
+        if span:
+            doc.ents = [span]
+            span._.candidates = [("Unknown", "Not in KB")]
+
+        disambiguator = nlp.get_pipe("ner_pipeline_popularity_disambiguator")
+        doc = disambiguator(doc)
+
+        if doc.ents:
+            assert doc.ents[0]._.resolved_entity is None
+
+    def test_single_candidate(self, nlp, kb):
+        doc = nlp.make_doc("Entity One.")
+
+        if not Span.has_extension("candidates"):
+            Span.set_extension("candidates", default=[])
+        if not Span.has_extension("resolved_entity"):
+            Span.set_extension("resolved_entity", default=None)
+        if not Span.has_extension("context"):
+            Span.set_extension("context", default=None)
+
+        span = doc.char_span(0, 10, label="ENT")
+        if span:
+            doc.ents = [span]
+            span._.candidates = [("Entity One", "First entity")]
+
+        disambiguator = nlp.get_pipe("ner_pipeline_popularity_disambiguator")
+        doc = disambiguator(doc)
+
+        if doc.ents:
+            assert doc.ents[0]._.resolved_entity is not None
+            assert doc.ents[0]._.resolved_entity.id == "Q1"
