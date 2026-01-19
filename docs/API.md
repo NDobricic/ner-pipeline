@@ -9,6 +9,7 @@ This document provides a comprehensive reference for the NER Pipeline Python API
 - [Data Types](#data-types)
 - [Configuration](#configuration)
 - [Context Extraction](#context-extraction)
+- [Advanced Features](#advanced-features)
 - [Usage Examples](#usage-examples)
 
 ## Core Classes
@@ -27,11 +28,12 @@ from ner_pipeline.config import PipelineConfig
 #### Constructor
 
 ```python
-NERPipeline(config: PipelineConfig)
+NERPipeline(config: PipelineConfig, progress_callback: Optional[Callable[[float, str], None]] = None)
 ```
 
 **Parameters:**
 - `config`: A `PipelineConfig` object containing pipeline configuration
+- `progress_callback`: Optional callback function `(progress: float, description: str) -> None` for tracking initialization progress (0.0 to 1.0)
 
 **Initialization:**
 - Instantiates knowledge base and document loader from registries
@@ -74,6 +76,37 @@ Process a single document through the spaCy pipeline.
     }],
     "meta": Dict         # Document metadata
 }
+```
+
+##### `process_document_with_progress(doc: Document, progress_callback: Optional[Callable], base_progress: float = 0.0, progress_range: float = 1.0) -> Dict`
+
+Process a single document with detailed progress callbacks for each pipeline stage.
+
+**Parameters:**
+- `doc`: A `Document` object to process
+- `progress_callback`: Callback function `(progress: float, description: str) -> None`
+- `base_progress`: Starting progress value (0.0-1.0)
+- `progress_range`: How much progress this processing represents (0.0-1.0)
+
+**Returns:**
+- Same format as `process_document`
+
+**Example:**
+```python
+def my_progress_callback(progress: float, description: str):
+    print(f"{progress*100:.1f}%: {description}")
+
+result = pipeline.process_document_with_progress(
+    doc,
+    progress_callback=my_progress_callback
+)
+# Output:
+# 0.0%: Tokenizing document...
+# 15.0%: NER (GLiNER)...
+# 45.0%: Candidate generation (BM25)...
+# 75.0%: Disambiguation (LLM)...
+# 95.0%: Serializing results...
+# 100.0%: Document processing complete
 ```
 
 ##### `run(paths: Iterable[str], output_path: Optional[str] = None) -> List[Dict]`
@@ -338,17 +371,57 @@ vLLM-based LLM disambiguation with tournament strategy.
 | `model_name` | str | "Qwen/Qwen3-8B" | LLM model |
 | `tensor_parallel_size` | int | 1 | GPU parallelism |
 | `max_model_len` | int | None | Max context length |
-| `add_none_candidate` | bool | False | Add "None" option |
+| `add_none_candidate` | bool | True | Add "None" option for NIL linking |
 | `add_descriptions` | bool | True | Include descriptions |
-| `disable_thinking` | bool | False | Disable reasoning |
+| `disable_thinking` | bool | True | Disable reasoning (adds `/no_think` for Qwen3) |
 | `system_prompt` | str | LELA default | Custom prompt |
 | `generation_config` | dict | {} | vLLM generation settings |
-| `self_consistency_k` | int | 1 | Voting samples |
+| `self_consistency_k` | int | 1 | Voting samples (>1 enables majority voting) |
 
 **Requires initialization:**
 ```python
 component = nlp.add_pipe("ner_pipeline_lela_vllm_disambiguator")
 component.initialize(kb)
+```
+
+**See Also:** [Self-Consistency Voting](#self-consistency-voting), [NIL Linking](#nil-linking), [Qwen3 Thinking Mode](#qwen3-thinking-mode)
+
+#### `ner_pipeline_lela_transformers_disambiguator`
+
+Transformers-based LLM disambiguation (alternative to vLLM for P100/Pascal GPUs).
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model_name` | str | "Qwen/Qwen3-4B" | LLM model |
+| `add_none_candidate` | bool | True | Add "None" option for NIL linking |
+| `add_descriptions` | bool | True | Include descriptions |
+| `disable_thinking` | bool | True | Disable reasoning |
+| `system_prompt` | str | LELA default | Custom prompt |
+| `generation_config` | dict | {} | HuggingFace generation settings |
+
+**Requires initialization:**
+```python
+component = nlp.add_pipe("ner_pipeline_lela_transformers_disambiguator")
+component.initialize(kb)
+```
+
+**When to use:** Use this instead of `lela_vllm` when:
+- Running on older GPUs (P100/Pascal) where vLLM has issues
+- vLLM installation fails or has compatibility problems
+- You need direct HuggingFace transformers integration
+
+**Example:**
+```json
+{
+  "disambiguator": {
+    "name": "lela_transformers",
+    "params": {
+      "model_name": "Qwen/Qwen3-4B",
+      "disable_thinking": true
+    }
+  }
+}
 ```
 
 #### `ner_pipeline_first_disambiguator`
@@ -475,6 +548,7 @@ candidates = tuples_to_candidates(tuples_list)
 | `none` | `ner_pipeline_noop_reranker` |
 | **Disambiguators** | |
 | `lela_vllm` | `ner_pipeline_lela_vllm_disambiguator` |
+| `lela_transformers` | `ner_pipeline_lela_transformers_disambiguator` |
 | `first` | `ner_pipeline_first_disambiguator` |
 | `popularity` | `ner_pipeline_popularity_disambiguator` |
 
@@ -488,6 +562,27 @@ candidates = tuples_to_candidates(tuples_list)
 | `html` | HTML pages |
 | `json` | JSON files |
 | `jsonl` | JSON Lines files |
+
+**JSON/JSONL Loader Parameters:**
+
+The `json` and `jsonl` loaders support a `text_field` parameter to customize which field contains the document text:
+
+```json
+{
+  "loader": {
+    "name": "jsonl",
+    "params": {
+      "text_field": "content"  // Default is "text"
+    }
+  }
+}
+```
+
+**Example JSONL with custom field:**
+```jsonl
+{"id": "doc-1", "content": "Document text here", "meta": {}}
+{"id": "doc-2", "content": "Another document", "meta": {}}
+```
 
 #### Knowledge Bases (Registry-based)
 
@@ -541,6 +636,156 @@ context = extract_context(text, 16, 31, mode="sentence", max_sentences=2)
 # Window mode
 context = extract_context(text, 16, 31, mode="window", window_chars=150)
 ```
+
+## Advanced Features
+
+### Progress Callbacks
+
+The pipeline supports progress callbacks at multiple levels for tracking processing status.
+
+#### Pipeline Initialization
+
+```python
+from ner_pipeline.pipeline import NERPipeline
+from ner_pipeline.config import PipelineConfig
+
+def init_callback(progress: float, description: str):
+    print(f"Init {progress*100:.0f}%: {description}")
+
+config = PipelineConfig.from_dict(config_dict)
+pipeline = NERPipeline(config, progress_callback=init_callback)
+# Output:
+# Init 0%: Loading knowledge base...
+# Init 15%: Initializing document loader...
+# Init 20%: Building spaCy pipeline...
+# Init 25%: Loading NER model (lela_gliner)...
+# Init 45%: Loading candidate generator (lela_bm25)...
+# Init 75%: Loading disambiguator (lela_vllm)...
+# Init 100%: Pipeline initialization complete
+```
+
+#### Document Processing
+
+```python
+def process_callback(progress: float, description: str):
+    print(f"Processing {progress*100:.0f}%: {description}")
+
+result = pipeline.process_document_with_progress(doc, progress_callback=process_callback)
+```
+
+---
+
+### Self-Consistency Voting
+
+The `lela_vllm` disambiguator supports self-consistency voting for improved accuracy. When `self_consistency_k > 1`, the model generates multiple responses and selects the answer by majority vote.
+
+**Configuration:**
+```json
+{
+  "disambiguator": {
+    "name": "lela_vllm",
+    "params": {
+      "self_consistency_k": 5  // Generate 5 responses, take majority vote
+    }
+  }
+}
+```
+
+**How it works:**
+1. The LLM generates `k` candidate answers for each entity
+2. Each answer is parsed to extract the selected candidate index
+3. The most frequently selected index wins (majority voting)
+
+**Trade-offs:**
+- Higher `k` = better accuracy but slower (k times more LLM calls)
+- Recommended: `k=3` or `k=5` for important decisions
+- Default: `k=1` (no voting, fastest)
+
+---
+
+### NIL Linking
+
+NIL linking allows the model to reject all candidates when none match the mention. This is enabled via the `add_none_candidate` parameter.
+
+**Configuration:**
+```json
+{
+  "disambiguator": {
+    "name": "lela_vllm",
+    "params": {
+      "add_none_candidate": true  // Enable NIL linking
+    }
+  }
+}
+```
+
+**How it works:**
+
+When `add_none_candidate=true`:
+- Candidate index 0 is reserved for "None of the listed candidates"
+- The LLM prompt includes this option explicitly
+- If the model selects index 0, `ent._.resolved_entity` remains `None`
+
+**Prompt format with NIL option:**
+```
+Candidates:
+0. None of the listed candidates
+1. Paris (city): Capital city of France
+2. Paris (novel): 1897 novel by Emile Zola
+3. Paris (Texas): City in Texas, USA
+```
+
+**Output behavior:**
+```python
+for ent in doc.ents:
+    if ent._.resolved_entity is None:
+        print(f"{ent.text}: Not linked (NIL)")
+    else:
+        print(f"{ent.text}: {ent._.resolved_entity.title}")
+```
+
+---
+
+### Qwen3 Thinking Mode
+
+Qwen3 models support a "thinking mode" where the model shows chain-of-thought reasoning. The pipeline can disable this for faster responses.
+
+**Configuration:**
+```json
+{
+  "disambiguator": {
+    "name": "lela_vllm",
+    "params": {
+      "disable_thinking": true  // Skip chain-of-thought reasoning
+    }
+  }
+}
+```
+
+**How it works:**
+
+When `disable_thinking=true`:
+- The prompt ends with the `/no_think` soft switch token
+- Qwen3 models recognize this and output the answer directly
+- Reduces token usage and latency significantly
+
+**With thinking (default for some prompts):**
+```
+<think>
+The mention "Paris" in the context about Olympics in France clearly
+refers to the capital city, not the novel or the Texas city...
+</think>
+answer: 1
+```
+
+**Without thinking (`disable_thinking=true`):**
+```
+1
+```
+
+**Note:** The transformers disambiguator also handles `</think>` tags in the output when parsing, so it works correctly even if the model includes thinking.
+
+---
 
 ## Usage Examples
 

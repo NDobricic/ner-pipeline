@@ -42,56 +42,56 @@ The pipeline identifies "Paris" as a mention and links it to the correct entity 
 The pipeline uses spaCy's component system where each stage is a registered factory:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Input Document                            │
-│              (text, PDF, DOCX, HTML, JSON, JSONL)               │
-└─────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                       Input Document                          │
+│            (text, PDF, DOCX, HTML, JSON, JSONL)               │
+└───────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                         LOADER                                   │
-│     Parse document format and extract text content               │
-│     (Registry-based: text, pdf, docx, html, json, jsonl)        │
-└─────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                           LOADER                              │
+│       Parse document format and extract text content          │
+│      (Registry-based: text, pdf, docx, html, json, jsonl)     │
+└───────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    spaCy Pipeline (nlp)                         │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌────────────────────────────────────────────────────────┐     │
-│  │  NER Component (doc.ents populated)                     │     │
-│  │  Factories: ner_pipeline_lela_gliner, _simple, _gliner, │     │
-│  │            _transformers, or spaCy's built-in NER       │     │
-│  └────────────────────────────────────────────────────────┘     │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌────────────────────────────────────────────────────────┐     │
-│  │  Candidate Generator (ent._.candidates populated)       │     │
-│  │  Factories: ner_pipeline_lela_bm25_candidates,          │     │
-│  │            _lela_dense_candidates, _fuzzy_candidates,   │     │
-│  │            _bm25_candidates                             │     │
-│  └────────────────────────────────────────────────────────┘     │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌────────────────────────────────────────────────────────┐     │
-│  │  Reranker (ent._.candidates reordered)                  │     │
-│  │  Factories: ner_pipeline_lela_embedder_reranker,        │     │
-│  │            _cross_encoder_reranker, _noop_reranker      │     │
-│  └────────────────────────────────────────────────────────┘     │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌────────────────────────────────────────────────────────┐     │
-│  │  Disambiguator (ent._.resolved_entity set)              │     │
-│  │  Factories: ner_pipeline_lela_vllm_disambiguator,       │     │
-│  │            _first_disambiguator, _popularity_disamb...  │     │
-│  └────────────────────────────────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                     spaCy Pipeline (nlp)                      │
+├───────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │  NER Component (doc.ents populated)                     │  │
+│  │  Factories: ner_pipeline_lela_gliner, _simple, _gliner, │  │
+│  │             _transformers, or spaCy's built-in NER      │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                              │                                │
+│                              ▼                                │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │  Candidate Generator (ent._.candidates populated)       │  │
+│  │  Factories: ner_pipeline_lela_bm25_candidates,          │  │
+│  │             _lela_dense_candidates, _fuzzy_candidates,  │  │
+│  │             _bm25_candidates                            │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                              │                                │
+│                              ▼                                │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │  Reranker (ent._.candidates reordered)                  │  │
+│  │  Factories: ner_pipeline_lela_embedder_reranker,        │  │
+│  │             _cross_encoder_reranker, _noop_reranker     │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                              │                                │
+│                              ▼                                │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │  Disambiguator (ent._.resolved_entity set)              │  │
+│  │  Factories: ner_pipeline_lela_vllm_disambiguator,       │  │
+│  │             _first_disambiguator, _popularity_disamb... │  │
+│  └─────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                         OUTPUT                                   │
-│              JSONL with resolved entities                        │
-└─────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                           OUTPUT                              │
+│                 JSONL with resolved entities                  │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ### spaCy Extensions
@@ -240,6 +240,10 @@ python app.py --port 7860
 | [WEB_APP.md](WEB_APP.md) | Gradio web application guide |
 | [PIPELINE.md](PIPELINE.md) | Detailed pipeline architecture and spaCy component documentation |
 | [LELA.md](LELA.md) | LELA methodology and integration |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common errors and solutions |
+| [REQUIREMENTS.md](REQUIREMENTS.md) | System requirements and GPU compatibility |
+| [DEVELOPMENT.md](DEVELOPMENT.md) | Creating custom components |
+| [TESTING.md](TESTING.md) | Running and writing tests |
 
 ## Requirements
 

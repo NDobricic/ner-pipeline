@@ -4,12 +4,26 @@ The NER Pipeline includes an interactive web interface built with Gradio for exp
 
 ## Table of Contents
 
+- [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Command-Line Options](#command-line-options)
 - [Interface Overview](#interface-overview)
 - [Configuration Options](#configuration-options)
 - [Using the Interface](#using-the-interface)
 - [Features](#features)
+- [Example Configurations](#example-configurations)
+
+## Installation
+
+```bash
+cd ner-pipeline
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+# If using spaCy NER
+python -m spacy download en_core_web_sm
+```
 
 ## Quick Start
 
@@ -360,3 +374,43 @@ app.py                    # Main Gradio application
 3. `NERPipeline` builds a spaCy `Language` with selected components
 4. Text is processed through `nlp(text)`
 5. Results are serialized and displayed
+
+## Example Configurations
+
+### Lightweight (No Heavy Models)
+
+Best for quick experiments and small knowledge bases:
+
+- **NER**: simple
+- **Candidates**: fuzzy
+- **Reranker**: none
+- **Disambiguator**: first
+
+### Accurate (With Models)
+
+Better accuracy for production use with larger KBs:
+
+- **NER**: spacy (en_core_web_sm)
+- **Candidates**: bm25
+- **Reranker**: cross_encoder
+- **Disambiguator**: popularity
+
+### Zero-shot
+
+For custom entity types and domain adaptation:
+
+- **NER**: gliner or lela_gliner
+- **Candidates**: dense or lela_bm25
+- **Reranker**: none or lela_embedder
+- **Disambiguator**: popularity or lela_vllm
+
+### Full LELA Pipeline
+
+Maximum accuracy with LLM disambiguation:
+
+- **NER**: lela_gliner (threshold: 0.5)
+- **Candidates**: lela_bm25 (top_k: 64)
+- **Reranker**: lela_embedder (top_k: 10)
+- **Disambiguator**: lela_vllm
+
+**Note:** Requires GPU with 16+ GB VRAM for full LELA pipeline.

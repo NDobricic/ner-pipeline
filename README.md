@@ -4,7 +4,7 @@ Standalone, swappable NER → candidate generation → rerank → disambiguation
 
 ## Install
 
-**Requirements:** Python 3.10 (recommended), CUDA 11.8 for GPU support
+**Requirements:** Python 3.10-3.12 (Python 3.13 is NOT supported due to vLLM), CUDA 11.8 for GPU support
 
 ```bash
 cd ner-pipeline
@@ -26,7 +26,15 @@ Launch the interactive web interface:
 ```bash
 python app.py
 ```
-Open `http://localhost:7860` and configure the pipeline through the UI. See [GRADIO_UI.md](GRADIO_UI.md) for details.
+Open `http://localhost:7860` and configure the pipeline through the UI. See [docs/WEB_APP.md](docs/WEB_APP.md) for details.
+
+### Troubleshooting
+
+If you encounter issues, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for solutions to common problems including:
+- PyTorch CUDA mismatch
+- vLLM installation failures
+- GPU memory issues
+- P100/Pascal GPU compatibility
 
 ### CLI
 1) Prepare a JSONL knowledge base with fields: `id`, `title`, `description` (plus optional metadata).

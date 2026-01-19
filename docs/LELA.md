@@ -421,6 +421,43 @@ For faster processing without GPU requirements:
 }
 ```
 
+### NoOp Reranker
+
+The `"none"` reranker config name maps to `ner_pipeline_noop_reranker`, which passes candidates through unchanged:
+
+```json
+{
+  "reranker": {"name": "none"}
+}
+```
+
+This is useful when:
+- You want to skip reranking entirely
+- Your candidate generator already orders candidates well
+- You're using a lightweight pipeline configuration
+
+### Cache Key Generation
+
+The pipeline uses content-addressed caching for processed documents. Cache keys are generated as:
+
+```python
+key = SHA256(f"{file_path}-{modification_time}-{file_size}".encode()).hexdigest()
+```
+
+**Components:**
+- `file_path`: Full path to the document
+- `modification_time`: File's mtime from `os.stat()`
+- `file_size`: File size in bytes
+
+**Location:** Cache files are stored in `.ner_cache/` (configurable via `cache_dir`)
+
+**Cache invalidation:** The cache is automatically invalidated when:
+- The file path changes
+- The file is modified (mtime changes)
+- The file size changes
+
+**Disabling cache:** Set `cache_dir` to `None` in configuration (not recommended for production)
+
 ## LELA Module Structure
 
 **Location:** `ner_pipeline/lela/`

@@ -223,6 +223,90 @@ nlp.add_pipe("ner_pipeline_ner_filter")
 
 ---
 
+## Long Document Handling
+
+NER components automatically handle documents that exceed model context limits through chunking strategies.
+
+### GLiNER Chunking
+
+The LELA GLiNER component (`ner_pipeline_lela_gliner`) chunks long documents with overlap:
+
+**Parameters:**
+- Chunk size: ~1500 characters
+- Overlap: 200 characters
+- Boundary detection: Sentence-aware
+
+**Algorithm:**
+1. If document ≤ 1500 chars: process directly
+2. Otherwise, split into overlapping chunks:
+   - Start at position 0
+   - Find chunk end at ~1500 chars
+   - Look for sentence boundary (`. `, `.\n`, `? `, `!\n`, `\n\n`) near end
+   - If found after half the chunk, break there
+   - Process chunk, adjust entity offsets back to document coordinates
+   - Move start forward by (chunk_length - overlap)
+   - Repeat until end of document
+
+**Overlap rationale:**
+- 200-char overlap ensures entities near chunk boundaries aren't missed
+- Duplicate entities (same span, different chunks) are filtered by longest-span-wins
+
+**Example:**
+```
+Document: 3000 characters
+├── Chunk 1: chars 0-1500 (processes entities in this range)
+├── Chunk 2: chars 1300-2800 (200-char overlap with chunk 1)
+└── Chunk 3: chars 2600-3000 (200-char overlap with chunk 2)
+
+Entity at chars 1450-1480:
+- Found in Chunk 1 (at local 1450-1480)
+- Also found in Chunk 2 (at local 150-180)
+- Deduplication keeps one copy
+```
+
+### Transformers NER Stride
+
+The Transformers NER component (`ner_pipeline_transformers`) uses HuggingFace's built-in stride mechanism:
+
+**Parameters:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `stride` | 128 | Token overlap between chunks |
+| `max_length` | Model-specific | Maximum tokens per chunk (auto-detected) |
+
+**Configuration:**
+```python
+nlp.add_pipe("ner_pipeline_transformers", config={
+    "model_name": "dslim/bert-base-NER",
+    "stride": 128  # Token overlap
+})
+```
+
+**How it works:**
+- HuggingFace's pipeline handles tokenization and chunking automatically
+- `stride` controls how many tokens overlap between chunks
+- Model's `max_length` is auto-detected from tokenizer (capped at 512 if too large)
+
+**Example:**
+```
+Document: 1000 tokens
+Model max_length: 512
+Stride: 128
+
+├── Chunk 1: tokens 0-512
+├── Chunk 2: tokens 384-896 (128-token overlap)
+└── Chunk 3: tokens 768-1000 (128-token overlap)
+```
+
+### spaCy NER
+
+spaCy's built-in NER does not have explicit context limits and processes documents as a whole. For very long documents, consider:
+
+1. Using a pipeline-level document chunking strategy
+2. Switching to GLiNER or Transformers NER which handle chunking automatically
+
+---
+
 ## Candidate Generation Components
 
 Candidate components populate `ent._.candidates` with `List[Tuple[str, str]]` (title, description).
