@@ -394,7 +394,7 @@ for ent in doc.ents:
 
 If you encounter issues not covered here:
 
-1. Check the [GitHub Issues](https://github.com/anthropics/claude-code/issues)
+1. Check the [GitHub Issues](https://github.com/NDobricic/ner-pipeline/issues)
 2. Enable debug logging and examine the output
 3. Verify your environment matches the [Requirements](REQUIREMENTS.md)
 4. Try a minimal configuration to isolate the issue
