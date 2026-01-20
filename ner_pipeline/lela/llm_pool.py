@@ -151,10 +151,44 @@ def get_vllm_instance(
     return _vllm_instances[key]
 
 
-def clear_vllm_instances():
-    """Clear all cached vLLM instances (for cleanup)."""
+def clear_vllm_instances(force: bool = False):
+    """
+    Clear all cached vLLM instances.
+
+    Args:
+        force: If True, actually delete instances and free GPU memory.
+               If False (default), do nothing - instances should be reused.
+
+    Note: vLLM instances are expensive to create and should be reused across
+    pipeline runs. Only use force=True when shutting down the application.
+    """
     global _vllm_instances
+
+    if not force:
+        # Don't clear - instances should be reused between runs
+        return
+
+    # Actually clean up vLLM instances
+    for key, instance in list(_vllm_instances.items()):
+        try:
+            logger.info(f"Shutting down vLLM instance: {key}")
+            del instance
+        except Exception as e:
+            logger.warning(f"Error cleaning up vLLM instance {key}: {e}")
+
     _vllm_instances.clear()
+
+    # Force garbage collection and clear CUDA cache
+    import gc
+    gc.collect()
+
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+    except Exception as e:
+        logger.warning(f"Error clearing CUDA cache: {e}")
 
 
 # Global singleton instances

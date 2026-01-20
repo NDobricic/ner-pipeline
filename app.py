@@ -3,6 +3,7 @@ import os
 os.environ["VLLM_USE_V1"] = "0"
 
 import argparse
+import gc
 import importlib.util
 import logging
 import tempfile
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import gradio as gr
+import torch
 
 from ner_pipeline.config import PipelineConfig
 from ner_pipeline.pipeline import NERPipeline
@@ -140,13 +142,19 @@ def run_pipeline(
     progress=gr.Progress(),
 ) -> Tuple[List[Tuple[str, Optional[str]]], str, Dict]:
     """Run the NER pipeline with selected configuration."""
-    
+    # Note: We intentionally don't clear vLLM instances here - they should be
+    # reused across runs to avoid expensive reinitialization and resource leaks.
+    # Only general garbage collection is performed.
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
     if not kb_file:
         raise gr.Error("Please upload a knowledge base JSONL file.")
-    
+
     if not text_input and not file_input:
         raise gr.Error("Please provide either text input or upload a file.")
-    
+
     progress(0.1, desc="Building pipeline configuration...")
     
     # Build NER params based on type
@@ -469,6 +477,10 @@ if __name__ == "__main__":
         )
         
         run_btn.click(
+            fn=lambda: ([], "*Processing...*", None),
+            inputs=None,
+            outputs=[highlighted_output, stats_output, json_output],
+        ).then(
             fn=run_pipeline,
             inputs=[
                 text_input,
@@ -490,6 +502,7 @@ if __name__ == "__main__":
                 kb_type,
             ],
             outputs=[highlighted_output, stats_output, json_output],
+            show_progress_on=highlighted_output,
         )
         
         gr.Markdown("""
