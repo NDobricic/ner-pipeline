@@ -360,13 +360,29 @@ class NERPipeline:
                 num_ents = len(spacy_doc.ents)
                 report(current_progress, f"{stage_name} complete: found {num_ents} entities")
 
+        import logging
+        import sys
+        logger = logging.getLogger(__name__)
+
+        logger.info("process_document_with_progress: all components done, serializing...")
+        sys.stderr.flush()
         report(0.95, "Serializing results...")
         result = self._serialize_doc(spacy_doc, doc)
+        logger.info("process_document_with_progress: serialization done")
+        sys.stderr.flush()
 
         # Normalize linking confidence across entities in this document
+        logger.info("process_document_with_progress: normalizing confidence...")
+        sys.stderr.flush()
         self._normalize_linking_confidence([result])
+        logger.info("process_document_with_progress: normalization done")
+        sys.stderr.flush()
 
+        logger.info("process_document_with_progress: calling final report(1.0)...")
+        sys.stderr.flush()
         report(1.0, "Document processing complete")
+        logger.info("=== process_document_with_progress RETURNING ===")
+        sys.stderr.flush()
         return result
 
     def _get_stage_description(self, component_name: str) -> str:

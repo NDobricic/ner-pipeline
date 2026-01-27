@@ -263,12 +263,21 @@ class LELATournamentDisambiguatorComponent:
             logger.debug(f"Tournament batch {batch_idx + 1}/{len(batches)} prompt:\n{prompt}")
 
         # Run all batches in parallel via vLLM
+        import sys
+        import torch
         try:
+            logger.info(f"vLLM generate() called with {len(prompts)} prompts...")
+            sys.stderr.flush()
             responses = self.llm.generate(
                 prompts,
                 sampling_params=self.sampling_params,
                 use_tqdm=False,
             )
+            # Ensure GPU operations complete before continuing
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            logger.info(f"vLLM generate() returned {len(responses)} responses")
+            sys.stderr.flush()
         except Exception as e:
             logger.error(f"LLM generation error in tournament round: {e}")
             return []
@@ -418,7 +427,12 @@ class LELATournamentDisambiguatorComponent:
 
             report_entity_progress(1.0, "done")
 
+        import sys
+        logger.info("LELATournamentDisambiguatorComponent: clearing progress_callback...")
+        sys.stderr.flush()
         self.progress_callback = None
+        logger.info("=== LELATournamentDisambiguatorComponent.__call__ RETURNING ===")
+        sys.stderr.flush()
         return doc
 
 

@@ -138,6 +138,46 @@ def get_label_color(label: str) -> str:
     return ENTITY_COLORS[idx]
 
 
+def highlighted_to_html(highlighted: List[Tuple[str, Optional[str]]], color_map: Dict[str, str]) -> str:
+    """Convert highlighted text data to HTML with inline styles.
+
+    This bypasses Gradio's buggy HighlightedText component.
+    """
+    import html
+
+    parts = []
+    for text, label in highlighted:
+        escaped_text = html.escape(text)
+        if label is None:
+            parts.append(escaped_text)
+        else:
+            color = color_map.get(label, "#808080")
+            # Create a styled span for the entity
+            parts.append(
+                f'<mark style="background-color: {color}; padding: 0.1em 0.2em; '
+                f'border-radius: 0.2em; margin: 0 0.1em;" '
+                f'title="{html.escape(label)}">{escaped_text}</mark>'
+            )
+
+    # Build legend
+    legend_parts = []
+    seen_labels = set()
+    for _, label in highlighted:
+        if label and label not in seen_labels:
+            seen_labels.add(label)
+            color = color_map.get(label, "#808080")
+            legend_parts.append(
+                f'<span style="display: inline-block; margin-right: 1em;">'
+                f'<span style="background-color: {color}; padding: 0.1em 0.3em; '
+                f'border-radius: 0.2em; font-size: 0.85em;">{html.escape(label)}</span></span>'
+            )
+
+    legend_html = '<div style="margin-bottom: 0.5em; line-height: 1.8;">' + ''.join(legend_parts) + '</div>' if legend_parts else ''
+    text_html = '<div style="line-height: 1.6; white-space: pre-wrap;">' + ''.join(parts) + '</div>'
+
+    return legend_html + text_html
+
+
 def format_highlighted_text_with_threshold(
     result: Dict,
     threshold: float = 0.0,
@@ -297,6 +337,11 @@ def run_pipeline(
     progress=gr.Progress(),
 ) -> Tuple[List[Tuple[str, Optional[str]]], str, Dict]:
     """Run the NER pipeline with selected configuration."""
+    import sys
+    logger = logging.getLogger(__name__)
+    logger.info(f"=== run_pipeline ENTERED (run #{_run_counter}) ===")
+    sys.stderr.flush()
+
     # Note: We intentionally don't clear vLLM instances here - they should be
     # reused across runs to avoid expensive reinitialization and resource leaks.
     # Only general garbage collection is performed.
@@ -413,13 +458,41 @@ def run_pipeline(
     except Exception as e:
         return format_error_output("Pipeline Execution Failed", str(e))
 
+    import sys
+
+    logger.info("Pipeline processing complete, formatting output...")
+    sys.stderr.flush()
     progress(0.9, desc="Formatting output...")
 
+    logger.info("Calling format_highlighted_text...")
+    sys.stderr.flush()
     highlighted = format_highlighted_text(result)
+    logger.info(f"format_highlighted_text done, got {len(highlighted)} segments")
+    sys.stderr.flush()
+
+    logger.info("Calling compute_linking_stats...")
+    sys.stderr.flush()
     stats = compute_linking_stats(result)
+    logger.info("compute_linking_stats done")
+    sys.stderr.flush()
 
-    progress(1.0, desc="Done!")
+    logger.info("Calling progress(1.0, Done!)...")
+    sys.stderr.flush()
+    try:
+        progress(1.0, desc="Done!")
+        logger.info("progress(1.0) returned successfully")
+    except Exception as e:
+        logger.error(f"progress(1.0) raised exception: {e}")
+    sys.stderr.flush()
 
+    # Ensure all GPU operations are complete before returning
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+        logger.info("CUDA synchronized")
+        sys.stderr.flush()
+
+    logger.info(f"=== run_pipeline RETURNING (run #{_run_counter}, {len(result.get('entities', []))} entities) ===")
+    sys.stderr.flush()
     return highlighted, stats, result
 
 
@@ -476,19 +549,45 @@ def apply_confidence_filter(
     Returns:
         Tuple of (gr.HighlightedText, stats, full_json)
     """
+    import sys
+    logger = logging.getLogger(__name__)
+    logger.info(f"=== apply_confidence_filter STARTED (run #{_run_counter}, threshold={threshold}) ===")
+    sys.stderr.flush()
+
     if not full_result:
-        return gr.HighlightedText(value=[]), "*Run the pipeline to see results.*", {}
+        logger.info("apply_confidence_filter: no result, returning empty")
+        return "", "*Run the pipeline to see results.*", {}
 
     # Handle error results - pass through unchanged
     if "error" in full_result:
-        error_highlighted = [(f"Error: {full_result['error']}", "ERROR")]
         error_stats = f"**Error**\n\n{full_result.get('details', 'Unknown error')}"
-        return gr.HighlightedText(value=error_highlighted, color_map={"ERROR": ERROR_COLOR}), error_stats, full_result
+        error_html = f'<div style="color: {ERROR_COLOR}; font-weight: bold;">Error: {full_result["error"]}</div>'
+        return error_html, error_stats, full_result
 
+    logger.info("apply_confidence_filter: calling format_highlighted_text_with_threshold...")
     highlighted, color_map = format_highlighted_text_with_threshold(full_result, threshold)
+    logger.info(f"apply_confidence_filter: got {len(highlighted)} segments, {len(color_map)} colors")
+
+    # Validate that all labels in highlighted have a color
+    labels_in_text = set(label for _, label in highlighted if label is not None)
+    labels_in_map = set(color_map.keys())
+    missing_labels = labels_in_text - labels_in_map
+    if missing_labels:
+        logger.warning(f"Labels missing from color_map: {missing_labels}")
+        # Add missing labels with default color
+        for label in missing_labels:
+            color_map[label] = "#808080"
+
+    logger.info("apply_confidence_filter: calling compute_linking_stats...")
     stats = compute_linking_stats(full_result, threshold)
 
-    return gr.HighlightedText(value=highlighted, color_map=color_map), stats, full_result
+    # Convert to HTML to bypass buggy HighlightedText component
+    html_output = highlighted_to_html(highlighted, color_map)
+
+    logger.info(f"=== apply_confidence_filter RETURNING (run #{_run_counter}) ===")
+    sys.stderr.flush()
+
+    return html_output, stats, full_result
 
 
 def apply_confidence_filter_display(
@@ -497,18 +596,34 @@ def apply_confidence_filter_display(
 ):
     """Apply confidence filter to display components only (skip JSON for performance)."""
     if not full_result:
-        return gr.HighlightedText(value=[]), "*Run the pipeline to see results.*"
+        return "", "*Run the pipeline to see results.*"
 
     # Handle error results - pass through unchanged
     if "error" in full_result:
-        error_highlighted = [(f"Error: {full_result['error']}", "ERROR")]
         error_stats = f"**Error**\n\n{full_result.get('details', 'Unknown error')}"
-        return gr.HighlightedText(value=error_highlighted, color_map={"ERROR": ERROR_COLOR}), error_stats
+        error_html = f'<div style="color: {ERROR_COLOR}; font-weight: bold;">Error: {full_result["error"]}</div>'
+        return error_html, error_stats
 
     highlighted, color_map = format_highlighted_text_with_threshold(full_result, threshold)
     stats = compute_linking_stats(full_result, threshold)
 
-    return gr.HighlightedText(value=highlighted, color_map=color_map), stats
+    # Convert to HTML to bypass buggy HighlightedText component
+    html_output = highlighted_to_html(highlighted, color_map)
+    return html_output, stats
+
+
+_run_counter = 0
+
+def clear_outputs_for_new_run():
+    """Clear outputs and log when a new run starts."""
+    global _run_counter
+    _run_counter += 1
+    logger = logging.getLogger(__name__)
+    logger.info(f"=== BUTTON CLICKED - Starting run #{_run_counter} ===")
+    import sys
+    sys.stderr.flush()
+    # Return empty HTML string instead of empty list for the HTML component
+    return "", "*Processing...*", None, None
 
 
 if __name__ == "__main__":
@@ -526,6 +641,10 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=args.log)
     logger = logging.getLogger(__name__)
+
+    # Silence noisy loggers
+    logging.getLogger("numba").setLevel(logging.WARNING)
+    logging.getLogger("numba.core").setLevel(logging.WARNING)
 
     # Log vLLM availability status
     vllm_ok = _is_vllm_usable()
@@ -708,10 +827,8 @@ if __name__ == "__main__":
 
                 with gr.Row():
                     with gr.Column(scale=2):
-                        highlighted_output = gr.HighlightedText(
+                        highlighted_output = gr.HTML(
                             label="Linked Entities",
-                            color_map={},
-                            show_legend=True,
                             elem_classes=["output-section"],
                         )
                     with gr.Column(scale=1):
@@ -847,7 +964,7 @@ Test files are available in `data/test/`:
         )
 
         run_btn.click(
-            fn=lambda: ([], "*Processing...*", None, None),
+            fn=clear_outputs_for_new_run,
             inputs=None,
             outputs=[highlighted_output, stats_output, json_output, full_result_state],
         ).then(
@@ -875,7 +992,7 @@ Test files are available in `data/test/`:
                 kb_type,
             ],
             outputs=[highlighted_output, stats_output, full_result_state],
-            show_progress_on=highlighted_output,
+            # Removed show_progress_on to test if it's causing the freeze
         ).then(
             fn=apply_confidence_filter,
             inputs=[full_result_state, confidence_threshold],
