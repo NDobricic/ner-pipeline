@@ -224,7 +224,16 @@ class TestLELAEmbedderRerankerComponent:
 
     @patch("ner_pipeline.spacy_components.rerankers.get_sentence_transformer_instance")
     def test_initialization_with_custom_params(self, mock_get_st):
+        import numpy as np
+        from spacy.tokens import Span
+        from ner_pipeline.types import Candidate
+        from ner_pipeline.utils import ensure_candidates_extension
+
+        ensure_candidates_extension()
+
         mock_model = MagicMock()
+        # Mock model.encode to return embeddings (1 query + 10 candidates = 11)
+        mock_model.encode.return_value = np.array([[0.5, 0.5]] * 11)
         mock_get_st.return_value = mock_model
 
         nlp = spacy.blank("en")
@@ -239,4 +248,18 @@ class TestLELAEmbedderRerankerComponent:
         assert reranker.model_name == "custom-model"
         assert reranker.top_k == 5
         assert reranker.device == "cuda"
+
+        # Create a doc with entity and candidates to trigger lazy loading
+        # Need more candidates than top_k (5) to trigger reranking
+        doc = nlp.make_doc("Test Entity is here.")
+        doc.ents = [Span(doc, 0, 2, label="TEST")]
+        # Set candidates on the Span - need > top_k candidates to trigger model loading
+        doc.ents[0]._.candidates = [
+            Candidate(entity_id=str(i), score=1.0, description=f"Test {i}")
+            for i in range(10)  # 10 > top_k (5)
+        ]
+
+        # Call the component to trigger lazy model loading
+        reranker(doc)
+
         mock_get_st.assert_called_once_with("custom-model", "cuda")

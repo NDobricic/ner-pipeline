@@ -4,22 +4,26 @@ import pytest
 
 from app import (
     compute_linking_stats,
-    format_highlighted_text,
+    format_highlighted_text_with_threshold,
     get_available_components,
+    highlighted_to_html,
     run_pipeline,
 )
 from tests.conftest import MockGradioFile, MockGradioProgress
 
 
 @pytest.mark.integration
-class TestFormatHighlightedText:
-    """Tests for format_highlighted_text function."""
+class TestFormatHighlightedTextWithThreshold:
+    """Tests for format_highlighted_text_with_threshold function."""
 
     def test_format_empty_entities(self):
         """No entities returns single tuple with full text."""
         result = {"text": "Hello world", "entities": []}
-        highlighted = format_highlighted_text(result)
-        assert highlighted == [("Hello world", None)]
+        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        assert len(highlighted) == 1
+        assert highlighted[0][0] == "Hello world"
+        assert highlighted[0][1] is None
+        assert highlighted[0][2] is None
 
     def test_format_single_entity(self):
         """One entity is highlighted correctly."""
@@ -35,10 +39,16 @@ class TestFormatHighlightedText:
                 }
             ],
         }
-        highlighted = format_highlighted_text(result)
+        highlighted, color_map = format_highlighted_text_with_threshold(result)
         assert len(highlighted) == 2
-        assert highlighted[0] == ("Barack Obama", "PERSON: Barack Obama")
-        assert highlighted[1] == (" was president.", None)
+        # First element: (text, label, entity_info)
+        assert highlighted[0][0] == "Barack Obama"
+        assert highlighted[0][1] == "PERSON: Barack Obama"
+        assert highlighted[0][2] is not None  # entity_info dict
+        assert highlighted[0][2]["kb_title"] == "Barack Obama"
+        # Second element: plain text
+        assert highlighted[1][0] == " was president."
+        assert highlighted[1][1] is None
 
     def test_format_multiple_entities(self):
         """Multiple entities with gaps are formatted correctly."""
@@ -61,12 +71,16 @@ class TestFormatHighlightedText:
                 },
             ],
         }
-        highlighted = format_highlighted_text(result)
+        highlighted, color_map = format_highlighted_text_with_threshold(result)
         assert len(highlighted) == 4
-        assert highlighted[0] == ("Albert Einstein", "PERSON: Albert Einstein")
-        assert highlighted[1] == (" was born in ", None)
-        assert highlighted[2] == ("Germany", "GPE: Germany")
-        assert highlighted[3] == (".", None)
+        assert highlighted[0][0] == "Albert Einstein"
+        assert highlighted[0][1] == "PERSON: Albert Einstein"
+        assert highlighted[1][0] == " was born in "
+        assert highlighted[1][1] is None
+        assert highlighted[2][0] == "Germany"
+        assert highlighted[2][1] == "GPE: Germany"
+        assert highlighted[3][0] == "."
+        assert highlighted[3][1] is None
 
     def test_format_linked_entity(self):
         """Linked entity shows 'LABEL: Title' format."""
@@ -82,8 +96,9 @@ class TestFormatHighlightedText:
                 }
             ],
         }
-        highlighted = format_highlighted_text(result)
-        assert highlighted[0] == ("Obama", "PERSON: Barack Obama")
+        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        assert highlighted[0][0] == "Obama"
+        assert highlighted[0][1] == "PERSON: Barack Obama"
 
     def test_format_unlinked_entity(self):
         """Unlinked entity shows 'LABEL [NOT IN KB]' format."""
@@ -99,8 +114,9 @@ class TestFormatHighlightedText:
                 }
             ],
         }
-        highlighted = format_highlighted_text(result)
-        assert highlighted[0] == ("John Doe", "PERSON [NOT IN KB]")
+        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        assert highlighted[0][0] == "John Doe"
+        assert highlighted[0][1] == "PERSON [NOT IN KB]"
 
     def test_format_entity_at_boundaries(self):
         """Entity at start and end of text are handled correctly."""
@@ -116,9 +132,10 @@ class TestFormatHighlightedText:
                 }
             ],
         }
-        highlighted = format_highlighted_text(result)
+        highlighted, color_map = format_highlighted_text_with_threshold(result)
         assert len(highlighted) == 1
-        assert highlighted[0] == ("Obama", "PERSON: Barack Obama")
+        assert highlighted[0][0] == "Obama"
+        assert highlighted[0][1] == "PERSON: Barack Obama"
 
     def test_format_missing_label_uses_ent(self):
         """Missing label defaults to 'ENT'."""
@@ -133,8 +150,93 @@ class TestFormatHighlightedText:
                 }
             ],
         }
-        highlighted = format_highlighted_text(result)
-        assert highlighted[0] == ("Entity", "ENT [NOT IN KB]")
+        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        assert highlighted[0][0] == "Entity"
+        assert highlighted[0][1] == "ENT [NOT IN KB]"
+
+    def test_returns_color_map(self):
+        """Returns a color_map with colors for each label."""
+        result = {
+            "text": "Barack Obama and Germany",
+            "entities": [
+                {
+                    "text": "Barack Obama",
+                    "start": 0,
+                    "end": 12,
+                    "label": "PERSON",
+                    "entity_title": "Barack Obama",
+                },
+                {
+                    "text": "Germany",
+                    "start": 17,
+                    "end": 24,
+                    "label": "GPE",
+                    "entity_title": "Germany",
+                },
+            ],
+        }
+        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        assert "PERSON: Barack Obama" in color_map
+        assert "GPE: Germany" in color_map
+        # Colors should be hex strings
+        assert color_map["PERSON: Barack Obama"].startswith("#")
+        assert color_map["GPE: Germany"].startswith("#")
+
+    def test_entity_info_contains_expected_fields(self):
+        """Entity info dict contains expected fields for popup."""
+        result = {
+            "text": "Obama",
+            "entities": [
+                {
+                    "text": "Obama",
+                    "start": 0,
+                    "end": 5,
+                    "label": "PERSON",
+                    "entity_title": "Barack Obama",
+                    "entity_id": "Q76",
+                    "entity_description": "44th President of the United States",
+                    "linking_confidence": 0.95,
+                    "linking_confidence_normalized": 0.85,
+                }
+            ],
+        }
+        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        entity_info = highlighted[0][2]
+        assert entity_info["mention"] == "Obama"
+        assert entity_info["type"] == "PERSON"
+        assert entity_info["kb_id"] == "Q76"
+        assert entity_info["kb_title"] == "Barack Obama"
+        assert entity_info["kb_description"] == "44th President of the United States"
+        assert entity_info["confidence"] == 0.95
+        assert entity_info["confidence_normalized"] == 0.85
+
+
+@pytest.mark.integration
+class TestHighlightedToHtml:
+    """Tests for highlighted_to_html function."""
+
+    def test_converts_to_html_string(self):
+        """Returns an HTML string."""
+        highlighted = [("Hello ", None, None), ("World", "ENTITY", {"kb_title": "World"})]
+        color_map = {"ENTITY": "#FF0000"}
+        html = highlighted_to_html(highlighted, color_map)
+        assert isinstance(html, str)
+        assert "<div" in html
+
+    def test_includes_entity_marks(self):
+        """HTML includes mark elements for entities."""
+        highlighted = [("Obama", "PERSON: Barack Obama", {"kb_title": "Barack Obama"})]
+        color_map = {"PERSON: Barack Obama": "#1F77B4"}
+        html = highlighted_to_html(highlighted, color_map)
+        assert "<mark" in html
+        assert "Obama" in html
+
+    def test_includes_popup_div(self):
+        """HTML includes a popup div for hover info."""
+        highlighted = [("Obama", "PERSON: Barack Obama", {"kb_title": "Barack Obama"})]
+        color_map = {"PERSON: Barack Obama": "#1F77B4"}
+        html = highlighted_to_html(highlighted, color_map)
+        assert "popup" in html.lower() or "display: none" in html
 
 
 @pytest.mark.integration
@@ -235,12 +337,19 @@ class TestGetAvailableComponents:
 
 @pytest.mark.integration
 class TestRunPipeline:
-    """Tests for run_pipeline function."""
+    """Tests for run_pipeline generator function."""
+
+    def _exhaust_generator(self, gen):
+        """Exhaust a generator and return the final result."""
+        result = None
+        for result in gen:
+            pass
+        return result
 
     def test_run_pipeline_text_input(self, mock_kb_file: MockGradioFile, mock_progress: MockGradioProgress):
         """Pipeline processes text input correctly."""
         text_input = "Barack Obama was president."
-        highlighted, stats, result = run_pipeline(
+        gen = run_pipeline(
             text_input=text_input,
             file_input=None,
             kb_file=mock_kb_file,
@@ -252,25 +361,29 @@ class TestRunPipeline:
             gliner_threshold=0.5,
             simple_min_len=3,
             cand_type="fuzzy",
+            cand_embedding_model="Qwen/Qwen3-Embedding-4B",
             cand_top_k=10,
             cand_use_context=True,
             reranker_type="none",
+            reranker_embedding_model="Qwen/Qwen3-Embedding-4B",
             reranker_top_k=10,
             disambig_type="first",
+            llm_model="Qwen/Qwen3-4B",
             tournament_batch_size=4,
             tournament_shuffle=False,
             tournament_thinking=False,
             kb_type="custom",
             progress=mock_progress,
         )
-        assert isinstance(highlighted, list)
+        html_output, stats, result = self._exhaust_generator(gen)
+        assert isinstance(html_output, str)
         assert isinstance(stats, str)
         assert isinstance(result, dict)
 
     def test_run_pipeline_returns_tuple(self, mock_kb_file: MockGradioFile, mock_progress: MockGradioProgress):
-        """Pipeline returns tuple of (highlighted, stats, result)."""
+        """Pipeline generator yields tuples of (html, stats, result)."""
         text_input = "Test text."
-        output = run_pipeline(
+        gen = run_pipeline(
             text_input=text_input,
             file_input=None,
             kb_file=mock_kb_file,
@@ -282,23 +395,27 @@ class TestRunPipeline:
             gliner_threshold=0.5,
             simple_min_len=3,
             cand_type="fuzzy",
+            cand_embedding_model="Qwen/Qwen3-Embedding-4B",
             cand_top_k=10,
             cand_use_context=True,
             reranker_type="none",
+            reranker_embedding_model="Qwen/Qwen3-Embedding-4B",
             reranker_top_k=10,
             disambig_type="first",
+            llm_model="Qwen/Qwen3-4B",
             tournament_batch_size=4,
             tournament_shuffle=False,
             tournament_thinking=False,
             kb_type="custom",
             progress=mock_progress,
         )
+        output = self._exhaust_generator(gen)
         assert len(output) == 3
 
     def test_run_pipeline_result_structure(self, mock_kb_file: MockGradioFile, mock_progress: MockGradioProgress):
         """Result has text and entities keys."""
         text_input = "Barack Obama was president."
-        _, _, result = run_pipeline(
+        gen = run_pipeline(
             text_input=text_input,
             file_input=None,
             kb_file=mock_kb_file,
@@ -310,23 +427,27 @@ class TestRunPipeline:
             gliner_threshold=0.5,
             simple_min_len=3,
             cand_type="fuzzy",
+            cand_embedding_model="Qwen/Qwen3-Embedding-4B",
             cand_top_k=10,
             cand_use_context=True,
             reranker_type="none",
+            reranker_embedding_model="Qwen/Qwen3-Embedding-4B",
             reranker_top_k=10,
             disambig_type="first",
+            llm_model="Qwen/Qwen3-4B",
             tournament_batch_size=4,
             tournament_shuffle=False,
             tournament_thinking=False,
             kb_type="custom",
             progress=mock_progress,
         )
+        _, _, result = self._exhaust_generator(gen)
         assert "text" in result
         assert "entities" in result
 
     def test_run_pipeline_no_kb_error(self, mock_progress: MockGradioProgress):
         """Returns error without KB file."""
-        highlighted, stats, result = run_pipeline(
+        gen = run_pipeline(
             text_input="Some text",
             file_input=None,
             kb_file=None,
@@ -338,23 +459,27 @@ class TestRunPipeline:
             gliner_threshold=0.5,
             simple_min_len=3,
             cand_type="fuzzy",
+            cand_embedding_model="Qwen/Qwen3-Embedding-4B",
             cand_top_k=10,
             cand_use_context=True,
             reranker_type="none",
+            reranker_embedding_model="Qwen/Qwen3-Embedding-4B",
             reranker_top_k=10,
             disambig_type="first",
+            llm_model="Qwen/Qwen3-4B",
             tournament_batch_size=4,
             tournament_shuffle=False,
             tournament_thinking=False,
             kb_type="custom",
             progress=mock_progress,
         )
+        html_output, stats, result = self._exhaust_generator(gen)
         assert "error" in result
         assert "Knowledge Base" in result["error"]
 
     def test_run_pipeline_no_input_error(self, mock_kb_file: MockGradioFile, mock_progress: MockGradioProgress):
         """Returns error without text or file input."""
-        highlighted, stats, result = run_pipeline(
+        gen = run_pipeline(
             text_input="",
             file_input=None,
             kb_file=mock_kb_file,
@@ -366,16 +491,54 @@ class TestRunPipeline:
             gliner_threshold=0.5,
             simple_min_len=3,
             cand_type="fuzzy",
+            cand_embedding_model="Qwen/Qwen3-Embedding-4B",
             cand_top_k=10,
             cand_use_context=True,
             reranker_type="none",
+            reranker_embedding_model="Qwen/Qwen3-Embedding-4B",
             reranker_top_k=10,
             disambig_type="first",
+            llm_model="Qwen/Qwen3-4B",
             tournament_batch_size=4,
             tournament_shuffle=False,
             tournament_thinking=False,
             kb_type="custom",
             progress=mock_progress,
         )
+        html_output, stats, result = self._exhaust_generator(gen)
         assert "error" in result
         assert "Input" in result["error"]
+
+    def test_run_pipeline_html_output_is_string(self, mock_kb_file: MockGradioFile, mock_progress: MockGradioProgress):
+        """HTML output is a string, not a list."""
+        text_input = "Barack Obama was president."
+        gen = run_pipeline(
+            text_input=text_input,
+            file_input=None,
+            kb_file=mock_kb_file,
+            loader_type="text",
+            ner_type="simple",
+            spacy_model="en_core_web_sm",
+            gliner_model="urchade/gliner_large",
+            gliner_labels="",
+            gliner_threshold=0.5,
+            simple_min_len=3,
+            cand_type="fuzzy",
+            cand_embedding_model="Qwen/Qwen3-Embedding-4B",
+            cand_top_k=10,
+            cand_use_context=True,
+            reranker_type="none",
+            reranker_embedding_model="Qwen/Qwen3-Embedding-4B",
+            reranker_top_k=10,
+            disambig_type="first",
+            llm_model="Qwen/Qwen3-4B",
+            tournament_batch_size=4,
+            tournament_shuffle=False,
+            tournament_thinking=False,
+            kb_type="custom",
+            progress=mock_progress,
+        )
+        html_output, _, _ = self._exhaust_generator(gen)
+        assert isinstance(html_output, str)
+        # Should contain HTML markup
+        assert "<" in html_output or html_output == ""

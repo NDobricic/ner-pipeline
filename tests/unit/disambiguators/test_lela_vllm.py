@@ -324,8 +324,13 @@ class TestLELAvLLMDisambiguatorConfig:
     @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_custom_model_name(self, mock_get_instance, mock_get_vllm):
         mock_vllm = MagicMock()
-        mock_get_vllm.return_value = (mock_vllm, MagicMock())
-        mock_get_instance.return_value = MagicMock()
+        mock_sampling_params = MagicMock()
+        mock_get_vllm.return_value = (mock_vllm, mock_sampling_params)
+
+        # Mock LLM instance with generate method
+        mock_llm = MagicMock()
+        mock_llm.generate.return_value = [MagicMock(outputs=[MagicMock(text='{"answer": 1}')])]
+        mock_get_instance.return_value = mock_llm
 
         # Create minimal KB
         with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
@@ -336,9 +341,22 @@ class TestLELAvLLMDisambiguatorConfig:
             kb = CustomJSONLKnowledgeBase(path=path)
 
             from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+            from ner_pipeline.utils import ensure_candidates_extension, ensure_resolved_entity_extension
+            ensure_candidates_extension()
+            ensure_resolved_entity_extension()
+
             nlp = spacy.blank("en")
             component = LELAvLLMDisambiguatorComponent(nlp=nlp, model_name="custom/model")
             component.initialize(kb)
+
+            # Create a doc with an entity to trigger lazy loading
+            doc = nlp.make_doc("Test Entity is here.")
+            doc.ents = [Span(doc, 0, 2, label="TEST")]
+            # Set candidates on the Span, not Doc
+            doc.ents[0]._.candidates = [Candidate(entity_id="1", score=1.0, description="Test")]
+
+            # Call the component to trigger lazy LLM loading
+            component(doc)
 
             # Check that get_vllm_instance was called with correct model
             mock_get_instance.assert_called_once()
@@ -351,8 +369,13 @@ class TestLELAvLLMDisambiguatorConfig:
     @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_tensor_parallel_size(self, mock_get_instance, mock_get_vllm):
         mock_vllm = MagicMock()
-        mock_get_vllm.return_value = (mock_vllm, MagicMock())
-        mock_get_instance.return_value = MagicMock()
+        mock_sampling_params = MagicMock()
+        mock_get_vllm.return_value = (mock_vllm, mock_sampling_params)
+
+        # Mock LLM instance with generate method
+        mock_llm = MagicMock()
+        mock_llm.generate.return_value = [MagicMock(outputs=[MagicMock(text='{"answer": 1}')])]
+        mock_get_instance.return_value = mock_llm
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
             f.write('{"title": "Test", "description": "Test"}\n')
@@ -362,9 +385,22 @@ class TestLELAvLLMDisambiguatorConfig:
             kb = CustomJSONLKnowledgeBase(path=path)
 
             from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+            from ner_pipeline.utils import ensure_candidates_extension, ensure_resolved_entity_extension
+            ensure_candidates_extension()
+            ensure_resolved_entity_extension()
+
             nlp = spacy.blank("en")
             component = LELAvLLMDisambiguatorComponent(nlp=nlp, tensor_parallel_size=4)
             component.initialize(kb)
+
+            # Create a doc with an entity to trigger lazy loading
+            doc = nlp.make_doc("Test Entity is here.")
+            doc.ents = [Span(doc, 0, 2, label="TEST")]
+            # Set candidates on the Span, not Doc
+            doc.ents[0]._.candidates = [Candidate(entity_id="1", score=1.0, description="Test")]
+
+            # Call the component to trigger lazy LLM loading
+            component(doc)
 
             call_kwargs = mock_get_instance.call_args[1]
             assert call_kwargs["tensor_parallel_size"] == 4
