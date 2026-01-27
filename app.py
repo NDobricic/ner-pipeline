@@ -7,11 +7,15 @@ import gc
 import importlib.util
 import logging
 import tempfile
+import threading
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple
 
 import gradio as gr
 import torch
+
+# Global cancellation event for cooperative cancellation
+_cancel_event = threading.Event()
 
 from ner_pipeline.config import PipelineConfig
 from ner_pipeline.pipeline import NERPipeline
@@ -512,15 +516,19 @@ def run_pipeline(
     tournament_thinking: bool,
     kb_type: str,
     progress=gr.Progress(),
-) -> Tuple[str, str, Dict]:
+):
     """Run the NER pipeline with selected configuration.
 
-    Returns (html_output, stats, result) where html_output is the rendered entity HTML.
+    This is a generator function that yields (html_output, stats, result) tuples.
+    Yielding allows Gradio to check for cancellation between steps.
     """
     import sys
     logger = logging.getLogger(__name__)
     logger.info(f"=== run_pipeline ENTERED (run #{_run_counter}) ===")
     sys.stderr.flush()
+
+    # Clear cancellation flag at the start of a new run
+    _cancel_event.clear()
 
     # Note: We intentionally don't clear vLLM instances here - they should be
     # reused across runs to avoid expensive reinitialization and resource leaks.
@@ -530,18 +538,27 @@ def run_pipeline(
         torch.cuda.empty_cache()
 
     if not kb_file:
-        return format_error_output(
+        yield format_error_output(
             "Missing Knowledge Base",
             "Please upload a knowledge base JSONL file."
         )
+        return
 
     if not text_input and not file_input:
-        return format_error_output(
+        yield format_error_output(
             "Missing Input",
             "Please provide either text input or upload a file."
         )
+        return
+
+    # Check for cancellation
+    if _cancel_event.is_set():
+        logger.info("Pipeline cancelled before configuration")
+        yield "", "*Pipeline cancelled.*", {}
+        return
 
     progress(0.1, desc="Building pipeline configuration...")
+    yield "", "*Building configuration...*", {}
 
     # Build NER params based on type
     ner_params = {}
@@ -590,7 +607,14 @@ def run_pipeline(
         "batch_size": 1,
     }
 
+    # Check for cancellation
+    if _cancel_event.is_set():
+        logger.info("Pipeline cancelled before initialization")
+        yield "", "*Pipeline cancelled.*", {}
+        return
+
     progress(0.15, desc="Initializing pipeline...")
+    yield "", "*Initializing pipeline...*", {}
 
     try:
         config = PipelineConfig.from_dict(config_dict)
@@ -602,9 +626,17 @@ def run_pipeline(
 
         pipeline = NERPipeline(config, progress_callback=init_progress_callback)
     except Exception as e:
-        return format_error_output("Pipeline Initialization Failed", str(e))
+        yield format_error_output("Pipeline Initialization Failed", str(e))
+        return
+
+    # Check for cancellation
+    if _cancel_event.is_set():
+        logger.info("Pipeline cancelled after initialization")
+        yield "", "*Pipeline cancelled.*", {}
+        return
 
     progress(0.4, desc="Loading document...")
+    yield "", "*Loading document...*", {}
 
     try:
         if file_input:
@@ -621,18 +653,31 @@ def run_pipeline(
             os.unlink(input_path)
 
         if not docs:
-            return format_error_output(
+            yield format_error_output(
                 "No Documents Loaded",
                 "The input file was empty or could not be parsed."
             )
+            return
 
         doc = docs[0]
 
-        # Process with fine-grained progress callback
+        # Check for cancellation
+        if _cancel_event.is_set():
+            logger.info("Pipeline cancelled before processing")
+            yield "", "*Pipeline cancelled.*", {}
+            return
+
+        progress(0.45, desc="Processing document...")
+        yield "", "*Processing document...*", {}
+
+        # Process with fine-grained progress callback that also checks for cancellation
         def progress_callback(local_progress: float, description: str):
             # Map local progress (0.0-1.0) to our range (0.45-0.85)
             actual_progress = 0.45 + local_progress * 0.4
             progress(actual_progress, desc=description)
+            # Raise exception if cancelled to interrupt processing
+            if _cancel_event.is_set():
+                raise InterruptedError("Pipeline cancelled by user")
 
         result = pipeline.process_document_with_progress(
             doc,
@@ -641,10 +686,13 @@ def run_pipeline(
             progress_range=1.0,
         )
 
+    except InterruptedError:
+        logger.info("Pipeline cancelled during processing")
+        yield "", "*Pipeline cancelled.*", {}
+        return
     except Exception as e:
-        return format_error_output("Pipeline Execution Failed", str(e))
-
-    import sys
+        yield format_error_output("Pipeline Execution Failed", str(e))
+        return
 
     logger.info("Pipeline processing complete, formatting output...")
     sys.stderr.flush()
@@ -682,7 +730,8 @@ def run_pipeline(
 
     logger.info(f"=== run_pipeline RETURNING (run #{_run_counter}, {len(result.get('entities', []))} entities) ===")
     sys.stderr.flush()
-    return html_output, stats, result
+    # Final yield with complete results
+    yield html_output, stats, result
 
 
 def update_ner_params(ner_choice: str):
@@ -846,12 +895,31 @@ def clear_outputs_for_new_run():
     """Clear outputs and log when a new run starts."""
     global _run_counter
     _run_counter += 1
+    # Clear cancellation flag for new run
+    _cancel_event.clear()
     logger = logging.getLogger(__name__)
     logger.info(f"=== BUTTON CLICKED - Starting run #{_run_counter} ===")
     import sys
     sys.stderr.flush()
     # Return empty HTML string instead of empty list for the HTML component
-    return "", "*Processing...*", None, None
+    # Also return button visibility updates: hide Run, show Cancel
+    return "", "*Processing...*", None, None, gr.update(visible=False), gr.update(visible=True)
+
+
+def restore_buttons_after_run():
+    """Restore button visibility after pipeline completes or is cancelled."""
+    # Show Run button, hide Cancel button (reset text and make interactive again)
+    return gr.update(visible=True), gr.update(visible=False, value="Cancel", interactive=True)
+
+
+def start_cancellation():
+    """Called when cancel button is clicked. Set flag and show cancelling state."""
+    logger = logging.getLogger(__name__)
+    logger.info("=== CANCEL BUTTON CLICKED ===")
+    # Set the cancellation flag - pipeline will check this and stop
+    _cancel_event.set()
+    # Update button to show "Cancelling..." with loading state (non-interactive)
+    return gr.update(value="Cancelling...", interactive=False)
 
 
 if __name__ == "__main__":
@@ -1071,11 +1139,19 @@ if __name__ == "__main__":
                     visible=False,
                 )
 
-                # --- RUN BUTTON ---
+                # --- RUN/CANCEL BUTTON ---
+                # Single button that changes between Run/Cancel states
                 run_btn = gr.Button(
                     "Run Pipeline",
                     variant="primary",
                     size="lg",
+                    elem_classes=["run-button"],
+                )
+                cancel_btn = gr.Button(
+                    "Cancel",
+                    variant="stop",
+                    size="lg",
+                    visible=False,
                     elem_classes=["run-button"],
                 )
 
@@ -1243,10 +1319,11 @@ Test files are available in `data/test/`:
             outputs=[memory_estimate_display],
         )
 
-        run_btn.click(
+        # Chain: clear outputs → run pipeline → apply filter → restore buttons
+        run_event = run_btn.click(
             fn=clear_outputs_for_new_run,
             inputs=None,
-            outputs=[highlighted_output, stats_output, json_output, full_result_state],
+            outputs=[highlighted_output, stats_output, json_output, full_result_state, run_btn, cancel_btn],
         ).then(
             fn=run_pipeline,
             inputs=[
@@ -1279,6 +1356,18 @@ Test files are available in `data/test/`:
             fn=apply_confidence_filter,
             inputs=[full_result_state, confidence_threshold],
             outputs=[highlighted_output, stats_output, json_output],
+        ).then(
+            fn=restore_buttons_after_run,
+            inputs=None,
+            outputs=[run_btn, cancel_btn],
+        )
+
+        # Cancel button: show "Cancelling..." and set flag
+        # The pipeline generator checks the flag and exits, then restore_buttons_after_run runs
+        cancel_btn.click(
+            fn=start_cancellation,
+            inputs=None,
+            outputs=[cancel_btn],
         )
 
         confidence_threshold.change(
