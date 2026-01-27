@@ -45,8 +45,9 @@ def _is_vllm_usable() -> bool:
 def get_available_components() -> Dict[str, List[str]]:
     """Get list of available spaCy pipeline components."""
     # These map to spaCy factories registered in ner_pipeline.spacy_components
-    # Always include lela_vllm - it will error at runtime if not usable
-    available_disambiguators = ["none", "first", "popularity", "lela_vllm", "lela_transformers"]
+    # lela_tournament is the full LELA paper implementation with tournament batching
+    # lela_vllm sends all candidates at once (simpler but less accurate for many candidates)
+    available_disambiguators = ["none", "first", "popularity", "lela_tournament", "lela_vllm", "lela_transformers"]
     
     return {
         "loaders": ["text", "pdf", "docx", "html", "json", "jsonl"],
@@ -98,27 +99,31 @@ def format_highlighted_text(result: Dict) -> List[Tuple[str, Optional[str]]]:
 GRAY_COLOR = "#D1D5DB"  # Tailwind gray-300 (light gray)
 
 # Color palette for consistent entity colors
+# Based on D3 Category20 / Tableau 20 - industry standard for categorical data visualization
+# First 10: saturated colors for primary distinction
+# Next 10: lighter variants for additional categories
+# Source: https://d3js.org/d3-scale-chromatic/categorical
 ENTITY_COLORS = [
-    "#AE14E3",
-    "#E0F51A",
-    "#E67899",
-    "#6B14E3",
-    "#E314C7",
-    "#E63874",
-    "#0118C7",
-    "#21BD7E",
-    "#566753",
-    "#196208",
-    "#9E8424",
-    "#F59061",
-    "#F0B833",
-    "#CC331C",
-    "#476AE0",
-    "#8D9EE6",
-    "#84A96F",
-    "#94500D",
-    "#53F06E",
-    "#36BAEB",
+    "#1F77B4",  # Blue
+    "#FF7F0E",  # Orange
+    "#2CA02C",  # Green
+    "#D62728",  # Red
+    "#9467BD",  # Purple
+    "#8C564B",  # Brown
+    "#E377C2",  # Pink
+    "#7F7F7F",  # Gray
+    "#BCBD22",  # Olive
+    "#17BECF",  # Cyan
+    "#AEC7E8",  # Light Blue
+    "#FFBB78",  # Light Orange
+    "#98DF8A",  # Light Green
+    "#FF9896",  # Light Red
+    "#C5B0D5",  # Light Purple
+    "#C49C94",  # Light Brown
+    "#F7B6D2",  # Light Pink
+    "#C7C7C7",  # Light Gray
+    "#DBDB8D",  # Light Olive
+    "#9EDAE5",  # Light Cyan
 ]
 
 
@@ -262,6 +267,9 @@ def run_pipeline(
     reranker_type: str,
     reranker_top_k: int,
     disambig_type: str,
+    tournament_batch_size: int,
+    tournament_shuffle: bool,
+    tournament_thinking: bool,
     kb_type: str,
     progress=gr.Progress(),
 ) -> Tuple[List[Tuple[str, Optional[str]]], str, Dict]:
@@ -303,12 +311,20 @@ def run_pipeline(
     if reranker_type != "none":
         reranker_params["top_k"] = reranker_top_k
     
+    # Build disambiguator params
+    disambig_params = {}
+    if disambig_type == "lela_tournament":
+        # batch_size=0 means auto (sqrt of candidates)
+        disambig_params["batch_size"] = tournament_batch_size if tournament_batch_size > 0 else None
+        disambig_params["shuffle_candidates"] = tournament_shuffle
+        disambig_params["disable_thinking"] = not tournament_thinking
+    
     config_dict = {
         "loader": {"name": loader_type, "params": {}},
         "ner": {"name": ner_type, "params": ner_params},
         "candidate_generator": {"name": cand_type, "params": cand_params},
         "reranker": {"name": reranker_type, "params": reranker_params} if reranker_type != "none" else {"name": "none", "params": {}},
-        "disambiguator": {"name": disambig_type, "params": {}} if disambig_type != "none" else None,
+        "disambiguator": {"name": disambig_type, "params": disambig_params} if disambig_type != "none" else None,
         "knowledge_base": {"name": kb_type, "params": {"path": kb_file.name}},
         "cache_dir": ".ner_cache",
         "batch_size": 1,
@@ -390,6 +406,12 @@ def update_cand_params(cand_choice: str):
     """Show/hide candidate-specific parameters based on selection."""
     show_context = cand_choice in ("lela_bm25", "lela_dense")
     return gr.update(visible=show_context)
+
+
+def update_disambig_params(disambig_choice: str):
+    """Show/hide disambiguator-specific parameters based on selection."""
+    show_tournament = disambig_choice == "lela_tournament"
+    return gr.update(visible=show_tournament)
 
 
 def update_loader_from_file(file: Optional[gr.File]):
@@ -590,8 +612,28 @@ if __name__ == "__main__":
                         choices=components["disambiguators"],
                         value="first",
                         label="Disambiguator",
-                        info="Maps to spaCy component factory",
+                        info="lela_tournament uses batched tournament selection (LELA paper)",
                     )
+                    
+                    with gr.Group(visible=False) as tournament_params:
+                        tournament_batch_size = gr.Slider(
+                            minimum=2,
+                            maximum=32,
+                            value=8,
+                            step=1,
+                            label="Tournament Batch Size (k)",
+                            info="Candidates per batch. 0 = auto (√candidates). Paper recommends √C.",
+                        )
+                        tournament_shuffle = gr.Checkbox(
+                            label="Shuffle Candidates",
+                            value=True,
+                            info="Randomize candidate order before tournament (as per LELA paper)",
+                        )
+                        tournament_thinking = gr.Checkbox(
+                            label="Enable Reasoning",
+                            value=True,
+                            info="Enable LLM chain-of-thought reasoning (slower but more accurate)",
+                        )
                 
                 with gr.Accordion("Knowledge Base", open=False):
                     kb_type = gr.Dropdown(
@@ -648,6 +690,12 @@ if __name__ == "__main__":
             outputs=[cand_use_context],
         )
         
+        disambig_type.change(
+            fn=update_disambig_params,
+            inputs=[disambig_type],
+            outputs=[tournament_params],
+        )
+        
         run_btn.click(
             fn=lambda: ([], "*Processing...*", None, None),
             inputs=None,
@@ -671,6 +719,9 @@ if __name__ == "__main__":
                 reranker_type,
                 reranker_top_k,
                 disambig_type,
+                tournament_batch_size,
+                tournament_shuffle,
+                tournament_thinking,
                 kb_type,
             ],
             outputs=[highlighted_output, stats_output, full_result_state],
@@ -709,6 +760,7 @@ Test files are available in `data/test/`:
 | lela_gliner | ner_pipeline_lela_gliner |
 | lela_bm25 | ner_pipeline_lela_bm25_candidates |
 | lela_embedder | ner_pipeline_lela_embedder_reranker |
+| lela_tournament | ner_pipeline_lela_tournament_disambiguator |
 | lela_vllm | ner_pipeline_lela_vllm_disambiguator |
         """)
         

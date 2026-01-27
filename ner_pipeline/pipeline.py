@@ -55,6 +55,7 @@ RERANKER_COMPONENT_MAP = {
 }
 
 DISAMBIGUATOR_COMPONENT_MAP = {
+    "lela_tournament": "ner_pipeline_lela_tournament_disambiguator",
     "lela_vllm": "ner_pipeline_lela_vllm_disambiguator",
     "lela_transformers": "ner_pipeline_lela_transformers_disambiguator",
     "first": "ner_pipeline_first_disambiguator",
@@ -384,7 +385,9 @@ class NERPipeline:
             "ner_pipeline_lela_embedder_reranker": "Reranking (embedder)",
             "ner_pipeline_cross_encoder_reranker": "Reranking (cross-encoder)",
             "ner_pipeline_noop_reranker": "Reranking (pass-through)",
+            "ner_pipeline_lela_tournament_disambiguator": "Disambiguation (LLM Tournament)",
             "ner_pipeline_lela_vllm_disambiguator": "Disambiguation (LLM)",
+            "ner_pipeline_lela_transformers_disambiguator": "Disambiguation (LLM)",
             "ner_pipeline_first_disambiguator": "Disambiguation",
             "ner_pipeline_popularity_disambiguator": "Disambiguation",
         }
@@ -410,6 +413,7 @@ class NERPipeline:
             "ner_pipeline_bm25_candidates",
             "ner_pipeline_lela_embedder_reranker",
             "ner_pipeline_cross_encoder_reranker",
+            "ner_pipeline_lela_tournament_disambiguator",
             "ner_pipeline_lela_vllm_disambiguator",
             "ner_pipeline_lela_transformers_disambiguator",
             "ner_pipeline_first_disambiguator",

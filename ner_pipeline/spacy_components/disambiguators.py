@@ -2,12 +2,15 @@
 spaCy disambiguator components for the NER pipeline.
 
 Provides factories and components for entity disambiguation:
-- LELAvLLMDisambiguatorComponent: vLLM-based LLM disambiguation
+- LELATournamentDisambiguatorComponent: Tournament-style LLM disambiguation (LELA paper)
+- LELAvLLMDisambiguatorComponent: vLLM-based LLM disambiguation (all candidates at once)
 - FirstDisambiguatorComponent: Select first candidate
 - PopularityDisambiguatorComponent: Select by highest score
 """
 
 import logging
+import math
+import random
 import re
 from collections import Counter
 from typing import List, Optional
@@ -60,6 +63,361 @@ def _ensure_extensions():
     """Ensure required extensions are registered on Span."""
     ensure_candidates_extension()
     ensure_resolved_entity_extension()
+
+
+# ============================================================================
+# LELA Tournament Disambiguator Component (implements the full LELA paper)
+# ============================================================================
+
+@Language.factory(
+    "ner_pipeline_lela_tournament_disambiguator",
+    default_config={
+        "model_name": DEFAULT_LLM_MODEL,
+        "tensor_parallel_size": DEFAULT_TENSOR_PARALLEL_SIZE,
+        "max_model_len": DEFAULT_MAX_MODEL_LEN,
+        "batch_size": None,  # None = auto (sqrt of num candidates)
+        "add_none_candidate": True,
+        "add_descriptions": True,
+        "disable_thinking": False,  # Enable thinking for better reasoning
+        "shuffle_candidates": True,  # Randomize candidate order as per paper
+        "system_prompt": None,
+        "generation_config": None,
+    },
+)
+def create_lela_tournament_disambiguator_component(
+    nlp: Language,
+    name: str,
+    model_name: str,
+    tensor_parallel_size: int,
+    max_model_len: Optional[int],
+    batch_size: Optional[int],
+    add_none_candidate: bool,
+    add_descriptions: bool,
+    disable_thinking: bool,
+    shuffle_candidates: bool,
+    system_prompt: Optional[str],
+    generation_config: Optional[dict],
+):
+    """Factory for LELA tournament disambiguator component."""
+    return LELATournamentDisambiguatorComponent(
+        nlp=nlp,
+        model_name=model_name,
+        tensor_parallel_size=tensor_parallel_size,
+        max_model_len=max_model_len,
+        batch_size=batch_size,
+        add_none_candidate=add_none_candidate,
+        add_descriptions=add_descriptions,
+        disable_thinking=disable_thinking,
+        shuffle_candidates=shuffle_candidates,
+        system_prompt=system_prompt,
+        generation_config=generation_config,
+    )
+
+
+class LELATournamentDisambiguatorComponent:
+    """
+    Tournament-style entity disambiguator as described in the LELA paper.
+    
+    Implements the key contribution of LELA: splitting candidates into batches,
+    running tournament rounds where winners face each other, until one remains.
+    
+    Key features:
+    - Tournament batching with configurable batch size k (default: sqrt(C))
+    - Random shuffling of candidates before each tournament
+    - Multiple rounds until single winner or all eliminated
+    - "None of the candidates" option at index 0
+    
+    Reference: LELA paper Section 3.2
+    """
+
+    def __init__(
+        self,
+        nlp: Language,
+        model_name: str = DEFAULT_LLM_MODEL,
+        tensor_parallel_size: int = DEFAULT_TENSOR_PARALLEL_SIZE,
+        max_model_len: Optional[int] = DEFAULT_MAX_MODEL_LEN,
+        batch_size: Optional[int] = None,
+        add_none_candidate: bool = True,
+        add_descriptions: bool = True,
+        disable_thinking: bool = False,
+        shuffle_candidates: bool = True,
+        system_prompt: Optional[str] = None,
+        generation_config: Optional[dict] = None,
+    ):
+        self.nlp = nlp
+        self.model_name = model_name
+        self.batch_size = batch_size  # None = auto (sqrt of C)
+        self.add_none_candidate = add_none_candidate
+        self.add_descriptions = add_descriptions
+        self.disable_thinking = disable_thinking
+        self.shuffle_candidates = shuffle_candidates
+        self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
+        self.generation_config = generation_config or DEFAULT_GENERATION_CONFIG
+
+        _ensure_extensions()
+
+        # Get vLLM and SamplingParams
+        vllm, SamplingParams = _get_vllm()
+
+        # Get or create LLM instance
+        self.llm = get_vllm_instance(
+            model_name=model_name,
+            tensor_parallel_size=tensor_parallel_size,
+            max_model_len=max_model_len,
+        )
+
+        # Set up sampling parameters
+        self.sampling_params = SamplingParams(**self.generation_config)
+
+        self.kb = None
+        self.progress_callback: Optional[ProgressCallback] = None
+
+        logger.info(f"LELA Tournament disambiguator initialized: {model_name}")
+
+    def initialize(self, kb: KnowledgeBase):
+        """Initialize the component with a knowledge base."""
+        self.kb = kb
+
+    @staticmethod
+    def _parse_output(output: str) -> int:
+        """Parse LLM output to extract answer index."""
+        # Handle Qwen3 thinking mode - extract content after </think>
+        if "</think>" in output:
+            output = output.split("</think>")[-1].strip()
+
+        # Try standard format: "answer": N or answer: N
+        match = re.search(r'"?answer"?\s*:\s*(\d+)', output, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+
+        # Try standalone number
+        match = re.search(r'(?:^|\s)(\d+)(?:\s|$|\.)', output.strip())
+        if match:
+            return int(match.group(1))
+
+        # Last resort: find any digit
+        match = re.search(r'(\d+)', output)
+        if match:
+            return int(match.group(1))
+
+        logger.debug(f"Could not parse answer from output: {output}")
+        return 0
+
+    def _mark_mention(self, text: str, start: int, end: int) -> str:
+        """Mark mention in text with brackets."""
+        return f"{text[:start]}{SPAN_OPEN}{text[start:end]}{SPAN_CLOSE}{text[end:]}"
+
+    def _compute_batch_size(self, num_candidates: int) -> int:
+        """Compute optimal batch size: k = ceil(sqrt(C)) as per paper."""
+        if self.batch_size is not None:
+            return self.batch_size
+        # Paper recommends k = ceil(sqrt(C)) for 2 rounds
+        return max(2, math.ceil(math.sqrt(num_candidates)))
+
+    def _run_tournament_round(
+        self,
+        marked_text: str,
+        candidates: List[Candidate],
+        batch_size: int,
+    ) -> List[Candidate]:
+        """
+        Run one tournament round: split candidates into batches, get winner from each.
+        
+        Args:
+            marked_text: Text with mention marked in [brackets]
+            candidates: List of candidates to compete
+            batch_size: Number of candidates per batch
+            
+        Returns:
+            List of winners from each batch
+        """
+        if not candidates:
+            return []
+
+        # Split into batches
+        batches = []
+        for i in range(0, len(candidates), batch_size):
+            batch = candidates[i:i + batch_size]
+            batches.append(batch)
+
+        # Prepare all prompts for parallel processing
+        prompts = []
+        tokenizer = self.llm.get_tokenizer()
+        
+        for batch in batches:
+            messages = create_disambiguation_messages(
+                marked_text=marked_text,
+                candidates=batch,
+                kb=self.kb,
+                system_prompt=self.system_prompt,
+                add_none_candidate=self.add_none_candidate,
+                add_descriptions=self.add_descriptions,
+                disable_thinking=self.disable_thinking,
+            )
+            prompt = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+            prompts.append(prompt)
+
+        # Run all batches in parallel via vLLM
+        try:
+            responses = self.llm.generate(
+                prompts,
+                sampling_params=self.sampling_params,
+                use_tqdm=False,
+            )
+        except Exception as e:
+            logger.error(f"LLM generation error in tournament round: {e}")
+            return []
+
+        # Collect winners from each batch
+        winners = []
+        for batch, response in zip(batches, responses):
+            if response is None or not response.outputs:
+                continue
+
+            raw_output = response.outputs[0].text
+            answer = self._parse_output(raw_output)
+            
+            logger.debug(f"Tournament batch: {len(batch)} candidates, answer={answer}")
+
+            # Answer 0 = "None" (no winner from this batch)
+            if answer == 0:
+                continue
+
+            # Valid answer: select winner
+            if 0 < answer <= len(batch):
+                winner = batch[answer - 1]
+                winners.append(winner)
+                logger.debug(f"Winner: {winner.entity_id}")
+
+        return winners
+
+    def _run_tournament(
+        self,
+        marked_text: str,
+        candidates: List[Candidate],
+        ent_text: str,
+    ) -> Optional[Candidate]:
+        """
+        Run full tournament: multiple rounds until single winner or no winners.
+        
+        Args:
+            marked_text: Text with mention marked in [brackets]
+            candidates: All candidates for this mention
+            ent_text: Entity text for logging
+            
+        Returns:
+            Winning candidate or None
+        """
+        if not candidates:
+            return None
+
+        # Shuffle candidates if enabled (as per paper)
+        if self.shuffle_candidates:
+            candidates = list(candidates)  # Copy to avoid modifying original
+            random.shuffle(candidates)
+
+        batch_size = self._compute_batch_size(len(candidates))
+        current_candidates = candidates
+        round_num = 1
+        max_rounds = math.ceil(math.log(len(candidates), max(2, batch_size))) + 2
+
+        logger.debug(
+            f"Starting tournament for '{ent_text}': {len(candidates)} candidates, "
+            f"batch_size={batch_size}, max_rounds={max_rounds}"
+        )
+
+        while len(current_candidates) > 1 and round_num <= max_rounds:
+            logger.debug(f"Tournament round {round_num}: {len(current_candidates)} candidates")
+            
+            winners = self._run_tournament_round(marked_text, current_candidates, batch_size)
+            
+            if not winners:
+                # All batches returned "None" - no valid entity
+                logger.debug(f"Tournament ended: all candidates eliminated in round {round_num}")
+                return None
+
+            current_candidates = winners
+            round_num += 1
+
+        if len(current_candidates) == 1:
+            logger.debug(f"Tournament winner: {current_candidates[0].entity_id}")
+            return current_candidates[0]
+
+        # Multiple winners remaining (shouldn't happen with proper batch size)
+        # Run final round with all remaining
+        if len(current_candidates) > 1:
+            logger.debug(f"Final round with {len(current_candidates)} remaining candidates")
+            winners = self._run_tournament_round(marked_text, current_candidates, len(current_candidates))
+            if winners:
+                return winners[0]
+
+        return None
+
+    def __call__(self, doc: Doc) -> Doc:
+        """Disambiguate all entities in the document using tournament strategy."""
+        if self.kb is None:
+            logger.warning("Tournament disambiguator not initialized - call initialize(kb) first")
+            return doc
+
+        text = doc.text
+        entities = list(doc.ents)
+        num_entities = len(entities)
+
+        for i, ent in enumerate(entities):
+            ent_text = ent.text[:25] + "..." if len(ent.text) > 25 else ent.text
+            base_progress = i / num_entities
+            entity_progress_range = 1.0 / num_entities
+
+            def report_entity_progress(sub_progress: float, sub_desc: str):
+                if self.progress_callback and num_entities > 0:
+                    progress = base_progress + sub_progress * entity_progress_range
+                    self.progress_callback(progress, f"Entity {i+1}/{num_entities} ({ent_text}): {sub_desc}")
+
+            report_entity_progress(0.0, "checking candidates")
+
+            candidates = getattr(ent._, "candidates", [])
+            if not candidates:
+                continue
+
+            # Single candidate with no none option: select directly
+            if len(candidates) == 1 and not self.add_none_candidate:
+                report_entity_progress(0.5, "single candidate, selecting")
+                entity = self.kb.get_entity(candidates[0].entity_id)
+                if entity:
+                    ent._.resolved_entity = entity
+                continue
+
+            report_entity_progress(0.1, f"tournament ({len(candidates)} candidates)")
+
+            # Mark mention in text
+            marked_text = self._mark_mention(text, ent.start_char, ent.end_char)
+
+            # Run tournament
+            try:
+                winner = self._run_tournament(marked_text, candidates, ent.text)
+                
+                if winner:
+                    entity = self.kb.get_entity(winner.entity_id)
+                    if entity:
+                        ent._.resolved_entity = entity
+                        logger.debug(f"Resolved '{ent.text}' to '{entity.title}' via tournament")
+                    else:
+                        logger.warning(f"Entity not found in KB: '{winner.entity_id}'")
+                else:
+                    logger.debug(f"No winner for '{ent.text}' - NIL")
+
+            except Exception as e:
+                logger.error(f"Tournament error for '{ent.text}': {e}")
+                continue
+
+            report_entity_progress(1.0, "done")
+
+        self.progress_callback = None
+        return doc
 
 
 # ============================================================================

@@ -361,14 +361,47 @@ Pass-through (no reranking).
 
 ### Disambiguator Components
 
-#### `ner_pipeline_lela_vllm_disambiguator`
+#### `ner_pipeline_lela_tournament_disambiguator`
 
-vLLM-based LLM disambiguation with tournament strategy.
+**Recommended** - Tournament-style LLM disambiguation as described in the LELA paper.
 
 **Config Options:**
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `model_name` | str | "Qwen/Qwen3-8B" | LLM model |
+| `model_name` | str | "Qwen/Qwen3-4B" | LLM model |
+| `tensor_parallel_size` | int | 1 | GPU parallelism |
+| `max_model_len` | int | None | Max context length |
+| `batch_size` | int | None | Tournament batch size k (None = auto √C) |
+| `shuffle_candidates` | bool | True | Randomize candidate order |
+| `add_none_candidate` | bool | True | Add "None" option for NIL linking |
+| `add_descriptions` | bool | True | Include descriptions |
+| `disable_thinking` | bool | False | Disable reasoning |
+| `system_prompt` | str | LELA default | Custom prompt |
+| `generation_config` | dict | {} | vLLM generation settings |
+
+**Requires initialization:**
+```python
+component = nlp.add_pipe("ner_pipeline_lela_tournament_disambiguator")
+component.initialize(kb)
+```
+
+**How Tournament Works:**
+1. Shuffle candidates randomly (if `shuffle_candidates=True`)
+2. Split into batches of size k (default: √num_candidates)
+3. LLM selects winner from each batch (processed in parallel)
+4. Winners compete in next round
+5. Repeat until one winner remains
+
+**See Also:** [NIL Linking](#nil-linking), [Qwen3 Thinking Mode](#qwen3-thinking-mode)
+
+#### `ner_pipeline_lela_vllm_disambiguator`
+
+vLLM-based LLM disambiguation - sends all candidates at once (simpler, no tournament).
+
+**Config Options:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model_name` | str | "Qwen/Qwen3-4B" | LLM model |
 | `tensor_parallel_size` | int | 1 | GPU parallelism |
 | `max_model_len` | int | None | Max context length |
 | `add_none_candidate` | bool | True | Add "None" option for NIL linking |
@@ -547,6 +580,7 @@ candidates = tuples_to_candidates(tuples_list)
 | `cross_encoder` | `ner_pipeline_cross_encoder_reranker` |
 | `none` | `ner_pipeline_noop_reranker` |
 | **Disambiguators** | |
+| `lela_tournament` | `ner_pipeline_lela_tournament_disambiguator` |
 | `lela_vllm` | `ner_pipeline_lela_vllm_disambiguator` |
 | `lela_transformers` | `ner_pipeline_lela_transformers_disambiguator` |
 | `first` | `ner_pipeline_first_disambiguator` |
