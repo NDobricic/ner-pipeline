@@ -244,7 +244,7 @@ class LELATournamentDisambiguatorComponent:
         prompts = []
         tokenizer = self.llm.get_tokenizer()
         
-        for batch in batches:
+        for batch_idx, batch in enumerate(batches):
             messages = create_disambiguation_messages(
                 marked_text=marked_text,
                 candidates=batch,
@@ -260,6 +260,7 @@ class LELATournamentDisambiguatorComponent:
                 add_generation_prompt=True,
             )
             prompts.append(prompt)
+            logger.debug(f"Tournament batch {batch_idx + 1}/{len(batches)} prompt:\n{prompt}")
 
         # Run all batches in parallel via vLLM
         try:
@@ -274,14 +275,15 @@ class LELATournamentDisambiguatorComponent:
 
         # Collect winners from each batch
         winners = []
-        for batch, response in zip(batches, responses):
+        for batch_idx, (batch, response) in enumerate(zip(batches, responses)):
             if response is None or not response.outputs:
                 continue
 
             raw_output = response.outputs[0].text
+            logger.debug(f"Tournament batch {batch_idx + 1}/{len(batches)} LLM output:\n{raw_output}")
             answer = self._parse_output(raw_output)
-            
-            logger.debug(f"Tournament batch: {len(batch)} candidates, answer={answer}")
+
+            logger.debug(f"Tournament batch: {len(batch)} candidates, parsed answer={answer}")
 
             # Answer 0 = "None" (no winner from this batch)
             if answer == 0:
@@ -624,7 +626,7 @@ class LELAvLLMDisambiguatorComponent:
                     tokenize=False,
                     add_generation_prompt=True,
                 )
-                logger.debug(f"Formatted prompt for '{ent.text}':\n{prompt[:500]}...")
+                logger.debug(f"Formatted prompt for '{ent.text}':\n{prompt}")
 
                 responses = self.llm.generate(
                     [prompt],
@@ -851,7 +853,7 @@ class LELATransformersDisambiguatorComponent:
                     tokenize=False,
                     add_generation_prompt=True,
                 )
-                logger.debug(f"Formatted prompt for '{ent.text}':\n{prompt[:500]}...")
+                logger.debug(f"Formatted prompt for '{ent.text}':\n{prompt}")
 
                 inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
                 with torch.no_grad():

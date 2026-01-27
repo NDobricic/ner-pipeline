@@ -127,8 +127,13 @@ ENTITY_COLORS = [
 ]
 
 
+ERROR_COLOR = "#DC2626"  # Tailwind red-600
+
+
 def get_label_color(label: str) -> str:
     """Get consistent color for a label based on its hash."""
+    if label == "ERROR":
+        return ERROR_COLOR
     idx = hash(label) % len(ENTITY_COLORS)
     return ENTITY_COLORS[idx]
 
@@ -250,6 +255,24 @@ def compute_linking_stats(result: Dict, threshold: float = 0.0) -> str:
     return stats
 
 
+def format_error_output(error_title: str, error_message: str) -> Tuple[List[Tuple[str, Optional[str]]], str, Dict]:
+    """Format an error for display in the output components."""
+    import traceback
+
+    # Get full traceback if available
+    tb = traceback.format_exc()
+    if tb and tb.strip() != "NoneType: None":
+        full_error = f"{error_message}\n\n**Traceback:**\n```\n{tb}\n```"
+    else:
+        full_error = error_message
+
+    highlighted = [(f"Error: {error_title}", "ERROR")]
+    stats = f"**Error**\n\n{full_error}"
+    result = {"error": error_title, "details": error_message}
+
+    return highlighted, stats, result
+
+
 def run_pipeline(
     text_input: str,
     file_input: Optional[gr.File],
@@ -282,13 +305,19 @@ def run_pipeline(
         torch.cuda.empty_cache()
 
     if not kb_file:
-        raise gr.Error("Please upload a knowledge base JSONL file.")
+        return format_error_output(
+            "Missing Knowledge Base",
+            "Please upload a knowledge base JSONL file."
+        )
 
     if not text_input and not file_input:
-        raise gr.Error("Please provide either text input or upload a file.")
+        return format_error_output(
+            "Missing Input",
+            "Please provide either text input or upload a file."
+        )
 
     progress(0.1, desc="Building pipeline configuration...")
-    
+
     # Build NER params based on type
     ner_params = {}
     if ner_type == "spacy":
@@ -300,17 +329,17 @@ def run_pipeline(
             ner_params["labels"] = [l.strip() for l in gliner_labels.split(",")]
     elif ner_type == "simple":
         ner_params["min_len"] = simple_min_len
-    
+
     # Build candidate params
     cand_params = {"top_k": cand_top_k}
     if cand_type in ("lela_bm25", "lela_dense"):
         cand_params["use_context"] = cand_use_context
-    
+
     # Build reranker params
     reranker_params = {}
     if reranker_type != "none":
         reranker_params["top_k"] = reranker_top_k
-    
+
     # Build disambiguator params
     disambig_params = {}
     if disambig_type == "lela_tournament":
@@ -318,7 +347,7 @@ def run_pipeline(
         disambig_params["batch_size"] = tournament_batch_size if tournament_batch_size > 0 else None
         disambig_params["shuffle_candidates"] = tournament_shuffle
         disambig_params["disable_thinking"] = not tournament_thinking
-    
+
     config_dict = {
         "loader": {"name": loader_type, "params": {}},
         "ner": {"name": ner_type, "params": ner_params},
@@ -329,7 +358,7 @@ def run_pipeline(
         "cache_dir": ".ner_cache",
         "batch_size": 1,
     }
-    
+
     progress(0.15, desc="Initializing pipeline...")
 
     try:
@@ -342,8 +371,8 @@ def run_pipeline(
 
         pipeline = NERPipeline(config, progress_callback=init_progress_callback)
     except Exception as e:
-        raise gr.Error(f"Failed to initialize pipeline: {str(e)}")
-    
+        return format_error_output("Pipeline Initialization Failed", str(e))
+
     progress(0.4, desc="Loading document...")
 
     try:
@@ -361,7 +390,10 @@ def run_pipeline(
             os.unlink(input_path)
 
         if not docs:
-            raise gr.Error("No documents loaded from input.")
+            return format_error_output(
+                "No Documents Loaded",
+                "The input file was empty or could not be parsed."
+            )
 
         doc = docs[0]
 
@@ -378,11 +410,9 @@ def run_pipeline(
             progress_range=1.0,
         )
 
-    except gr.Error:
-        raise
     except Exception as e:
-        raise gr.Error(f"Pipeline execution failed: {str(e)}")
-    
+        return format_error_output("Pipeline Execution Failed", str(e))
+
     progress(0.9, desc="Formatting output...")
 
     highlighted = format_highlighted_text(result)
@@ -449,6 +479,12 @@ def apply_confidence_filter(
     if not full_result:
         return gr.HighlightedText(value=[]), "*Run the pipeline to see results.*", {}
 
+    # Handle error results - pass through unchanged
+    if "error" in full_result:
+        error_highlighted = [(f"Error: {full_result['error']}", "ERROR")]
+        error_stats = f"**Error**\n\n{full_result.get('details', 'Unknown error')}"
+        return gr.HighlightedText(value=error_highlighted, color_map={"ERROR": ERROR_COLOR}), error_stats, full_result
+
     highlighted, color_map = format_highlighted_text_with_threshold(full_result, threshold)
     stats = compute_linking_stats(full_result, threshold)
 
@@ -462,6 +498,12 @@ def apply_confidence_filter_display(
     """Apply confidence filter to display components only (skip JSON for performance)."""
     if not full_result:
         return gr.HighlightedText(value=[]), "*Run the pipeline to see results.*"
+
+    # Handle error results - pass through unchanged
+    if "error" in full_result:
+        error_highlighted = [(f"Error: {full_result['error']}", "ERROR")]
+        error_stats = f"**Error**\n\n{full_result.get('details', 'Unknown error')}"
+        return gr.HighlightedText(value=error_highlighted, color_map={"ERROR": ERROR_COLOR}), error_stats
 
     highlighted, color_map = format_highlighted_text_with_threshold(full_result, threshold)
     stats = compute_linking_stats(full_result, threshold)
@@ -481,221 +523,329 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=7860, help="Port to run the server on")
     parser.add_argument("--share", action="store_true", help="Create a public share link")
     args = parser.parse_args()
-    
+
     logging.basicConfig(level=args.log)
     logger = logging.getLogger(__name__)
-    
+
     # Log vLLM availability status
     vllm_ok = _is_vllm_usable()
     logger.info(f"vLLM disambiguator available: {vllm_ok}")
-    
-    components = get_available_components()
-    
-    with gr.Blocks(title="NER Pipeline", fill_height=True) as demo:
-        gr.Markdown(DESCRIPTION)
 
+    components = get_available_components()
+
+    # Custom CSS for cleaner design
+    custom_css = """
+    .main-header {
+        text-align: center;
+        margin-bottom: 0.25rem;
+    }
+    .subtitle {
+        text-align: center;
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+    }
+    .config-row {
+        align-items: flex-start !important;
+    }
+    .output-section {
+        min-height: 300px;
+    }
+    .run-button {
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+    }
+    """
+
+    with gr.Blocks(title="NER Pipeline", fill_height=True, css=custom_css) as demo:
         # State for storing full pipeline result (before confidence filtering)
         full_result_state = gr.State(value=None)
-        
-        with gr.Row():
-            with gr.Column(scale=1):
-                gr.Markdown("### Input")
-                
-                text_input = gr.Textbox(
-                    label="Text Input",
-                    placeholder="Enter text to process...",
-                    lines=8,
-                    value="Albert Einstein was born in Germany. Marie Curie was a pioneering scientist.",
-                )
-                
-                file_input = gr.File(
-                    label="Or Upload Document",
-                    file_types=[".txt", ".pdf", ".docx", ".html"],
-                )
-                
-                kb_file = gr.File(
-                    label="Knowledge Base (JSONL)",
-                    file_types=[".jsonl"],
-                    value="data/test/sample_kb.jsonl" if os.path.exists("data/test/sample_kb.jsonl") else None,
-                )
-                
-                gr.Markdown("### Pipeline Configuration")
-                
-                with gr.Accordion("Loader", open=False):
-                    loader_type = gr.Dropdown(
-                        choices=components["loaders"],
-                        value="text",
-                        label="Loader Type",
-                        info="Auto-detected from file extension",
-                    )
-                
-                with gr.Accordion("Named Entity Recognition (NER)", open=True):
-                    ner_type = gr.Dropdown(
-                        choices=components["ner"],
-                        value="simple",
-                        label="NER Model",
-                        info="Maps to spaCy component factory",
-                    )
-                    
-                    with gr.Group(visible=False) as spacy_params:
-                        spacy_model = gr.Textbox(
-                            label="SpaCy Model",
-                            value="en_core_web_sm",
-                            info="Requires: python -m spacy download en_core_web_sm",
+
+        gr.Markdown("# NER Pipeline", elem_classes=["main-header"])
+        gr.Markdown(
+            "*Modular entity recognition and linking pipeline. Upload a knowledge base, enter text, configure the pipeline, and run.*",
+            elem_classes=["subtitle"]
+        )
+
+        with gr.Tabs():
+            # ===== MAIN PIPELINE TAB =====
+            with gr.Tab("Pipeline"):
+                # --- INPUT SECTION ---
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        text_input = gr.Textbox(
+                            label="Text Input",
+                            placeholder="Enter text to process, or upload a document...",
+                            lines=4,
+                            value="Albert Einstein was born in Germany. Marie Curie was a pioneering scientist.",
                         )
-                    
-                    with gr.Group(visible=False) as gliner_params:
-                        gliner_model = gr.Textbox(
-                            label="GLiNER Model",
-                            value="urchade/gliner_large",
+                    with gr.Column(scale=1):
+                        file_input = gr.File(
+                            label="Upload Document",
+                            file_types=[".txt", ".pdf", ".docx", ".html"],
                         )
-                        gliner_labels = gr.Textbox(
-                            label="Entity Labels (comma-separated)",
-                            value="person, organization, location",
+                        kb_file = gr.File(
+                            label="Knowledge Base (JSONL)",
+                            file_types=[".jsonl"],
+                            value="data/test/sample_kb.jsonl" if os.path.exists("data/test/sample_kb.jsonl") else None,
                         )
-                        gliner_threshold = gr.Slider(
-                            minimum=0.1,
-                            maximum=1.0,
-                            value=0.5,
-                            step=0.05,
-                            label="Detection Threshold",
+
+                # --- CONFIGURATION SECTION (Horizontal Layout) ---
+                gr.Markdown("### Configuration")
+
+                with gr.Row(equal_height=False, elem_classes=["config-row"]):
+                    # NER Column
+                    with gr.Column(scale=1, min_width=200):
+                        gr.Markdown("**NER**")
+                        ner_type = gr.Dropdown(
+                            choices=components["ner"],
+                            value="simple",
+                            label="Model",
+                            container=False,
                         )
-                    
-                    with gr.Group(visible=True) as simple_params:
-                        simple_min_len = gr.Slider(
-                            minimum=1,
-                            maximum=10,
-                            value=3,
-                            step=1,
-                            label="Minimum Length",
+                        with gr.Group(visible=False) as spacy_params:
+                            spacy_model = gr.Textbox(
+                                label="SpaCy Model",
+                                value="en_core_web_sm",
+                                scale=1,
+                            )
+                        with gr.Group(visible=False) as gliner_params:
+                            gliner_model = gr.Textbox(
+                                label="GLiNER Model",
+                                value="urchade/gliner_large",
+                            )
+                            gliner_labels = gr.Textbox(
+                                label="Labels (comma-sep)",
+                                value="person, organization, location",
+                            )
+                            gliner_threshold = gr.Slider(
+                                minimum=0.1, maximum=1.0, value=0.5, step=0.05,
+                                label="Threshold",
+                            )
+                        with gr.Group(visible=True) as simple_params:
+                            simple_min_len = gr.Slider(
+                                minimum=1, maximum=10, value=3, step=1,
+                                label="Min Length",
+                            )
+
+                    # Candidates Column
+                    with gr.Column(scale=1, min_width=200):
+                        gr.Markdown("**Candidates**")
+                        cand_type = gr.Dropdown(
+                            choices=components["candidates"],
+                            value="fuzzy",
+                            label="Generator",
+                            container=False,
                         )
-                
-                with gr.Accordion("Candidate Generation", open=True):
-                    cand_type = gr.Dropdown(
-                        choices=components["candidates"],
-                        value="fuzzy",
-                        label="Candidate Generator",
-                        info="Maps to spaCy component factory",
-                    )
-                    cand_top_k = gr.Slider(
-                        minimum=1,
-                        maximum=100,
-                        value=64,
-                        step=1,
-                        label="Top K Candidates",
-                        info="Retrieve this many candidates before reranking",
-                    )
-                    cand_use_context = gr.Checkbox(
-                        label="Use Context",
-                        value=True,
-                        visible=False,
-                        info="Include surrounding context in retrieval query",
-                    )
-                
-                with gr.Accordion("Reranking", open=False):
-                    reranker_type = gr.Dropdown(
-                        choices=components["rerankers"],
-                        value="none",
-                        label="Reranker",
-                        info="Maps to spaCy component factory",
-                    )
-                    reranker_top_k = gr.Slider(
-                        minimum=1,
-                        maximum=20,
-                        value=10,
-                        step=1,
-                        label="Reranker Top K",
-                    )
-                
-                with gr.Accordion("Disambiguation", open=True):
-                    disambig_type = gr.Dropdown(
-                        choices=components["disambiguators"],
-                        value="first",
-                        label="Disambiguator",
-                        info="lela_tournament uses batched tournament selection (LELA paper)",
-                    )
-                    
-                    with gr.Group(visible=False) as tournament_params:
-                        tournament_batch_size = gr.Slider(
-                            minimum=2,
-                            maximum=32,
-                            value=8,
-                            step=1,
-                            label="Tournament Batch Size (k)",
-                            info="Candidates per batch. 0 = auto (√candidates). Paper recommends √C.",
+                        cand_top_k = gr.Slider(
+                            minimum=1, maximum=100, value=64, step=1,
+                            label="Top K",
                         )
-                        tournament_shuffle = gr.Checkbox(
-                            label="Shuffle Candidates",
+                        cand_use_context = gr.Checkbox(
+                            label="Use Context",
                             value=True,
-                            info="Randomize candidate order before tournament (as per LELA paper)",
+                            visible=False,
                         )
-                        tournament_thinking = gr.Checkbox(
-                            label="Enable Reasoning",
-                            value=True,
-                            info="Enable LLM chain-of-thought reasoning (slower but more accurate)",
+
+                    # Reranking Column
+                    with gr.Column(scale=1, min_width=200):
+                        gr.Markdown("**Reranking**")
+                        reranker_type = gr.Dropdown(
+                            choices=components["rerankers"],
+                            value="none",
+                            label="Reranker",
+                            container=False,
                         )
-                
-                with gr.Accordion("Knowledge Base", open=False):
-                    kb_type = gr.Dropdown(
-                        choices=components["knowledge_bases"],
-                        value="custom",
-                        label="KB Format",
-                        info="JSONL format with fields: id (optional), title, description",
-                    )
-                
-                run_btn = gr.Button("Run Pipeline", variant="primary", size="lg")
-            
-            with gr.Column(scale=1):
-                gr.Markdown("### Output")
+                        reranker_top_k = gr.Slider(
+                            minimum=1, maximum=20, value=10, step=1,
+                            label="Top K",
+                        )
 
-                confidence_threshold = gr.Slider(
-                    minimum=0.0,
-                    maximum=1.0,
-                    value=0.0,
-                    step=0.01,
-                    label="Confidence Threshold",
-                    info="Filter display by linking confidence (JSON always shows full results)",
+                    # Disambiguation Column
+                    with gr.Column(scale=1, min_width=200):
+                        gr.Markdown("**Disambiguation**")
+                        disambig_type = gr.Dropdown(
+                            choices=components["disambiguators"],
+                            value="first",
+                            label="Method",
+                            container=False,
+                        )
+                        with gr.Group(visible=False) as tournament_params:
+                            tournament_batch_size = gr.Slider(
+                                minimum=2, maximum=32, value=8, step=1,
+                                label="Batch Size",
+                            )
+                            tournament_shuffle = gr.Checkbox(
+                                label="Shuffle",
+                                value=True,
+                            )
+                            tournament_thinking = gr.Checkbox(
+                                label="Reasoning",
+                                value=True,
+                            )
+
+                # Hidden loader and KB type (auto-detected)
+                loader_type = gr.Dropdown(
+                    choices=components["loaders"],
+                    value="text",
+                    visible=False,
+                )
+                kb_type = gr.Dropdown(
+                    choices=components["knowledge_bases"],
+                    value="custom",
+                    visible=False,
                 )
 
-                highlighted_output = gr.HighlightedText(
-                    label="Linked Entities",
-                    color_map={},
-                    show_legend=True,
+                # --- RUN BUTTON ---
+                run_btn = gr.Button(
+                    "Run Pipeline",
+                    variant="primary",
+                    size="lg",
+                    elem_classes=["run-button"],
                 )
 
-                stats_output = gr.Markdown(
-                    label="Linking Statistics",
-                    value="*Run the pipeline to see entity linking statistics.*",
-                )
+                # --- OUTPUT SECTION ---
+                gr.Markdown("### Results")
 
-                json_output = gr.JSON(
-                    label="Full Pipeline Output",
-                )
-        
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        highlighted_output = gr.HighlightedText(
+                            label="Linked Entities",
+                            color_map={},
+                            show_legend=True,
+                            elem_classes=["output-section"],
+                        )
+                    with gr.Column(scale=1):
+                        confidence_threshold = gr.Slider(
+                            minimum=0.0, maximum=1.0, value=0.0, step=0.01,
+                            label="Confidence Filter",
+                            info="Gray out low-confidence links",
+                        )
+                        stats_output = gr.Markdown(
+                            value="*Run the pipeline to see statistics.*",
+                        )
+
+                with gr.Accordion("Full JSON Output", open=False):
+                    json_output = gr.JSON(label="Pipeline Output")
+
+            # ===== DOCUMENTATION TAB =====
+            with gr.Tab("Help"):
+                gr.Markdown("""
+## Quick Start
+
+1. **Upload Knowledge Base**: JSONL file with entities (`title`, `description`, optional `id`)
+2. **Enter Text or Upload File**: Input text directly or upload a document
+3. **Configure Pipeline**: Select components and adjust parameters
+4. **Run**: Click "Run Pipeline" to process
+
+---
+
+## Example Files
+
+Test files are available in `data/test/`:
+- `sample_kb.jsonl` - Sample knowledge base with 10 entities
+- `sample_doc.txt` - Sample document for testing
+
+---
+
+## Pipeline Components
+
+### NER Models
+| Name | Description |
+|------|-------------|
+| **simple** | Regex-based extraction of capitalized phrases |
+| **spacy** | SpaCy NER models (requires download) |
+| **gliner** | GLiNER zero-shot NER with custom labels |
+| **lela_gliner** | LELA-optimized GLiNER |
+
+### Candidate Generators
+| Name | Description |
+|------|-------------|
+| **fuzzy** | Fuzzy string matching |
+| **bm25** | BM25 text retrieval |
+| **lela_bm25** | Context-aware BM25 |
+| **lela_dense** | Dense embedding retrieval |
+
+### Rerankers
+| Name | Description |
+|------|-------------|
+| **none** | No reranking |
+| **cross_encoder** | Cross-encoder reranking |
+| **lela_embedder** | Embedding-based reranking |
+
+### Disambiguators
+| Name | Description |
+|------|-------------|
+| **none** | No disambiguation |
+| **first** | Select first candidate |
+| **popularity** | Select by popularity |
+| **lela_tournament** | LLM tournament selection (LELA paper) |
+| **lela_vllm** | vLLM-based disambiguation |
+
+---
+
+## spaCy Component Mapping
+
+| Config Name | spaCy Factory |
+|-------------|---------------|
+| simple | ner_pipeline_simple |
+| lela_gliner | ner_pipeline_lela_gliner |
+| lela_bm25 | ner_pipeline_lela_bm25_candidates |
+| lela_embedder | ner_pipeline_lela_embedder_reranker |
+| lela_tournament | ner_pipeline_lela_tournament_disambiguator |
+| lela_vllm | ner_pipeline_lela_vllm_disambiguator |
+
+---
+
+## Entity Type Legend (SpaCy)
+
+| Label | Meaning | Example |
+|-------|---------|---------|
+| **PERSON** | People, including fictional | *Albert Einstein*, *Marie Curie* |
+| **ORG** | Organizations, companies, agencies | *Google*, *United Nations*, *NASA* |
+| **GPE** | Geopolitical entities | *France*, *New York*, *California* |
+| **LOC** | Non-GPE locations | *Mount Everest*, *Pacific Ocean* |
+| **FAC** | Facilities | *Empire State Building*, *JFK Airport* |
+| **PRODUCT** | Objects, vehicles, foods | *iPhone*, *Boeing 747* |
+| **EVENT** | Named events | *World War II*, *Hurricane Katrina* |
+| **WORK_OF_ART** | Creative works | *The Great Gatsby*, *Mona Lisa* |
+| **LAW** | Legal documents | *Roe v. Wade*, *GDPR* |
+| **LANGUAGE** | Languages | *English*, *Mandarin* |
+| **DATE** | Dates/periods | *January 2020*, *next week* |
+| **TIME** | Times | *3:00 PM*, *morning* |
+| **PERCENT** | Percentages | *50%*, *ten percent* |
+| **MONEY** | Monetary values | *$100*, *€50 million* |
+| **QUANTITY** | Measurements | *10 kg*, *five miles* |
+| **ORDINAL** | Ordinal numbers | *first*, *3rd* |
+| **CARDINAL** | Cardinal numbers | *one*, *100*, *millions* |
+| **NORP** | Nationalities/groups | *American*, *Buddhist* |
+| **ENT** | Generic entity | Any capitalized phrase |
+                """)
+
+        # --- EVENT HANDLERS ---
         file_input.change(
             fn=update_loader_from_file,
             inputs=[file_input],
             outputs=[loader_type],
         )
-        
+
         ner_type.change(
             fn=update_ner_params,
             inputs=[ner_type],
             outputs=[spacy_params, gliner_params, simple_params],
         )
-        
+
         cand_type.change(
             fn=update_cand_params,
             inputs=[cand_type],
             outputs=[cand_use_context],
         )
-        
+
         disambig_type.change(
             fn=update_disambig_params,
             inputs=[disambig_type],
             outputs=[tournament_params],
         )
-        
+
         run_btn.click(
             fn=lambda: ([], "*Processing...*", None, None),
             inputs=None,
@@ -737,57 +887,6 @@ if __name__ == "__main__":
             inputs=[full_result_state, confidence_threshold],
             outputs=[highlighted_output, stats_output],
         )
-        
-        gr.Markdown("""
-## Quick Start
 
-1. **Upload Knowledge Base**: Provide a JSONL file with entities (fields: `title`, `description`, and optional `id`)
-2. **Enter Text or Upload File**: Input text directly or upload a document
-3. **Configure Pipeline**: Select spaCy components and adjust parameters
-4. **Run**: Click "Run Pipeline" to process
-
-### Example Files
-
-Test files are available in `data/test/`:
-- `sample_kb.jsonl` - Sample knowledge base with 10 entities
-- `sample_doc.txt` - Sample document for testing
-
-### spaCy Component Mapping
-
-| Config Name | spaCy Factory |
-|-------------|---------------|
-| simple | ner_pipeline_simple |
-| lela_gliner | ner_pipeline_lela_gliner |
-| lela_bm25 | ner_pipeline_lela_bm25_candidates |
-| lela_embedder | ner_pipeline_lela_embedder_reranker |
-| lela_tournament | ner_pipeline_lela_tournament_disambiguator |
-| lela_vllm | ner_pipeline_lela_vllm_disambiguator |
-        """)
-        
-        with gr.Accordion("Entity Type Legend (SpaCy)", open=False):
-            gr.Markdown("""
-| Label | Meaning | Example |
-|-------|---------|---------|
-| **PERSON** | People, including fictional | *Albert Einstein*, *Marie Curie* |
-| **ORG** | Organizations, companies, agencies | *Google*, *United Nations*, *NASA* |
-| **GPE** | Geopolitical entities (countries, cities, states) | *France*, *New York*, *California* |
-| **LOC** | Non-GPE locations (mountains, water bodies) | *Mount Everest*, *Pacific Ocean* |
-| **FAC** | Facilities (buildings, airports, highways) | *Empire State Building*, *JFK Airport* |
-| **PRODUCT** | Objects, vehicles, foods (not services) | *iPhone*, *Boeing 747* |
-| **EVENT** | Named events (hurricanes, battles, wars) | *World War II*, *Hurricane Katrina* |
-| **WORK_OF_ART** | Titles of books, songs, etc. | *The Great Gatsby*, *Mona Lisa* |
-| **LAW** | Named documents made into laws | *Roe v. Wade*, *GDPR* |
-| **LANGUAGE** | Any named language | *English*, *Mandarin* |
-| **DATE** | Absolute or relative dates/periods | *January 2020*, *next week* |
-| **TIME** | Times smaller than a day | *3:00 PM*, *morning* |
-| **PERCENT** | Percentages | *50%*, *ten percent* |
-| **MONEY** | Monetary values | *$100*, *€50 million* |
-| **QUANTITY** | Measurements | *10 kg*, *five miles* |
-| **ORDINAL** | Ordinal numbers | *first*, *3rd* |
-| **CARDINAL** | Numerals not covered by other types | *one*, *100*, *millions* |
-| **NORP** | Nationalities, religious/political groups | *American*, *Buddhist*, *Republican* |
-| **ENT** | Generic entity (used by simple regex NER) | Any capitalized phrase |
-            """)
-    
     logger.info(f"Launching Gradio UI on port {args.port}...")
     demo.launch(server_name="0.0.0.0", server_port=args.port, share=args.share)
