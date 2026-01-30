@@ -118,24 +118,25 @@ class NERPipeline:
             if progress_callback:
                 progress_callback(progress, desc)
 
-        # Start with blank English model
-        nlp = spacy.blank("en")
-
-        # Add NER component
-        report(0.25, f"Loading NER model ({config.ner.name})...")
         ner_name = config.ner.name
         ner_params = dict(config.ner.params)
 
         if ner_name == "spacy":
-            # Use spaCy's built-in NER with a pretrained model
+            # Use spaCy's built-in NER with a pretrained model.
+            # We load the model directly and add our components to it.
             model_name = ner_params.pop("model", "en_core_web_sm")
-            spacy_nlp = spacy.load(model_name)
-            # Copy NER component
-            if "ner" in spacy_nlp.pipe_names:
-                nlp.add_pipe("ner", source=spacy_nlp)
-            # Add filter to set context
-            nlp.add_pipe("ner_pipeline_ner_filter")
+            nlp = spacy.load(model_name)
+            # Add a filter to set context on existing entities after NER runs.
+            # We add it 'after' the 'ner' component to ensure entities are present.
+            if "ner" in nlp.pipe_names:
+                nlp.add_pipe("ner_pipeline_ner_filter", after="ner")
+            else:
+                # If the loaded model has no NER, we still add the filter
+                # in case another component adds entities.
+                nlp.add_pipe("ner_pipeline_ner_filter")
         else:
+            # For custom NER components, start with a blank model.
+            nlp = spacy.blank("en")
             factory_name = NER_COMPONENT_MAP.get(ner_name)
             if factory_name is None:
                 raise ValueError(f"Unknown NER component: {ner_name}")
