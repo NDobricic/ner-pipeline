@@ -504,6 +504,7 @@ def run_pipeline(
     simple_min_len: int,
     cand_type: str,
     cand_embedding_model: str,
+    cand_device: str,
     cand_top_k: int,
     cand_use_context: bool,
     reranker_type: str,
@@ -578,6 +579,7 @@ def run_pipeline(
         cand_params["use_context"] = cand_use_context
     if cand_type == "lela_dense":
         cand_params["model_name"] = cand_embedding_model
+        cand_params["device"] = cand_device
 
     # Build reranker params
     reranker_params = {}
@@ -747,7 +749,7 @@ def update_cand_params(cand_choice: str):
     """Show/hide candidate-specific parameters based on selection."""
     show_context = cand_choice in ("lela_bm25", "lela_dense")
     show_embedding_model = cand_choice == "lela_dense"
-    return gr.update(visible=show_embedding_model), gr.update(visible=show_context)
+    return gr.update(visible=show_embedding_model), gr.update(visible=show_embedding_model), gr.update(visible=show_context)
 
 
 def update_reranker_params(reranker_choice: str):
@@ -1065,6 +1067,12 @@ if __name__ == "__main__":
                             label="Embedding Model",
                             visible=False,
                         )
+                        cand_device = gr.Dropdown(
+                            choices=["cuda", "cpu"],
+                            value="cuda",
+                            label="Device",
+                            visible=False,
+                        )
                         cand_top_k = gr.Slider(
                             minimum=1, maximum=100, value=64, step=1,
                             label="Top K",
@@ -1287,7 +1295,7 @@ Test files are available in `data/test/`:
         cand_type.change(
             fn=update_cand_params,
             inputs=[cand_type],
-            outputs=[cand_embedding_model, cand_use_context],
+            outputs=[cand_embedding_model, cand_device, cand_use_context],
         )
 
         reranker_type.change(
@@ -1339,6 +1347,7 @@ Test files are available in `data/test/`:
                 simple_min_len,
                 cand_type,
                 cand_embedding_model,
+                cand_device,
                 cand_top_k,
                 cand_use_context,
                 reranker_type,
