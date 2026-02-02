@@ -54,7 +54,7 @@ RETRIEVER_TASK = (
     "Given an ambiguous mention, retrieve relevant entities that the mention refers to."
 )
 RERANKER_TASK = (
-    "Given a text with a marked mention enclosed in square brackets, "
+    "Given a text with a mention enclosed between the '[' and ']' characters, "
     "retrieve relevant entities that the mention refers to."
 )
 
