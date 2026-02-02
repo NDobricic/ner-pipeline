@@ -115,6 +115,7 @@ doc = nlp("Albert Einstein visited Paris.")
 | `none` | `ner_pipeline_noop_reranker` |
 | `lela_tournament` | `ner_pipeline_lela_tournament_disambiguator` |
 | `lela_vllm` | `ner_pipeline_lela_vllm_disambiguator` |
+| `lela_transformers` | `ner_pipeline_lela_transformers_disambiguator` |
 | `first` | `ner_pipeline_first_disambiguator` |
 | `popularity` | `ner_pipeline_popularity_disambiguator` |
 

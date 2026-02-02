@@ -69,44 +69,48 @@ python app.py --port 8080 --share --log INFO
 
 ## Interface Overview
 
-The web interface is divided into two main columns:
+The web interface uses a single-page layout with configuration at the top and results below.
 
-### Left Column: Input & Configuration
+### Input Section
 
-1. **Input Section**
-   - Text input box for direct text entry
-   - File upload for documents
-   - Knowledge Base upload
+- **Text Input**: Direct text entry box with sample text pre-filled
+- **File Upload**: Upload documents (txt, pdf, docx, html)
+- **Knowledge Base**: Upload JSONL file containing entities
 
-2. **Loader Configuration**
-   - Automatically detected from uploaded file type
-   - Manual override available
+### Configuration Section
 
-3. **NER Configuration**
-   - Model selection (maps to spaCy component factories)
-   - Model-specific parameters
+A horizontal row of component configuration columns:
 
-4. **Candidate Generation Configuration**
-   - Generator selection
-   - Top-K setting
+1. **NER**: Model selection and model-specific parameters
+2. **Candidates**: Generator selection, embedding model (for dense), top-K, context usage
+3. **Reranking**: Reranker selection, embedding model (for LELA embedder), top-K
+4. **Disambiguation**: Method selection, LLM model choice, tournament parameters
 
-5. **Reranking Configuration**
-   - Reranker selection
-   - Model-specific parameters
+**Memory Estimation Display**: Shows real-time GPU memory estimates above the configuration, including:
+- GPU name and available VRAM
+- Allocatable memory (considering vLLM's 90% utilization)
+- Updates dynamically as you change component selections
 
-6. **Disambiguation Configuration**
-   - Disambiguator selection
-   - Model-specific parameters
-
-### Right Column: Output
+### Output Section
 
 1. **Linked Entities**
    - Highlighted text showing detected entities
-   - Color-coded by entity type
+   - Color-coded by entity type (consistent colors based on label hash)
+   - **Interactive popups on hover** showing entity details
 
-2. **Full Pipeline Output**
-   - Complete JSON output with all details
-   - Entity information, candidates, scores
+2. **Confidence Filter Slider**
+   - Adjusts threshold (0-1) for graying out low-confidence links
+   - Entities below threshold display in gray
+   - Statistics update to show above/below threshold counts
+
+3. **Statistics Panel**
+   - Total entities, linked vs. not-in-KB counts
+   - Average confidence score
+   - Threshold breakdown when filter is active
+
+4. **Full JSON Output** (collapsible accordion)
+   - Complete pipeline output with all entity details
+   - Includes `linking_confidence_normalized` scores
 
 ## Configuration Options
 
@@ -182,11 +186,14 @@ Each NER option maps to a spaCy pipeline factory:
 
 #### LELA Dense
 - **spaCy Factory:** `ner_pipeline_lela_dense_candidates`
-- **model_name**: Embedding model
+- **Embedding Model**: Selectable from dropdown:
+  - MiniLM-L6 (~0.3GB VRAM)
+  - BGE-Base (~0.5GB VRAM)
+  - Qwen3-Embed-0.6B (~2GB VRAM)
+  - Qwen3-Embed-4B (~9GB VRAM)
 - **top_k**: Number of candidates
-- **base_url**: API endpoint URL
-- **port**: API port
-- Uses OpenAI-compatible embedding API
+- **use_context**: Include mention context in query
+- Uses SentenceTransformer for local embedding computation
 
 ### Reranking Options
 
@@ -201,11 +208,10 @@ Each NER option maps to a spaCy pipeline factory:
 
 #### LELA Embedder
 - **spaCy Factory:** `ner_pipeline_lela_embedder_reranker`
-- **model_name**: Embedding model
+- **Embedding Model**: Selectable from dropdown (same choices as LELA Dense)
 - **top_k**: Number of candidates to keep
-- **base_url**: API endpoint URL
-- **port**: API port
 - Reranks using cosine similarity with marked mention
+- Uses SentenceTransformer for local embedding computation
 
 ### Disambiguation Options
 
@@ -220,17 +226,29 @@ Each NER option maps to a spaCy pipeline factory:
 - **spaCy Factory:** `ner_pipeline_popularity_disambiguator`
 - Selects the candidate with the highest score
 
-#### LLM
-- **model_name**: HuggingFace model for zero-shot classification
-- Uses NLI-based relevance scoring
+#### LELA Tournament (Recommended)
+- **spaCy Factory:** `ner_pipeline_lela_tournament_disambiguator`
+- **LLM Model**: Selectable from dropdown:
+  - Qwen3-0.6B (~2GB VRAM)
+  - Qwen3-1.7B (~4GB VRAM)
+  - Qwen3-4B (~9GB VRAM)
+  - Qwen3-8B (~18GB VRAM)
+- **Batch Size**: Tournament batch size (2-32, default: 8, or auto √candidates)
+- **Shuffle**: Randomize candidate order before tournament
+- **Reasoning**: Enable chain-of-thought reasoning for better accuracy
+- Implements the full LELA paper tournament strategy
 
 #### LELA vLLM
 - **spaCy Factory:** `ner_pipeline_lela_vllm_disambiguator`
-- **model_name**: LLM model (default: `Qwen/Qwen3-8B`)
-- **tensor_parallel_size**: GPU parallelism
-- **add_none_candidate**: Include "None" option
-- **add_descriptions**: Include entity descriptions in prompt
+- **LLM Model**: Same model choices as tournament
+- Sends all candidates at once (simpler, faster for small candidate sets)
 - Uses vLLM for fast batched inference
+
+#### LELA Transformers
+- **spaCy Factory:** `ner_pipeline_lela_transformers_disambiguator`
+- **LLM Model**: Same model choices as above
+- Alternative for older GPUs (P100/Pascal) where vLLM has issues
+- Uses HuggingFace transformers directly
 
 ## Using the Interface
 
@@ -246,12 +264,21 @@ Each NER option maps to a spaCy pipeline factory:
 
 3. **Configure Pipeline**
    - Select NER model and parameters
-   - Choose candidate generator
+   - Choose candidate generator and embedding model (if using dense)
    - Optionally configure reranker and disambiguator
+   - For LLM disambiguation, select model size based on available VRAM
+   - Watch the memory estimate display to ensure configuration fits
 
 4. **Run Pipeline**
-   - Click "Run Entity Linking"
-   - View results in the output panels
+   - Click **Run Pipeline** button
+   - Button changes to **Cancel** during execution
+   - Progress bar shows current stage
+   - Click Cancel to interrupt long-running operations
+
+5. **Explore Results**
+   - Hover over highlighted entities to see details
+   - Adjust confidence threshold to filter low-confidence links
+   - Expand JSON output for full details
 
 ### Default Configuration
 
@@ -281,42 +308,77 @@ in 1921 for his work on theoretical physics.
 
 ## Features
 
+### Pipeline Cancellation
+
+Long-running pipelines can be cancelled:
+- Click **Cancel** button (replaces Run button during execution)
+- Pipeline stops at the next checkpoint
+- Button shows "Cancelling..." while stopping
+- Useful for LLM-based disambiguation which can take time
+
 ### Highlighted Entity Display
 
 The output shows detected entities with color-coded highlighting:
-- Each entity type gets a distinct color
-- Hover over entities to see the resolved information
-- Labels appear next to each mention
+- Each entity type gets a distinct, consistent color (based on D3 Category20 palette)
+- **Interactive popups on hover** showing:
+  - Entity title from knowledge base
+  - Entity ID
+  - Entity type/label
+  - Linking confidence (percentage)
+  - Entity description (truncated if long)
+- Legend items also have hover popups with summary info
+- Hovering a legend item highlights only entities of that type (others turn gray)
+
+### Confidence Filtering
+
+Filter results by linking confidence in real-time:
+- **Confidence slider** (0.0 - 1.0) controls the threshold
+- Entities below threshold are grayed out (per-instance)
+- Legend is grayed only when ALL instances of that label are below threshold
+- Statistics panel shows above/below threshold breakdown
+- Filtering is instant (no re-run needed)
+
+### Memory Estimation
+
+Real-time GPU memory estimates help you choose appropriate models:
+- Shows GPU name and available VRAM
+- Displays allocatable memory (90% of free, per vLLM)
+- Updates dynamically as you change components
+- Warns if configuration may exceed available memory
 
 ### Dynamic Parameter UI
 
 - Parameters change based on selected component
 - Only relevant options are displayed
 - LELA-specific components show additional configuration
+- Embedding model dropdowns for dense candidates and rerankers
+- LLM model dropdown for disambiguators with VRAM estimates
 
 ### Progress Tracking
 
 The interface shows processing progress:
-- 10% - Loading document
-- 30% - Running NER
-- 50% - Generating candidates
-- 70% - Reranking candidates
-- 90% - Disambiguating entities
+- 10% - Building configuration
+- 15-35% - Initializing pipeline (loading models)
+- 40% - Loading document
+- 45-85% - Processing document (NER, candidates, disambiguation)
+- 90% - Formatting output
 - 100% - Complete
 
 ### Error Handling
 
 - Clear error messages for common issues
-- Missing file errors
+- Missing file errors with helpful suggestions
 - Configuration validation
-- Model loading failures
+- Model loading failures with traceback
+- GPU memory warnings
 
 ### Full JSON Output
 
-The JSON viewer shows complete results including:
-- All detected mentions
+The JSON viewer (collapsible accordion) shows complete results including:
+- All detected mentions with positions
 - Candidate lists with scores
 - Resolved entity information
+- `linking_confidence` and `linking_confidence_normalized` scores
 - Document metadata
 
 ## Troubleshooting
@@ -337,9 +399,10 @@ The JSON viewer shows complete results including:
 - Check for GPU memory issues with large models
 - Try using a smaller model variant
 
-**4. "Connection error" for LELA components**
-- Verify the embedding server is running
-- Check base_url and port settings
+**4. "CUDA out of memory"**
+- Select smaller LLM model (e.g., Qwen3-0.6B instead of Qwen3-4B)
+- Reduce candidate top_k and reranker top_k
+- Watch the memory estimate display before running
 
 ### Performance Tips
 
@@ -360,11 +423,16 @@ The web app is built using:
 ### File Structure
 
 ```
-app.py                    # Main Gradio application
-├── create_ui()           # UI layout definition
-├── process_input()       # Main processing function
-├── get_highlighted_text() # Entity highlighting
-└── build_config()        # Configuration assembly
+app.py                              # Main Gradio application
+├── run_pipeline()                  # Main processing generator function
+├── filter_entities_by_confidence() # Confidence threshold filtering
+├── format_highlighted_text_with_threshold() # Per-instance confidence coloring
+├── highlighted_to_html()           # Entity highlighting with popups
+├── compute_linking_stats()         # Statistics calculation
+├── compute_memory_estimate()       # GPU memory estimation
+├── start_cancellation()            # Cancel button handler
+├── clear_outputs_for_new_run()     # Run button handler
+└── update_*_params()               # Dynamic UI update handlers
 ```
 
 ### How It Works
@@ -406,11 +474,16 @@ For custom entity types and domain adaptation:
 
 ### Full LELA Pipeline
 
-Maximum accuracy with LLM disambiguation:
+Maximum accuracy with LLM tournament disambiguation:
 
 - **NER**: lela_gliner (threshold: 0.5)
 - **Candidates**: lela_bm25 (top_k: 64)
-- **Reranker**: lela_embedder (top_k: 10)
-- **Disambiguator**: lela_vllm
+- **Reranker**: lela_embedder (top_k: 10, Qwen3-Embed-4B)
+- **Disambiguator**: lela_tournament (Qwen3-4B, reasoning enabled)
 
-**Note:** Requires GPU with 16+ GB VRAM for full LELA pipeline.
+**VRAM Requirements:**
+- Qwen3-0.6B LLM: ~4GB total
+- Qwen3-4B LLM: ~12GB total
+- Qwen3-8B LLM: ~20GB total
+
+**Note:** The tournament disambiguator is recommended over lela_vllm for large candidate sets as it implements the full LELA paper methodology.

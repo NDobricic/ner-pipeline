@@ -28,6 +28,7 @@ coverage.xml
 # Local data and cache
 .ner_cache/
 data/*
+report/*
 
 # Logs / artifacts
 *.log

@@ -109,7 +109,9 @@ The configuration names map to spaCy component factories:
 | **Disambiguators** | | |
 | `first` | `ner_pipeline_first_disambiguator` | Select first |
 | `popularity` | `ner_pipeline_popularity_disambiguator` | Select by score |
+| `lela_tournament` | `ner_pipeline_lela_tournament_disambiguator` | Tournament LLM disambiguation |
 | `lela_vllm` | `ner_pipeline_lela_vllm_disambiguator` | vLLM disambiguation |
+| `lela_transformers` | `ner_pipeline_lela_transformers_disambiguator` | Transformers LLM disambiguation |
 
 ### Example Configurations
 

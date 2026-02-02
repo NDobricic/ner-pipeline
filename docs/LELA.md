@@ -208,9 +208,15 @@ cand.initialize(kb)
 
 #### `ner_pipeline_lela_dense_candidates`
 
-Dense retrieval using OpenAI-compatible embedding API.
+Dense retrieval using SentenceTransformers and FAISS.
 
 **Default Model:** `Qwen/Qwen3-Embedding-4B`
+
+**Available Models:**
+- `sentence-transformers/all-MiniLM-L6-v2` (~0.3GB)
+- `BAAI/bge-base-en-v1.5` (~0.5GB)
+- `Qwen/Qwen3-Embedding-0.6B` (~2GB)
+- `Qwen/Qwen3-Embedding-4B` (~9GB)
 
 **Query Format:**
 ```
@@ -224,8 +230,6 @@ Query: {mention_text}
 cand = nlp.add_pipe("ner_pipeline_lela_dense_candidates", config={
     "model_name": "Qwen/Qwen3-Embedding-4B",
     "top_k": 64,
-    "base_url": "http://localhost",
-    "port": 8000,
     "use_context": True
 })
 cand.initialize(kb)
@@ -238,17 +242,24 @@ cand.initialize(kb)
   "params": {
     "model_name": "Qwen/Qwen3-Embedding-4B",
     "top_k": 64,
-    "base_url": "http://localhost",
-    "port": 8000
+    "use_context": true
   }
 }
 ```
 
+**Note:** The dense candidate generator now uses SentenceTransformers directly for local model loading. No external API server is required.
+
 ### LELA Reranking: `ner_pipeline_lela_embedder_reranker`
 
-Cosine similarity reranking with marked mentions.
+Cosine similarity reranking with marked mentions using SentenceTransformers.
 
-**Default Model:** `tomaarsen/Qwen3-Reranker-4B-seq-cls`
+**Default Model:** `Qwen/Qwen3-Embedding-4B`
+
+**Available Models:**
+- `sentence-transformers/all-MiniLM-L6-v2` (~0.3GB)
+- `BAAI/bge-base-en-v1.5` (~0.5GB)
+- `Qwen/Qwen3-Embedding-0.6B` (~2GB)
+- `Qwen/Qwen3-Embedding-4B` (~9GB)
 
 **Mention Marking:**
 ```
@@ -268,9 +279,7 @@ Query: France hosted the Olympics in [Paris].
 ```python
 nlp.add_pipe("ner_pipeline_lela_embedder_reranker", config={
     "model_name": "Qwen/Qwen3-Embedding-4B",
-    "top_k": 10,
-    "base_url": "http://localhost",
-    "port": 8000
+    "top_k": 10
 })
 ```
 
@@ -280,12 +289,12 @@ nlp.add_pipe("ner_pipeline_lela_embedder_reranker", config={
   "name": "lela_embedder",
   "params": {
     "model_name": "Qwen/Qwen3-Embedding-4B",
-    "top_k": 10,
-    "base_url": "http://localhost",
-    "port": 8000
+    "top_k": 10
   }
 }
 ```
+
+**Note:** The reranker now uses SentenceTransformers directly for local model loading. No external API server is required.
 
 ### LELA Tournament Disambiguation: `ner_pipeline_lela_tournament_disambiguator`
 
@@ -379,6 +388,43 @@ disamb.initialize(kb)
 }
 ```
 
+### LELA Transformers Disambiguation: `ner_pipeline_lela_transformers_disambiguator`
+
+LLM-based disambiguation using HuggingFace Transformers - alternative for older GPUs.
+
+**Default Model:** `Qwen/Qwen3-4B`
+
+**When to Use:**
+- Running on older GPUs (P100/Pascal) where vLLM has compatibility issues
+- vLLM installation fails or has problems
+- You need direct HuggingFace transformers integration
+
+**spaCy Usage:**
+```python
+disamb = nlp.add_pipe("ner_pipeline_lela_transformers_disambiguator", config={
+    "model_name": "Qwen/Qwen3-4B",
+    "add_none_candidate": True,
+    "add_descriptions": True,
+    "disable_thinking": True
+})
+disamb.initialize(kb)
+```
+
+**JSON Config:**
+```json
+{
+  "name": "lela_transformers",
+  "params": {
+    "model_name": "Qwen/Qwen3-4B",
+    "add_none_candidate": true,
+    "add_descriptions": true,
+    "disable_thinking": true
+  }
+}
+```
+
+**Note:** This component loads the model directly with HuggingFace transformers, which may be slower than vLLM but has better compatibility with older hardware.
+
 ### LELA Knowledge Base: `lela_jsonl`
 
 LELA-format JSONL knowledge base where title serves as ID.
@@ -428,18 +474,19 @@ LELA-format JSONL knowledge base where title serves as ID.
     "name": "lela_embedder",
     "params": {
       "model_name": "Qwen/Qwen3-Embedding-4B",
-      "top_k": 10,
-      "base_url": "http://localhost",
-      "port": 8000
+      "top_k": 10
     }
   },
   "disambiguator": {
-    "name": "lela_vllm",
+    "name": "lela_tournament",
     "params": {
-      "model_name": "Qwen/Qwen3-8B",
+      "model_name": "Qwen/Qwen3-4B",
       "tensor_parallel_size": 1,
+      "batch_size": null,
+      "shuffle_candidates": true,
       "add_none_candidate": true,
-      "add_descriptions": true
+      "add_descriptions": true,
+      "disable_thinking": false
     }
   },
   "knowledge_base": {
@@ -448,6 +495,8 @@ LELA-format JSONL knowledge base where title serves as ID.
   }
 }
 ```
+
+**Note:** The `lela_tournament` disambiguator is recommended over `lela_vllm` for large candidate sets as it implements the full LELA paper tournament methodology.
 
 ### Lightweight Configuration (BM25 only)
 
@@ -670,9 +719,11 @@ python -m ner_pipeline.cli \
 |-----------|-----------------|-------|
 | lela_gliner | Yes | GLiNER model inference |
 | lela_bm25 | No | CPU-based BM25 |
-| lela_dense | Yes | Embedding computation |
-| lela_embedder | Yes | Embedding computation |
-| lela_vllm | Yes (Required) | LLM inference |
+| lela_dense | Yes | Embedding computation via SentenceTransformers |
+| lela_embedder | Yes | Embedding computation via SentenceTransformers |
+| lela_tournament | Yes (Required) | vLLM-based LLM inference |
+| lela_vllm | Yes (Required) | vLLM-based LLM inference |
+| lela_transformers | Yes | HuggingFace transformers (better P100 support) |
 
 ### CUDA Compatibility
 
@@ -688,10 +739,18 @@ For **newer GPUs** (A100, H100, etc.):
 
 | Model | Size | VRAM Required |
 |-------|------|---------------|
+| **NER** | | |
 | NuNER_Zero-span | ~350MB | ~2GB |
-| Qwen3-Embedding-4B | ~8GB | ~10GB |
-| Qwen3-4B | ~8GB | ~10GB |
-| Qwen3-8B | ~16GB | ~20GB |
+| **Embedding** | | |
+| MiniLM-L6 | ~80MB | ~0.3GB |
+| BGE-Base | ~400MB | ~0.5GB |
+| Qwen3-Embedding-0.6B | ~1.2GB | ~2GB |
+| Qwen3-Embedding-4B | ~8GB | ~9GB |
+| **LLM (Disambiguation)** | | |
+| Qwen3-0.6B | ~1.2GB | ~2GB |
+| Qwen3-1.7B | ~3.4GB | ~4GB |
+| Qwen3-4B | ~8GB | ~9GB |
+| Qwen3-8B | ~16GB | ~18GB |
 
 ### Optimization Tips
 
