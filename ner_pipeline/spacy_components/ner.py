@@ -88,7 +88,7 @@ class GLiNERComponent:
         nlp: Language,
         model_name: str = DEFAULT_GLINER_MODEL,
         labels: Optional[List[str]] = None,
-        threshold: float = 0.5,
+        threshold: float = 0.4,
         context_mode: str = "sentence",
     ):
         self.nlp = nlp
