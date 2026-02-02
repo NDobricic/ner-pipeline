@@ -267,8 +267,8 @@ def _get_faiss():
         "model_name": DEFAULT_EMBEDDER_MODEL,
         "top_k": CANDIDATES_TOP_K,
         "device": None,
-        "use_context": True,
-        "cache_dir": None,  # Add cache_dir to default_config
+        "use_context": False,
+        "cache_dir": None,
     },
 )
 def create_lela_dense_candidates_component(
@@ -278,7 +278,7 @@ def create_lela_dense_candidates_component(
     top_k: int,
     device: Optional[str],
     use_context: bool,
-    cache_dir: Optional[str],  # Add cache_dir to factory signature
+    cache_dir: Optional[str],
 ):
     """Factory for LELA dense candidates component."""
     return LELADenseCandidatesComponent(
@@ -287,7 +287,7 @@ def create_lela_dense_candidates_component(
         top_k=top_k,
         device=device,
         use_context=use_context,
-        cache_dir=cache_dir,  # Pass cache_dir to component
+        cache_dir=cache_dir,
     )
 
 
@@ -314,8 +314,8 @@ class LELADenseCandidatesComponent:
         model_name: str = DEFAULT_EMBEDDER_MODEL,
         top_k: int = CANDIDATES_TOP_K,
         device: Optional[str] = None,
-        use_context: bool = True,
-        cache_dir: Optional[str] = None,  # Accept cache_dir in init
+        use_context: bool = False,
+        cache_dir: Optional[str] = None,
     ):
         self.nlp = nlp
         self.model_name = model_name
@@ -332,7 +332,6 @@ class LELADenseCandidatesComponent:
         self.kb = None
         self.entities = None
         self.index = None
-        # Use provided cache_dir or default
         self.cache_dir = Path(cache_dir) if cache_dir else Path("./.ner_cache")
 
         # Optional progress callback for fine-grained progress reporting
@@ -358,9 +357,6 @@ class LELADenseCandidatesComponent:
 
     def initialize(self, kb: KnowledgeBase):
         """Initialize the component with a knowledge base."""
-        if kb is None:
-            raise ValueError("LELA dense retrieval requires a knowledge base.")
-
         self.kb = kb
 
         faiss = _get_faiss()
@@ -407,9 +403,7 @@ class LELADenseCandidatesComponent:
 
     def _format_query(self, mention_text: str, context: Optional[str] = None) -> str:
         """Format query with task instruction."""
-        query = mention_text
-        if context:
-            query = f"{mention_text}: {context}"
+        query = f"{mention_text}: {context}" if context else mention_text
         return f"Instruct: {RETRIEVER_TASK}\nQuery: {query}"
 
     def __call__(self, doc: Doc) -> Doc:
