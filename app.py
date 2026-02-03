@@ -136,7 +136,7 @@ def get_label_color(label: str) -> str:
     return ENTITY_COLORS[idx]
 
 
-def highlighted_to_html(highlighted: List[Tuple[str, Optional[str], Optional[Dict]]], color_map: Dict[str, str]) -> str:
+def highlighted_to_html(highlighted: List[Tuple[str, Optional[str], Optional[Dict]]], color_map: Dict[str, str], show_legend: bool = True) -> str:
     """Convert highlighted text data to HTML with inline styles, interactive hover, and popups.
 
     This bypasses Gradio's buggy HighlightedText component.
@@ -314,7 +314,9 @@ def highlighted_to_html(highlighted: List[Tuple[str, Optional[str], Optional[Dic
                 f'border-radius: 0.2em; font-size: 0.85em;">{html.escape(label)}</span></span>'
             )
 
-    legend_html = f'<div class="entity-legend" style="margin-bottom: 0.5em; line-height: 1.8;">{"".join(legend_parts)}</div>' if legend_parts else ''
+    legend_html = ''
+    if show_legend:
+        legend_html = f'<div class="entity-legend" style="margin-bottom: 0.5em; line-height: 1.8;">{"".join(legend_parts)}</div>' if legend_parts else ''
     text_html = f'<div class="entity-text" style="line-height: 1.6; white-space: pre-wrap;">{"".join(parts)}</div>'
 
     # Popup div (hidden by default, absolute positioning relative to container)
@@ -537,28 +539,30 @@ def run_pipeline(
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
+    no_tab_switch = gr.update()
+
     if not kb_file:
-        yield format_error_output(
+        yield (*format_error_output(
             "Missing Knowledge Base",
             "Please upload a knowledge base JSONL file."
-        )
+        ), no_tab_switch)
         return
 
     if not text_input and not file_input:
-        yield format_error_output(
+        yield (*format_error_output(
             "Missing Input",
             "Please provide either text input or upload a file."
-        )
+        ), no_tab_switch)
         return
 
     # Check for cancellation
     if _cancel_event.is_set():
         logger.info("Pipeline cancelled before configuration")
-        yield "", "*Pipeline cancelled.*", {}
+        yield "", "*Pipeline cancelled.*", {}, no_tab_switch
         return
 
     progress(0.1, desc="Building pipeline configuration...")
-    yield "", "*Building configuration...*", {}
+    yield "", "*Building configuration...*", {}, no_tab_switch
 
     # Build NER params based on type
     ner_params = {}
@@ -610,11 +614,11 @@ def run_pipeline(
     # Check for cancellation
     if _cancel_event.is_set():
         logger.info("Pipeline cancelled before initialization")
-        yield "", "*Pipeline cancelled.*", {}
+        yield "", "*Pipeline cancelled.*", {}, no_tab_switch
         return
 
     progress(0.15, desc="Initializing pipeline...")
-    yield "", "*Initializing pipeline...*", {}
+    yield "", "*Initializing pipeline...*", {}, no_tab_switch
 
     try:
         config = PipelineConfig.from_dict(config_dict)
@@ -626,17 +630,17 @@ def run_pipeline(
 
         pipeline = NERPipeline(config, progress_callback=init_progress_callback)
     except Exception as e:
-        yield format_error_output("Pipeline Initialization Failed", str(e))
+        yield (*format_error_output("Pipeline Initialization Failed", str(e)), no_tab_switch)
         return
 
     # Check for cancellation
     if _cancel_event.is_set():
         logger.info("Pipeline cancelled after initialization")
-        yield "", "*Pipeline cancelled.*", {}
+        yield "", "*Pipeline cancelled.*", {}, no_tab_switch
         return
 
     progress(0.4, desc="Loading document...")
-    yield "", "*Loading document...*", {}
+    yield "", "*Loading document...*", {}, no_tab_switch
 
     try:
         if file_input:
@@ -653,10 +657,10 @@ def run_pipeline(
             os.unlink(input_path)
 
         if not docs:
-            yield format_error_output(
+            yield (*format_error_output(
                 "No Documents Loaded",
                 "The input file was empty or could not be parsed."
-            )
+            ), no_tab_switch)
             return
 
         doc = docs[0]
@@ -664,11 +668,11 @@ def run_pipeline(
         # Check for cancellation
         if _cancel_event.is_set():
             logger.info("Pipeline cancelled before processing")
-            yield "", "*Pipeline cancelled.*", {}
+            yield "", "*Pipeline cancelled.*", {}, no_tab_switch
             return
 
         progress(0.45, desc="Processing document...")
-        yield "", "*Processing document...*", {}
+        yield "", "*Processing document...*", {}, no_tab_switch
 
         # Process with fine-grained progress callback that also checks for cancellation
         def progress_callback(local_progress: float, description: str):
@@ -688,10 +692,10 @@ def run_pipeline(
 
     except InterruptedError:
         logger.info("Pipeline cancelled during processing")
-        yield "", "*Pipeline cancelled.*", {}
+        yield "", "*Pipeline cancelled.*", {}, no_tab_switch
         return
     except Exception as e:
-        yield format_error_output("Pipeline Execution Failed", str(e))
+        yield (*format_error_output("Pipeline Execution Failed", str(e)), no_tab_switch)
         return
 
     logger.info("Pipeline processing complete, formatting output...")
@@ -704,8 +708,8 @@ def run_pipeline(
     logger.info(f"format_highlighted_text_with_threshold done, got {len(highlighted)} segments")
     sys.stderr.flush()
 
-    # Convert to HTML for the gr.HTML component
-    html_output = highlighted_to_html(highlighted, color_map)
+    # Convert to HTML for the gr.HTML component (no legend for inline preview)
+    html_output = highlighted_to_html(highlighted, color_map, show_legend=False)
 
     logger.info("Calling compute_linking_stats...")
     sys.stderr.flush()
@@ -730,8 +734,8 @@ def run_pipeline(
 
     logger.info(f"=== run_pipeline RETURNING (run #{_run_counter}, {len(result.get('entities', []))} entities) ===")
     sys.stderr.flush()
-    # Final yield with complete results
-    yield html_output, stats, result
+    # Final yield with complete results + switch to Preview tab
+    yield html_output, stats, result, gr.Tabs(selected=1)
 
 
 def update_ner_params(ner_choice: str):
@@ -859,7 +863,7 @@ def apply_confidence_filter(
     stats = compute_linking_stats(full_result, threshold)
 
     # Convert to HTML to bypass buggy HighlightedText component
-    html_output = highlighted_to_html(highlighted, color_map)
+    html_output = highlighted_to_html(highlighted, color_map, show_legend=False)
 
     logger.info(f"=== apply_confidence_filter RETURNING (run #{_run_counter}) ===")
     sys.stderr.flush()
@@ -885,7 +889,7 @@ def apply_confidence_filter_display(
     stats = compute_linking_stats(full_result, threshold)
 
     # Convert to HTML to bypass buggy HighlightedText component
-    html_output = highlighted_to_html(highlighted, color_map)
+    html_output = highlighted_to_html(highlighted, color_map, show_legend=False)
     return html_output, stats
 
 
@@ -903,7 +907,8 @@ def clear_outputs_for_new_run():
     sys.stderr.flush()
     # Return empty HTML string instead of empty list for the HTML component
     # Also return button visibility updates: hide Run, show Cancel
-    return "", "*Processing...*", None, None, gr.update(visible=False), gr.update(visible=True)
+    # Switch to Preview tab (selected=1) so user sees progress
+    return "", "*Processing...*", None, None, gr.update(visible=False), gr.update(visible=True), gr.Tabs(selected=1)
 
 
 def restore_buttons_after_run():
@@ -951,11 +956,9 @@ if __name__ == "__main__":
     # Custom CSS for cleaner design
     custom_css = """
     .main-header {
-        text-align: center;
         margin-bottom: 0.25rem;
     }
     .subtitle {
-        text-align: center;
         margin-top: 0;
         margin-bottom: 0.5rem;
     }
@@ -987,12 +990,30 @@ if __name__ == "__main__":
                 # --- INPUT SECTION ---
                 with gr.Row():
                     with gr.Column(scale=2):
-                        text_input = gr.Textbox(
-                            label="Text Input",
-                            placeholder="Enter text to process, or upload a document...",
-                            lines=4,
-                            value="Albert Einstein was born in Germany. Marie Curie was a pioneering scientist.",
-                        )
+                        input_tabs = gr.Tabs(selected=0)
+                        with input_tabs:
+                            with gr.Tab("Edit", id=0):
+                                text_input = gr.Textbox(
+                                    label="Text Input",
+                                    placeholder="Enter text to process, or upload a document...",
+                                    lines=4,
+                                    value="Albert Einstein was born in Germany. Marie Curie was a pioneering scientist.",
+                                )
+                            with gr.Tab("Preview", id=1):
+                                confidence_threshold = gr.Slider(
+                                    minimum=0.0, maximum=1.0, value=0.0, step=0.01,
+                                    label="Confidence Filter",
+                                    info="Gray out low-confidence links",
+                                )
+                                preview_html = gr.HTML(
+                                    elem_classes=["output-section"],
+                                )
+                            with gr.Tab("Stats", id=2):
+                                stats_output = gr.Markdown(
+                                    value="*Run the pipeline to see statistics.*",
+                                )
+                            with gr.Tab("JSON", id=3):
+                                json_output = gr.JSON(label="Pipeline Output")
                     with gr.Column(scale=1):
                         file_input = gr.File(
                             label="Upload Document",
@@ -1003,6 +1024,21 @@ if __name__ == "__main__":
                             file_types=[".jsonl"],
                             value="data/test/sample_kb.jsonl" if os.path.exists("data/test/sample_kb.jsonl") else None,
                         )
+
+                # --- RUN/CANCEL BUTTON ---
+                run_btn = gr.Button(
+                    "Run Pipeline",
+                    variant="primary",
+                    size="lg",
+                    elem_classes=["run-button"],
+                )
+                cancel_btn = gr.Button(
+                    "Cancel",
+                    variant="stop",
+                    size="lg",
+                    visible=False,
+                    elem_classes=["run-button"],
+                )
 
                 # --- CONFIGURATION SECTION (Horizontal Layout) ---
                 gr.Markdown("### Configuration")
@@ -1139,43 +1175,6 @@ if __name__ == "__main__":
                     visible=False,
                 )
 
-                # --- RUN/CANCEL BUTTON ---
-                # Single button that changes between Run/Cancel states
-                run_btn = gr.Button(
-                    "Run Pipeline",
-                    variant="primary",
-                    size="lg",
-                    elem_classes=["run-button"],
-                )
-                cancel_btn = gr.Button(
-                    "Cancel",
-                    variant="stop",
-                    size="lg",
-                    visible=False,
-                    elem_classes=["run-button"],
-                )
-
-                # --- OUTPUT SECTION ---
-                gr.Markdown("### Results")
-
-                with gr.Row():
-                    with gr.Column(scale=2):
-                        highlighted_output = gr.HTML(
-                            label="Linked Entities",
-                            elem_classes=["output-section"],
-                        )
-                    with gr.Column(scale=1):
-                        confidence_threshold = gr.Slider(
-                            minimum=0.0, maximum=1.0, value=0.0, step=0.01,
-                            label="Confidence Filter",
-                            info="Gray out low-confidence links",
-                        )
-                        stats_output = gr.Markdown(
-                            value="*Run the pipeline to see statistics.*",
-                        )
-
-                with gr.Accordion("Full JSON Output", open=False):
-                    json_output = gr.JSON(label="Pipeline Output")
 
             # ===== DOCUMENTATION TAB =====
             with gr.Tab("Help"):
@@ -1323,7 +1322,7 @@ Test files are available in `data/test/`:
         run_event = run_btn.click(
             fn=clear_outputs_for_new_run,
             inputs=None,
-            outputs=[highlighted_output, stats_output, json_output, full_result_state, run_btn, cancel_btn],
+            outputs=[preview_html, stats_output, json_output, full_result_state, run_btn, cancel_btn, input_tabs],
         ).then(
             fn=run_pipeline,
             inputs=[
@@ -1351,11 +1350,11 @@ Test files are available in `data/test/`:
                 tournament_thinking,
                 kb_type,
             ],
-            outputs=[highlighted_output, stats_output, full_result_state],
+            outputs=[preview_html, stats_output, full_result_state, input_tabs],
         ).then(
             fn=apply_confidence_filter,
             inputs=[full_result_state, confidence_threshold],
-            outputs=[highlighted_output, stats_output, json_output],
+            outputs=[preview_html, stats_output, json_output],
         ).then(
             fn=restore_buttons_after_run,
             inputs=None,
@@ -1373,7 +1372,7 @@ Test files are available in `data/test/`:
         confidence_threshold.change(
             fn=apply_confidence_filter_display,
             inputs=[full_result_state, confidence_threshold],
-            outputs=[highlighted_output, stats_output],
+            outputs=[preview_html, stats_output],
         )
 
     logger.info(f"Launching Gradio UI on port {args.port}...")
