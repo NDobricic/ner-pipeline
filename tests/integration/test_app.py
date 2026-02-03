@@ -371,7 +371,8 @@ class TestRunPipeline:
             llm_model="Qwen/Qwen3-4B",
             tournament_batch_size=4,
             tournament_shuffle=False,
-            tournament_thinking=False,
+            lela_thinking=False,
+            lela_none_candidate=True,
             kb_type="custom",
             progress=mock_progress,
         )
@@ -405,7 +406,8 @@ class TestRunPipeline:
             llm_model="Qwen/Qwen3-4B",
             tournament_batch_size=4,
             tournament_shuffle=False,
-            tournament_thinking=False,
+            lela_thinking=False,
+            lela_none_candidate=True,
             kb_type="custom",
             progress=mock_progress,
         )
@@ -437,7 +439,8 @@ class TestRunPipeline:
             llm_model="Qwen/Qwen3-4B",
             tournament_batch_size=4,
             tournament_shuffle=False,
-            tournament_thinking=False,
+            lela_thinking=False,
+            lela_none_candidate=True,
             kb_type="custom",
             progress=mock_progress,
         )
@@ -469,7 +472,8 @@ class TestRunPipeline:
             llm_model="Qwen/Qwen3-4B",
             tournament_batch_size=4,
             tournament_shuffle=False,
-            tournament_thinking=False,
+            lela_thinking=False,
+            lela_none_candidate=True,
             kb_type="custom",
             progress=mock_progress,
         )
@@ -501,7 +505,8 @@ class TestRunPipeline:
             llm_model="Qwen/Qwen3-4B",
             tournament_batch_size=4,
             tournament_shuffle=False,
-            tournament_thinking=False,
+            lela_thinking=False,
+            lela_none_candidate=True,
             kb_type="custom",
             progress=mock_progress,
         )
@@ -534,7 +539,8 @@ class TestRunPipeline:
             llm_model="Qwen/Qwen3-4B",
             tournament_batch_size=4,
             tournament_shuffle=False,
-            tournament_thinking=False,
+            lela_thinking=False,
+            lela_none_candidate=True,
             kb_type="custom",
             progress=mock_progress,
         )

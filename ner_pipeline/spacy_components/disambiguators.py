@@ -256,6 +256,9 @@ class LELATournamentDisambiguatorComponent:
                 tokenize=False,
                 add_generation_prompt=True,
             )
+            for msg in messages:
+                logger.debug(f"[{msg['role']}] {msg['content']}")
+            logger.debug(f"Formatted tournament prompt:\n{prompt}")
             prompts.append(prompt)
 
         # Run all batches in parallel via vLLM
@@ -277,8 +280,8 @@ class LELATournamentDisambiguatorComponent:
 
             raw_output = response.outputs[0].text
             answer = self._parse_output(raw_output)
-            
-            logger.debug(f"Tournament batch: {len(batch)} candidates, answer={answer}")
+
+            logger.debug(f"Tournament batch: {len(batch)} candidates, answer={answer}, raw_output={raw_output}")
 
             # Answer 0 = "None" (no winner from this batch)
             if answer == 0:
@@ -674,7 +677,9 @@ class LELAvLLMDisambiguatorComponent:
                     tokenize=False,
                     add_generation_prompt=True,
                 )
-                logger.debug(f"Formatted prompt for '{ent.text}':\n{prompt[:500]}...")
+                for msg in messages:
+                    logger.debug(f"[{msg['role']}] {msg['content']}")
+                logger.debug(f"Formatted prompt for '{ent.text}':\n{prompt}")
 
                 responses = self.llm.generate(
                     [prompt],
@@ -690,7 +695,7 @@ class LELAvLLMDisambiguatorComponent:
                 continue
 
             report_entity_progress(0.9, "parsing LLM response")
-            
+
             try:
                 # Log the raw LLM output for debugging
                 raw_output = response.outputs[0].text if response.outputs else ""
@@ -904,7 +909,9 @@ class LELATransformersDisambiguatorComponent:
                     tokenize=False,
                     add_generation_prompt=True,
                 )
-                logger.debug(f"Formatted prompt for '{ent.text}':\n{prompt[:500]}...")
+                for msg in messages:
+                    logger.debug(f"[{msg['role']}] {msg['content']}")
+                logger.debug(f"Formatted prompt for '{ent.text}':\n{prompt}")
 
                 inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
                 with torch.no_grad():

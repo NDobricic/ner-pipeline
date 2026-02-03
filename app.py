@@ -515,7 +515,8 @@ def run_pipeline(
     llm_model: str,
     tournament_batch_size: int,
     tournament_shuffle: bool,
-    tournament_thinking: bool,
+    lela_thinking: bool,
+    lela_none_candidate: bool,
     kb_type: str,
     progress=gr.Progress(),
 ):
@@ -594,11 +595,12 @@ def run_pipeline(
     disambig_params = {}
     if disambig_type in ("lela_tournament", "lela_vllm", "lela_transformers"):
         disambig_params["model_name"] = llm_model
+        disambig_params["disable_thinking"] = not lela_thinking
+        disambig_params["add_none_candidate"] = lela_none_candidate
     if disambig_type == "lela_tournament":
         # batch_size=0 means auto (sqrt of candidates)
         disambig_params["batch_size"] = tournament_batch_size if tournament_batch_size > 0 else None
         disambig_params["shuffle_candidates"] = tournament_shuffle
-        disambig_params["disable_thinking"] = not tournament_thinking
 
     config_dict = {
         "loader": {"name": loader_type, "params": {}},
@@ -763,8 +765,8 @@ def update_reranker_params(reranker_choice: str):
 def update_disambig_params(disambig_choice: str):
     """Show/hide disambiguator-specific parameters based on selection."""
     show_tournament = disambig_choice == "lela_tournament"
-    show_llm_model = disambig_choice in ("lela_tournament", "lela_vllm", "lela_transformers")
-    return gr.update(visible=show_tournament), gr.update(visible=show_llm_model)
+    show_llm = disambig_choice in ("lela_tournament", "lela_vllm", "lela_transformers")
+    return gr.update(visible=show_tournament), gr.update(visible=show_llm), gr.update(visible=show_llm)
 
 
 def update_loader_from_file(file: Optional[gr.File]):
@@ -1149,6 +1151,15 @@ if __name__ == "__main__":
                             label="LLM Model",
                             visible=False,
                         )
+                        with gr.Group(visible=False) as lela_common_params:
+                            lela_thinking = gr.Checkbox(
+                                label="Reasoning",
+                                value=True,
+                            )
+                            lela_none_candidate = gr.Checkbox(
+                                label="'None' Candidate",
+                                value=True,
+                            )
                         with gr.Group(visible=False) as tournament_params:
                             tournament_batch_size = gr.Slider(
                                 minimum=2, maximum=32, value=8, step=1,
@@ -1156,10 +1167,6 @@ if __name__ == "__main__":
                             )
                             tournament_shuffle = gr.Checkbox(
                                 label="Shuffle",
-                                value=True,
-                            )
-                            tournament_thinking = gr.Checkbox(
-                                label="Reasoning",
                                 value=True,
                             )
 
@@ -1298,7 +1305,7 @@ Test files are available in `data/test/`:
         disambig_type.change(
             fn=update_disambig_params,
             inputs=[disambig_type],
-            outputs=[tournament_params, llm_model],
+            outputs=[tournament_params, llm_model, lela_common_params],
         )
 
         # Memory estimate updates
@@ -1347,7 +1354,8 @@ Test files are available in `data/test/`:
                 llm_model,
                 tournament_batch_size,
                 tournament_shuffle,
-                tournament_thinking,
+                lela_thinking,
+                lela_none_candidate,
                 kb_type,
             ],
             outputs=[preview_html, stats_output, full_result_state, input_tabs],
