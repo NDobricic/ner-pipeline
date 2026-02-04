@@ -32,7 +32,6 @@ from .registry import (
 )
 from .types import Candidate, Document, ProgressCallback
 
-
 # Component name mapping from config names to spaCy factory names
 NER_COMPONENT_MAP = {
     "lela_gliner": "ner_pipeline_lela_gliner",
@@ -96,8 +95,11 @@ class NERPipeline:
 
         if config.knowledge_base is None:
             from ner_pipeline.knowledge_bases.yago_downloader import ensure_yago_kb
+
             path = ensure_yago_kb()
-            config.knowledge_base = ComponentConfig(name="custom", params={"path": path})
+            config.knowledge_base = ComponentConfig(
+                name="custom", params={"path": path}
+            )
 
         self.kb = None
         if config.knowledge_base:
@@ -108,8 +110,13 @@ class NERPipeline:
             kb_factory = knowledge_bases.get(config.knowledge_base.name)
             # Filter params to only those the factory accepts
             import inspect
+
             sig = inspect.signature(kb_factory)
-            valid_params = {k: v for k, v in config.knowledge_base.params.items() if k in sig.parameters}
+            valid_params = {
+                k: v
+                for k, v in config.knowledge_base.params.items()
+                if k in sig.parameters
+            }
             self.kb = kb_factory(**valid_params)
 
         check_cancelled()
@@ -139,6 +146,7 @@ class NERPipeline:
         Returns:
             Configured spaCy Language instance
         """
+
         def report(progress: float, desc: str):
             if progress_callback:
                 progress_callback(progress, desc)
@@ -147,25 +155,25 @@ class NERPipeline:
             if cancel_event and cancel_event.is_set():
                 raise InterruptedError("Pipeline initialization cancelled")
 
-        # Start with blank English model
-        nlp = spacy.blank("en")
-
-        # Add NER component
-        check_cancelled()
-        report(0.25, f"Loading NER model ({config.ner.name})...")
         ner_name = config.ner.name
         ner_params = dict(config.ner.params)
 
         if ner_name == "spacy":
             # Use spaCy's built-in NER with a pretrained model
             model_name = ner_params.pop("model", "en_core_web_sm")
-            spacy_nlp = spacy.load(model_name)
-            # Copy NER component
-            if "ner" in spacy_nlp.pipe_names:
-                nlp.add_pipe("ner", source=spacy_nlp)
-            # Add filter to set context
-            nlp.add_pipe("ner_pipeline_ner_filter")
+            nlp = spacy.load(model_name)
+            check_cancelled()
+            # Add a filter to set context on existing entities after NER runs.
+            # We add it 'after' the 'ner' component to ensure entities are present.
+            if "ner" in nlp.pipe_names:
+                nlp.add_pipe("ner_pipeline_ner_filter", after="ner")
+            else:
+                # If the loaded model has no NER, we still add the filter
+                # in case another component adds entities.
+                nlp.add_pipe("ner_pipeline_ner_filter")
         else:
+            # For custom NER components, start with a blank model
+            nlp = spacy.blank("en")
             factory_name = NER_COMPONENT_MAP.get(ner_name)
             if factory_name is None:
                 raise ValueError(f"Unknown NER component: {ner_name}")
@@ -173,7 +181,9 @@ class NERPipeline:
 
         # Add candidate generation component
         check_cancelled()
-        report(0.45, f"Loading candidate generator ({config.candidate_generator.name})...")
+        report(
+            0.45, f"Loading candidate generator ({config.candidate_generator.name})..."
+        )
         cand_name = config.candidate_generator.name
         cand_params = dict(config.candidate_generator.params)
         factory_name = CANDIDATES_COMPONENT_MAP.get(cand_name)
@@ -351,6 +361,7 @@ class NERPipeline:
         Returns:
             Dict with extracted entities and metadata
         """
+
         def report(local_progress: float, desc: str):
             if progress_callback:
                 actual_progress = base_progress + local_progress * progress_range
@@ -368,7 +379,9 @@ class NERPipeline:
         # Calculate progress per stage
         # Reserve some progress for entity-level processing
         num_components = len(components)
-        component_progress = 0.9 / num_components  # 90% for components, 10% for serialization
+        component_progress = (
+            0.9 / num_components
+        )  # 90% for components, 10% for serialization
 
         current_progress = 0.0
 
@@ -377,32 +390,44 @@ class NERPipeline:
             report(current_progress, f"{stage_name}...")
 
             # Set up component-level progress callback if the component supports it
-            if hasattr(component, 'progress_callback') and self._is_entity_processing_component(name):
-                def make_component_callback(base_prog: float, comp_prog: float, stage: str):
+            if hasattr(
+                component, "progress_callback"
+            ) and self._is_entity_processing_component(name):
+
+                def make_component_callback(
+                    base_prog: float, comp_prog: float, stage: str
+                ):
                     def callback(local_progress: float, desc: str):
                         actual_progress = base_prog + local_progress * comp_prog
                         report(actual_progress, f"{stage}: {desc}")
+
                     return callback
-                
+
                 component.progress_callback = make_component_callback(
                     current_progress, component_progress, stage_name
                 )
-            
+
             # Run the component
             spacy_doc = component(spacy_doc)
 
             current_progress += component_progress
 
             # Report entity count after NER component
-            if self._is_ner_component(name) and hasattr(spacy_doc, 'ents'):
+            if self._is_ner_component(name) and hasattr(spacy_doc, "ents"):
                 num_ents = len(spacy_doc.ents)
-                report(current_progress, f"{stage_name} complete: found {num_ents} entities")
+                report(
+                    current_progress,
+                    f"{stage_name} complete: found {num_ents} entities",
+                )
 
         import logging
         import sys
+
         logger = logging.getLogger(__name__)
 
-        logger.info("process_document_with_progress: all components done, serializing...")
+        logger.info(
+            "process_document_with_progress: all components done, serializing..."
+        )
         sys.stderr.flush()
         report(0.95, "Serializing results...")
         result = self._serialize_doc(spacy_doc, doc)
@@ -536,7 +561,9 @@ class NERPipeline:
                 else:
                     entity["linking_confidence_normalized"] = None
 
-    def run(self, paths: Iterable[str], output_path: Optional[str] = None) -> List[Dict]:
+    def run(
+        self, paths: Iterable[str], output_path: Optional[str] = None
+    ) -> List[Dict]:
         """
         Process multiple files through the pipeline.
 
