@@ -660,11 +660,9 @@ def run_pipeline(
             else {"name": "none", "params": {}}
         )
         disambiguator_config = (
-            (
-                {"name": disambig_type, "params": disambig_params}
-                if disambig_type != "none"
-                else None
-            ),
+            {"name": disambig_type, "params": disambig_params}
+            if disambig_type != "none"
+            else None
         )
 
     config_dict = {
