@@ -185,9 +185,6 @@ class NERPipeline:
         cand_name = config.candidate_generator.name
         if cand_name != "none":
             cand_params = dict(config.candidate_generator.params)
-            # Pass cache_dir only to components that can use it
-            if cand_name == "lela_dense":
-                cand_params["cache_dir"] = str(self.cache_dir)
             factory_name = CANDIDATES_COMPONENT_MAP.get(cand_name)
             if factory_name is None:
                 raise ValueError(f"Unknown candidate generator: {cand_name}")
