@@ -80,7 +80,7 @@ def _get_faiss():
         "model_name": DEFAULT_EMBEDDER_MODEL,
         "top_k": CANDIDATES_TOP_K,
         "device": None,
-        "use_context": True,
+        "use_context": False,
     },
 )
 def create_lela_dense_candidates_component(
@@ -118,7 +118,7 @@ class LELADenseCandidatesComponent:
         model_name: str = DEFAULT_EMBEDDER_MODEL,
         top_k: int = CANDIDATES_TOP_K,
         device: Optional[str] = None,
-        use_context: bool = True,
+        use_context: bool = False,
     ):
         self.nlp = nlp
         self.model_name = model_name
@@ -207,9 +207,7 @@ class LELADenseCandidatesComponent:
 
     def _format_query(self, mention_text: str, context: Optional[str] = None) -> str:
         """Format query with task instruction."""
-        query = mention_text
-        if context:
-            query = f"{mention_text}: {context}"
+        query = f"{mention_text}: {context}" if context else mention_text
         return f"Instruct: {RETRIEVER_TASK}\nQuery: {query}"
 
     def __call__(self, doc: Doc) -> Doc:
@@ -346,9 +344,6 @@ class FuzzyCandidatesComponent:
 
     def initialize(self, kb: KnowledgeBase, cache_dir: Optional[Path] = None):
         """Initialize the component with a knowledge base."""
-        if kb is None:
-            raise ValueError("Fuzzy matching requires a knowledge base.")
-
         self.kb = kb
         self.entities = list(kb.all_entities())
         self.titles = [e.title for e in self.entities]

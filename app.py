@@ -1358,7 +1358,7 @@ if __name__ == "__main__":
                         )
                         cand_use_context = gr.Checkbox(
                             label="Use Context",
-                            value=True,
+                            value=False,
                             visible=False,
                         )
 
