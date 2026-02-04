@@ -25,6 +25,7 @@ from ner_pipeline.lela.config import (
     AVAILABLE_LLM_MODELS as LLM_MODEL_CHOICES,
     AVAILABLE_EMBEDDING_MODELS as EMBEDDING_MODEL_CHOICES,
     AVAILABLE_CROSS_ENCODER_MODELS as CROSS_ENCODER_MODEL_CHOICES,
+    DEFAULT_GLINER_MODEL,
 )
 
 DESCRIPTION = """
@@ -1285,7 +1286,7 @@ if __name__ == "__main__":
                         with gr.Group(visible=False) as gliner_params:
                             gliner_model = gr.Textbox(
                                 label="GLiNER Model",
-                                value="urchade/gliner_large",
+                                value=DEFAULT_GLINER_MODEL,
                             )
                             gliner_labels = gr.Textbox(
                                 label="Labels (comma-sep)",
