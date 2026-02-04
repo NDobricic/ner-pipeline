@@ -192,7 +192,7 @@ class NERPipeline:
 
             # Initialize with KB if needed
             if hasattr(cand_component, "initialize") and self.kb is not None:
-                cand_component.initialize(self.kb)
+                cand_component.initialize(self.kb, cache_dir=self.cache_dir)
 
         check_cancelled()
         # Add reranker component
