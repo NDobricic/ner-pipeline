@@ -184,15 +184,19 @@ class NERPipeline:
             0.45, f"Loading candidate generator ({config.candidate_generator.name})..."
         )
         cand_name = config.candidate_generator.name
-        cand_params = dict(config.candidate_generator.params)
-        factory_name = CANDIDATES_COMPONENT_MAP.get(cand_name)
-        if factory_name is None:
-            raise ValueError(f"Unknown candidate generator: {cand_name}")
-        cand_component = nlp.add_pipe(factory_name, config=cand_params)
+        if cand_name != "none":
+            cand_params = dict(config.candidate_generator.params)
+            # Pass cache_dir only to components that can use it
+            if cand_name == "lela_dense":
+                cand_params["cache_dir"] = str(self.cache_dir)
+            factory_name = CANDIDATES_COMPONENT_MAP.get(cand_name)
+            if factory_name is None:
+                raise ValueError(f"Unknown candidate generator: {cand_name}")
+            cand_component = nlp.add_pipe(factory_name, config=cand_params)
 
-        # Initialize with KB if needed
-        if hasattr(cand_component, "initialize") and self.kb is not None:
-            cand_component.initialize(self.kb, cache_dir=self.cache_dir)
+            # Initialize with KB if needed
+            if hasattr(cand_component, "initialize") and self.kb is not None:
+                cand_component.initialize(self.kb)
 
         check_cancelled()
         # Add reranker component
