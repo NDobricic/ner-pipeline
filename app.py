@@ -875,12 +875,10 @@ def update_cand_params(cand_choice: str):
         return (
             gr.update(visible=False),
             gr.update(visible=False),
-            gr.update(visible=False),
         )
     show_context = cand_choice in ("lela_bm25", "lela_dense")
     show_embedding_model = cand_choice == "lela_dense"
     return (
-        gr.update(visible=show_embedding_model),
         gr.update(visible=show_embedding_model),
         gr.update(visible=show_context),
     )
