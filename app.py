@@ -1,4 +1,5 @@
 import os
+
 # Disable vLLM V1 engine before any imports - V1 uses multiprocessing that fails from worker threads
 os.environ["VLLM_USE_V1"] = "0"
 
@@ -23,12 +24,13 @@ from ner_pipeline.memory import get_system_resources
 from ner_pipeline.lela.config import (
     AVAILABLE_LLM_MODELS as LLM_MODEL_CHOICES,
     AVAILABLE_EMBEDDING_MODELS as EMBEDDING_MODEL_CHOICES,
+    AVAILABLE_CROSS_ENCODER_MODELS as CROSS_ENCODER_MODEL_CHOICES,
 )
 
 DESCRIPTION = """
 # NER Pipeline 🔗
 
-Modular NER → candidate generation → rerank → disambiguation pipeline built on spaCy. 
+Modular NER → candidate generation → rerank → disambiguation pipeline built on spaCy.
 Swap components, configure parameters, and test with your own knowledge bases.
 """
 
@@ -39,28 +41,36 @@ def _is_vllm_usable() -> bool:
     cuda_available = False
     try:
         import torch
+
         cuda_available = torch.cuda.is_available()
     except ImportError:
         pass
-    
+
     # Log for debugging
     import logging
+
     logger = logging.getLogger(__name__)
     logger.info(f"vLLM check: installed={vllm_installed}, cuda={cuda_available}")
-    
+
     return vllm_installed and cuda_available
 
 
 def get_available_components() -> Dict[str, List[str]]:
     """Get list of available spaCy pipeline components."""
     # These map to spaCy factories registered in ner_pipeline.spacy_components
-    available_disambiguators = ["none", "first", "popularity", "lela_vllm", "lela_transformers"]
-    
+    available_disambiguators = [
+        "none",
+        "first",
+        "popularity",
+        "lela_vllm",
+        "lela_transformers",
+    ]
+
     return {
         "loaders": ["text", "pdf", "docx", "html", "json", "jsonl"],
         "ner": ["simple", "spacy", "gliner", "transformers", "lela_gliner"],
         "candidates": ["fuzzy", "bm25", "lela_bm25", "lela_dense"],
-        "rerankers": ["none", "cross_encoder", "lela_embedder"],
+        "rerankers": ["none", "cross_encoder"],
         "disambiguators": available_disambiguators,
         "knowledge_bases": ["custom"],
     }
@@ -134,7 +144,11 @@ def get_label_color(label: str) -> str:
     return ENTITY_COLORS[idx]
 
 
-def highlighted_to_html(highlighted: List[Tuple[str, Optional[str], Optional[Dict]]], color_map: Dict[str, str], show_legend: bool = True) -> str:
+def highlighted_to_html(
+    highlighted: List[Tuple[str, Optional[str], Optional[Dict]]],
+    color_map: Dict[str, str],
+    show_legend: bool = True,
+) -> str:
     """Convert highlighted text data to HTML with inline styles, interactive hover, and popups.
 
     This bypasses Gradio's buggy HighlightedText component.
@@ -181,7 +195,9 @@ def highlighted_to_html(highlighted: List[Tuple[str, Optional[str], Optional[Dic
             parts.append(escaped_text)
         else:
             # Use per-instance color if available, otherwise fall back to color_map
-            color = (entity_info.get("display_color") if entity_info else None) or color_map.get(label, "#808080")
+            color = (
+                entity_info.get("display_color") if entity_info else None
+            ) or color_map.get(label, "#808080")
             css_class = label_to_class(label)
 
             # Track count and store first entity info for each label (for legend popup)
@@ -193,23 +209,35 @@ def highlighted_to_html(highlighted: List[Tuple[str, Optional[str], Optional[Dic
             popup_lines = []
             if entity_info:
                 if entity_info.get("kb_title"):
-                    popup_lines.append(f"<strong>{escape_js_string(entity_info['kb_title'])}</strong>")
+                    popup_lines.append(
+                        f"<strong>{escape_js_string(entity_info['kb_title'])}</strong>"
+                    )
                 if entity_info.get("kb_id"):
-                    popup_lines.append(f"<em>ID: {escape_js_string(entity_info['kb_id'])}</em>")
+                    popup_lines.append(
+                        f"<em>ID: {escape_js_string(entity_info['kb_id'])}</em>"
+                    )
                 if entity_info.get("type"):
                     popup_lines.append(f"Type: {escape_js_string(entity_info['type'])}")
-                if entity_info.get("mention") and entity_info.get("mention") != entity_info.get("kb_title"):
-                    popup_lines.append(f"Mention: &quot;{escape_js_string(entity_info['mention'])}&quot;")
+                if entity_info.get("mention") and entity_info.get(
+                    "mention"
+                ) != entity_info.get("kb_title"):
+                    popup_lines.append(
+                        f"Mention: &quot;{escape_js_string(entity_info['mention'])}&quot;"
+                    )
                 if entity_info.get("confidence_normalized") is not None:
-                    conf_pct = entity_info['confidence_normalized'] * 100
+                    conf_pct = entity_info["confidence_normalized"] * 100
                     popup_lines.append(f"Confidence: {conf_pct:.1f}%")
                 if entity_info.get("kb_description"):
-                    desc = entity_info['kb_description']
+                    desc = entity_info["kb_description"]
                     if len(desc) > 150:
                         desc = desc[:150] + "..."
-                    popup_lines.append(f"<div style=&quot;margin-top:0.3em;font-size:0.9em;color:#666;&quot;>{escape_js_string(desc)}</div>")
+                    popup_lines.append(
+                        f"<div style=&quot;margin-top:0.3em;font-size:0.9em;color:#666;&quot;>{escape_js_string(desc)}</div>"
+                    )
 
-            popup_content = "<br>".join(popup_lines) if popup_lines else escape_js_string(label)
+            popup_content = (
+                "<br>".join(popup_lines) if popup_lines else escape_js_string(label)
+            )
 
             # JavaScript for showing/hiding popup (absolute positioning relative to container)
             # Account for container scroll position and use viewport for bounds checking
@@ -224,17 +252,19 @@ def highlighted_to_html(highlighted: List[Tuple[str, Optional[str], Optional[Dic
                 f"p.style.left=left+'px';p.style.top=top+'px';"
                 f"p.style.display='block';"
             )
-            hide_popup_js = f"document.getElementById('{popup_id}').style.display='none';"
+            hide_popup_js = (
+                f"document.getElementById('{popup_id}').style.display='none';"
+            )
 
             parts.append(
                 f'<mark class="entity-mark {css_class}" '
                 f'data-color="{color}" '
                 f'style="background-color: {color}; padding: 0.1em 0.2em; '
-                f'border-radius: 0.2em; margin: 0 0.1em; cursor: pointer; '
+                f"border-radius: 0.2em; margin: 0 0.1em; cursor: pointer; "
                 f'transition: background-color 0.2s ease, opacity 0.2s ease;" '
                 f'onmouseenter="{show_popup_js}" '
                 f'onmouseleave="{hide_popup_js}">'
-                f'{escaped_text}</mark>'
+                f"{escaped_text}</mark>"
             )
 
     # JavaScript functions for legend hover (highlight/dim entities)
@@ -271,20 +301,28 @@ def highlighted_to_html(highlighted: List[Tuple[str, Optional[str], Optional[Dic
             popup_lines = []
             if entity_info:
                 if entity_info.get("kb_title"):
-                    popup_lines.append(f"<strong>{escape_js_string(entity_info['kb_title'])}</strong>")
+                    popup_lines.append(
+                        f"<strong>{escape_js_string(entity_info['kb_title'])}</strong>"
+                    )
                 if entity_info.get("kb_id"):
-                    popup_lines.append(f"<em>ID: {escape_js_string(entity_info['kb_id'])}</em>")
+                    popup_lines.append(
+                        f"<em>ID: {escape_js_string(entity_info['kb_id'])}</em>"
+                    )
                 if entity_info.get("type"):
                     popup_lines.append(f"Type: {escape_js_string(entity_info['type'])}")
                 # Show occurrence count instead of instance-specific confidence
                 popup_lines.append(f"Mentions: {count}")
                 if entity_info.get("kb_description"):
-                    desc = entity_info['kb_description']
+                    desc = entity_info["kb_description"]
                     if len(desc) > 150:
                         desc = desc[:150] + "..."
-                    popup_lines.append(f"<div style=&quot;margin-top:0.3em;font-size:0.9em;color:#666;&quot;>{escape_js_string(desc)}</div>")
+                    popup_lines.append(
+                        f"<div style=&quot;margin-top:0.3em;font-size:0.9em;color:#666;&quot;>{escape_js_string(desc)}</div>"
+                    )
 
-            popup_content = "<br>".join(popup_lines) if popup_lines else escape_js_string(label)
+            popup_content = (
+                "<br>".join(popup_lines) if popup_lines else escape_js_string(label)
+            )
 
             show_popup_js = (
                 f"var p=document.getElementById('{popup_id}');"
@@ -297,7 +335,9 @@ def highlighted_to_html(highlighted: List[Tuple[str, Optional[str], Optional[Dic
                 f"p.style.left=left+'px';p.style.top=top+'px';"
                 f"p.style.display='block';"
             )
-            hide_popup_js = f"document.getElementById('{popup_id}').style.display='none';"
+            hide_popup_js = (
+                f"document.getElementById('{popup_id}').style.display='none';"
+            )
 
             # Combine highlight JS with popup JS
             combined_enter = enter_js + show_popup_js
@@ -312,26 +352,30 @@ def highlighted_to_html(highlighted: List[Tuple[str, Optional[str], Optional[Dic
                 f'border-radius: 0.2em; font-size: 0.85em;">{html.escape(label)}</span></span>'
             )
 
-    legend_html = ''
+    legend_html = ""
     if show_legend:
-        legend_html = f'<div class="entity-legend" style="margin-bottom: 0.5em; line-height: 1.8;">{"".join(legend_parts)}</div>' if legend_parts else ''
+        legend_html = (
+            f'<div class="entity-legend" style="margin-bottom: 0.5em; line-height: 1.8;">{"".join(legend_parts)}</div>'
+            if legend_parts
+            else ""
+        )
     text_html = f'<div class="entity-text" style="line-height: 1.6; white-space: pre-wrap;">{"".join(parts)}</div>'
 
     # Popup div (hidden by default, absolute positioning relative to container)
     popup_html = (
         f'<div id="{popup_id}" style="'
-        f'display: none; '
-        f'position: absolute; '
-        f'background: white; '
-        f'border: 1px solid #ccc; '
-        f'border-radius: 6px; '
-        f'padding: 0.5em 0.75em; '
-        f'box-shadow: 0 2px 8px rgba(0,0,0,0.15); '
-        f'max-width: 350px; '
-        f'z-index: 1000; '
-        f'font-size: 0.9em; '
-        f'line-height: 1.4; '
-        f'pointer-events: none;'
+        f"display: none; "
+        f"position: absolute; "
+        f"background: white; "
+        f"border: 1px solid #ccc; "
+        f"border-radius: 6px; "
+        f"padding: 0.5em 0.75em; "
+        f"box-shadow: 0 2px 8px rgba(0,0,0,0.15); "
+        f"max-width: 350px; "
+        f"z-index: 1000; "
+        f"font-size: 0.9em; "
+        f"line-height: 1.4; "
+        f"pointer-events: none;"
         f'"></div>'
     )
 
@@ -399,7 +443,7 @@ def format_highlighted_text_with_threshold(
 
     for entity, label, conf, is_below in entity_data:
         if entity["start"] > last_end:
-            highlighted.append((text[last_end:entity["start"]], None, None))
+            highlighted.append((text[last_end : entity["start"]], None, None))
 
         # Determine color for THIS instance
         instance_color = GRAY_COLOR if is_below else get_label_color(label)
@@ -436,7 +480,11 @@ def compute_linking_stats(result: Dict, threshold: float = 0.0) -> str:
     unlinked = total - linked
 
     # Compute average confidence for linked entities
-    confidences = [e.get("linking_confidence") for e in entities if e.get("linking_confidence") is not None]
+    confidences = [
+        e.get("linking_confidence")
+        for e in entities
+        if e.get("linking_confidence") is not None
+    ]
     avg_confidence = sum(confidences) / len(confidences) if confidences else 0
 
     # Count entities above/below threshold
@@ -481,9 +529,9 @@ def format_error_output(error_title: str, error_message: str) -> Tuple[str, str,
     # Create HTML error display
     html_output = (
         f'<div style="color: {ERROR_COLOR}; padding: 1em; '
-        f'border: 1px solid {ERROR_COLOR}; border-radius: 6px; '
+        f"border: 1px solid {ERROR_COLOR}; border-radius: 6px; "
         f'background-color: #FEF2F2;">'
-        f'<strong>Error: {error_title}</strong></div>'
+        f"<strong>Error: {error_title}</strong></div>"
     )
     stats = f"**Error**\n\n{full_error}"
     result = {"error": error_title, "details": error_message}
@@ -508,6 +556,7 @@ def run_pipeline(
     cand_use_context: bool,
     reranker_type: str,
     reranker_embedding_model: str,
+    reranker_cross_encoder_model: str,
     reranker_top_k: int,
     disambig_type: str,
     llm_model: str,
@@ -522,6 +571,7 @@ def run_pipeline(
     Yielding allows Gradio to check for cancellation between steps.
     """
     import sys
+
     logger = logging.getLogger(__name__)
     logger.info(f"=== run_pipeline ENTERED (run #{_run_counter}) ===")
     sys.stderr.flush()
@@ -540,15 +590,18 @@ def run_pipeline(
 
     if not kb_file:
         from ner_pipeline.knowledge_bases.yago_downloader import ensure_yago_kb
+
         kb_path = ensure_yago_kb()
     else:
         kb_path = kb_file.name
 
     if not text_input and not file_input:
-        yield (*format_error_output(
-            "Missing Input",
-            "Please provide either text input or upload a file."
-        ), no_tab_switch)
+        yield (
+            *format_error_output(
+                "Missing Input", "Please provide either text input or upload a file."
+            ),
+            no_tab_switch,
+        )
         return
 
     # Check for cancellation
@@ -583,6 +636,8 @@ def run_pipeline(
     reranker_params = {"top_k": reranker_top_k}
     if reranker_type == "lela_embedder":
         reranker_params["model_name"] = reranker_embedding_model
+    if reranker_type == "cross_encoder":
+        reranker_params["model_name"] = reranker_cross_encoder_model
 
     # Build disambiguator params
     disambig_params = {}
@@ -596,7 +651,11 @@ def run_pipeline(
         "ner": {"name": ner_type, "params": ner_params},
         "candidate_generator": {"name": cand_type, "params": cand_params},
         "reranker": {"name": reranker_type, "params": reranker_params},
-        "disambiguator": {"name": disambig_type, "params": disambig_params} if disambig_type != "none" else None,
+        "disambiguator": (
+            {"name": disambig_type, "params": disambig_params}
+            if disambig_type != "none"
+            else None
+        ),
         "knowledge_base": {"name": kb_type, "params": {"path": kb_path}},
         "cache_dir": ".ner_cache",
         "batch_size": 1,
@@ -622,14 +681,19 @@ def run_pipeline(
             if _cancel_event.is_set():
                 raise InterruptedError("Pipeline cancelled by user")
 
-        pipeline = NERPipeline(config, progress_callback=init_progress_callback, cancel_event=_cancel_event)
+        pipeline = NERPipeline(
+            config, progress_callback=init_progress_callback, cancel_event=_cancel_event
+        )
     except InterruptedError:
         logger.info("Pipeline cancelled during initialization")
         yield "", "*Pipeline cancelled.*", {}, no_tab_switch
         return
     except Exception as e:
         logger.exception("Pipeline initialization failed")
-        yield (*format_error_output("Pipeline Initialization Failed", str(e)), no_tab_switch)
+        yield (
+            *format_error_output("Pipeline Initialization Failed", str(e)),
+            no_tab_switch,
+        )
         return
 
     # Check for cancellation
@@ -645,7 +709,9 @@ def run_pipeline(
         if file_input:
             input_path = file_input.name
         else:
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as f:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False, encoding="utf-8"
+            ) as f:
                 f.write(text_input)
                 input_path = f.name
 
@@ -656,10 +722,13 @@ def run_pipeline(
             os.unlink(input_path)
 
         if not docs:
-            yield (*format_error_output(
-                "No Documents Loaded",
-                "The input file was empty or could not be parsed."
-            ), no_tab_switch)
+            yield (
+                *format_error_output(
+                    "No Documents Loaded",
+                    "The input file was empty or could not be parsed.",
+                ),
+                no_tab_switch,
+            )
             return
 
         doc = docs[0]
@@ -734,8 +803,12 @@ def run_pipeline(
 
     logger.info("Calling format_highlighted_text_with_threshold...")
     sys.stderr.flush()
-    highlighted, color_map = format_highlighted_text_with_threshold(result, threshold=0.0)
-    logger.info(f"format_highlighted_text_with_threshold done, got {len(highlighted)} segments")
+    highlighted, color_map = format_highlighted_text_with_threshold(
+        result, threshold=0.0
+    )
+    logger.info(
+        f"format_highlighted_text_with_threshold done, got {len(highlighted)} segments"
+    )
     sys.stderr.flush()
 
     # Convert to HTML for the gr.HTML component (no legend for inline preview)
@@ -762,7 +835,9 @@ def run_pipeline(
         logger.info("CUDA synchronized")
         sys.stderr.flush()
 
-    logger.info(f"=== run_pipeline RETURNING (run #{_run_counter}, {len(result.get('entities', []))} entities) ===")
+    logger.info(
+        f"=== run_pipeline RETURNING (run #{_run_counter}, {len(result.get('entities', []))} entities) ==="
+    )
     sys.stderr.flush()
     # Final yield with complete results + switch to Preview tab
     yield html_output, stats, result, gr.Tabs(selected=1)
@@ -786,8 +861,11 @@ def update_cand_params(cand_choice: str):
 
 def update_reranker_params(reranker_choice: str):
     """Show/hide reranker-specific parameters based on selection."""
+    show_cross_encoder_model = reranker_choice == "cross_encoder"
     show_embedding_model = reranker_choice == "lela_embedder"
-    return gr.update(visible=show_embedding_model)
+    return gr.update(visible=show_cross_encoder_model), gr.update(
+        visible=show_embedding_model
+    )
 
 
 def update_disambig_params(disambig_choice: str):
@@ -827,18 +905,22 @@ def compute_memory_estimate(
     from ner_pipeline.lela.config import VLLM_GPU_MEMORY_UTILIZATION
     from ner_pipeline.lela.llm_pool import get_cached_models_info
     from ner_pipeline.knowledge_bases.custom import get_kb_cache_info
-    
+
     try:
         resources = get_system_resources()
 
         lines = []
         if resources.gpu_available:
             lines.append(f"**GPU:** {resources.gpu_name}")
-            lines.append(f"**VRAM:** {resources.gpu_vram_free_gb:.1f}GB free / {resources.gpu_vram_total_gb:.1f}GB total")
-            
+            lines.append(
+                f"**VRAM:** {resources.gpu_vram_free_gb:.1f}GB free / {resources.gpu_vram_total_gb:.1f}GB total"
+            )
+
             # Show allocatable memory (considering vLLM's memory fraction)
             allocatable = resources.gpu_vram_free_gb * VLLM_GPU_MEMORY_UTILIZATION
-            lines.append(f"**Allocatable:** ~{allocatable:.1f}GB ({VLLM_GPU_MEMORY_UTILIZATION*100:.0f}% of free)")
+            lines.append(
+                f"**Allocatable:** ~{allocatable:.1f}GB ({VLLM_GPU_MEMORY_UTILIZATION*100:.0f}% of free)"
+            )
         else:
             lines.append("**GPU:** Not available")
 
@@ -853,14 +935,17 @@ def compute_memory_estimate(
             model_name = vllm_info["key"].split(":")[0].split("/")[-1]
             status = "in use" if vllm_info["in_use"] else "cached"
             cached_models.append(f"{model_name} ({status})")
-        
+
         if cached_models:
             lines.append(f"**Cached models:** {', '.join(cached_models)}")
 
         # Show cached KBs
         kb_cache_info = get_kb_cache_info()
         if kb_cache_info:
-            kb_names = [f"{Path(kb['path']).name} ({kb['entity_count']:,} entities)" for kb in kb_cache_info]
+            kb_names = [
+                f"{Path(kb['path']).name} ({kb['entity_count']:,} entities)"
+                for kb in kb_cache_info
+            ]
             lines.append(f"**Cached KBs:** {', '.join(kb_names)}")
 
         return "\n".join(lines)
@@ -883,8 +968,11 @@ def apply_confidence_filter(
         Tuple of (html_output, stats, full_json)
     """
     import sys
+
     logger = logging.getLogger(__name__)
-    logger.info(f"=== apply_confidence_filter STARTED (run #{_run_counter}, threshold={threshold}) ===")
+    logger.info(
+        f"=== apply_confidence_filter STARTED (run #{_run_counter}, threshold={threshold}) ==="
+    )
     sys.stderr.flush()
 
     if not full_result:
@@ -897,9 +985,15 @@ def apply_confidence_filter(
         error_html = f'<div style="color: {ERROR_COLOR}; font-weight: bold;">Error: {full_result["error"]}</div>'
         return error_html, error_stats, full_result
 
-    logger.info("apply_confidence_filter: calling format_highlighted_text_with_threshold...")
-    highlighted, color_map = format_highlighted_text_with_threshold(full_result, threshold)
-    logger.info(f"apply_confidence_filter: got {len(highlighted)} segments, {len(color_map)} colors")
+    logger.info(
+        "apply_confidence_filter: calling format_highlighted_text_with_threshold..."
+    )
+    highlighted, color_map = format_highlighted_text_with_threshold(
+        full_result, threshold
+    )
+    logger.info(
+        f"apply_confidence_filter: got {len(highlighted)} segments, {len(color_map)} colors"
+    )
 
     # Validate that all labels in highlighted have a color
     labels_in_text = set(item[1] for item in highlighted if item[1] is not None)
@@ -937,7 +1031,9 @@ def apply_confidence_filter_display(
         error_html = f'<div style="color: {ERROR_COLOR}; font-weight: bold;">Error: {full_result["error"]}</div>'
         return error_html, error_stats
 
-    highlighted, color_map = format_highlighted_text_with_threshold(full_result, threshold)
+    highlighted, color_map = format_highlighted_text_with_threshold(
+        full_result, threshold
+    )
     stats = compute_linking_stats(full_result, threshold)
 
     # Convert to HTML to bypass buggy HighlightedText component
@@ -946,6 +1042,7 @@ def apply_confidence_filter_display(
 
 
 _run_counter = 0
+
 
 def clear_outputs_for_new_run():
     """Clear outputs and log when a new run starts."""
@@ -956,17 +1053,28 @@ def clear_outputs_for_new_run():
     logger = logging.getLogger(__name__)
     logger.info(f"=== BUTTON CLICKED - Starting run #{_run_counter} ===")
     import sys
+
     sys.stderr.flush()
     # Return empty HTML string instead of empty list for the HTML component
     # Also return button visibility updates: hide Run, show Cancel
     # Switch to Preview tab (selected=1) so user sees progress
-    return "", "*Processing...*", None, None, gr.update(visible=False), gr.update(visible=True), gr.Tabs(selected=1)
+    return (
+        "",
+        "*Processing...*",
+        None,
+        None,
+        gr.update(visible=False),
+        gr.update(visible=True),
+        gr.Tabs(selected=1),
+    )
 
 
 def restore_buttons_after_run():
     """Restore button visibility after pipeline completes or is cancelled."""
     # Show Run button, hide Cancel button (reset text and make interactive again)
-    return gr.update(visible=True), gr.update(visible=False, value="Cancel", interactive=True)
+    return gr.update(visible=True), gr.update(
+        visible=False, value="Cancel", interactive=True
+    )
 
 
 def start_cancellation():
@@ -988,8 +1096,12 @@ if __name__ == "__main__":
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Set the logging level",
     )
-    parser.add_argument("--port", type=int, default=7860, help="Port to run the server on")
-    parser.add_argument("--share", action="store_true", help="Create a public share link")
+    parser.add_argument(
+        "--port", type=int, default=7860, help="Port to run the server on"
+    )
+    parser.add_argument(
+        "--share", action="store_true", help="Create a public share link"
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=args.log)
@@ -1035,10 +1147,10 @@ if __name__ == "__main__":
         } else {
             setupPageCloseHandler();
         }
-        
+
         function setupPageCloseHandler() {
             console.log("NER Pipeline: Page close handler initialized");
-            
+
             // Find the cancel button if visible (indicates pipeline is running)
             function findCancelButton() {
                 const buttons = document.querySelectorAll('button');
@@ -1053,7 +1165,7 @@ if __name__ == "__main__":
                 }
                 return null;
             }
-            
+
             // Cancel pipeline when page is actually closing/navigating away
             window.addEventListener('pagehide', function() {
                 const cancelBtn = findCancelButton();
@@ -1062,7 +1174,7 @@ if __name__ == "__main__":
                     console.log("NER Pipeline: Triggered cancellation on pagehide");
                 }
             }, { capture: true });
-            
+
             // Backup: also try on beforeunload (fires earlier, more reliable for sending requests)
             window.addEventListener('beforeunload', function() {
                 const cancelBtn = findCancelButton();
@@ -1083,7 +1195,7 @@ if __name__ == "__main__":
         gr.Markdown("# NER Pipeline", elem_classes=["main-header"])
         gr.Markdown(
             "*Modular entity recognition and linking pipeline. Upload a knowledge base, enter text, configure the pipeline, and run.*",
-            elem_classes=["subtitle"]
+            elem_classes=["subtitle"],
         )
 
         with gr.Tabs():
@@ -1103,7 +1215,10 @@ if __name__ == "__main__":
                                 )
                             with gr.Tab("Preview", id=1):
                                 confidence_threshold = gr.Slider(
-                                    minimum=0.0, maximum=1.0, value=0.0, step=0.01,
+                                    minimum=0.0,
+                                    maximum=1.0,
+                                    value=0.0,
+                                    step=0.01,
                                     label="Confidence Filter",
                                     info="Gray out low-confidence links",
                                 )
@@ -1144,7 +1259,7 @@ if __name__ == "__main__":
 
                 # --- CONFIGURATION SECTION (Horizontal Layout) ---
                 gr.Markdown("### Configuration")
-                
+
                 # GPU memory info (left-aligned, above components)
                 memory_estimate_display = gr.Markdown(
                     value="*Detecting GPU...*",
@@ -1177,12 +1292,18 @@ if __name__ == "__main__":
                                 value="person, organization, location",
                             )
                             gliner_threshold = gr.Slider(
-                                minimum=0.1, maximum=1.0, value=0.5, step=0.05,
+                                minimum=0.1,
+                                maximum=1.0,
+                                value=0.5,
+                                step=0.05,
                                 label="Threshold",
                             )
                         with gr.Group(visible=True) as simple_params:
                             simple_min_len = gr.Slider(
-                                minimum=1, maximum=10, value=3, step=1,
+                                minimum=1,
+                                maximum=10,
+                                value=3,
+                                step=1,
                                 label="Min Length",
                             )
 
@@ -1196,7 +1317,9 @@ if __name__ == "__main__":
                             container=False,
                         )
                         # Embedding model selection for dense candidates
-                        embedding_model_choices = [(m[1], m[0]) for m in EMBEDDING_MODEL_CHOICES]
+                        embedding_model_choices = [
+                            (m[1], m[0]) for m in EMBEDDING_MODEL_CHOICES
+                        ]
                         cand_embedding_model = gr.Dropdown(
                             choices=embedding_model_choices,
                             value="Qwen/Qwen3-Embedding-4B",
@@ -1204,7 +1327,10 @@ if __name__ == "__main__":
                             visible=False,
                         )
                         cand_top_k = gr.Slider(
-                            minimum=1, maximum=100, value=64, step=1,
+                            minimum=1,
+                            maximum=100,
+                            value=64,
+                            step=1,
                             label="Top K",
                         )
                         cand_use_context = gr.Checkbox(
@@ -1222,6 +1348,16 @@ if __name__ == "__main__":
                             label="Reranker",
                             container=False,
                         )
+                        # Cross-encoder model selection
+                        cross_encoder_model_choices = [
+                            (m[1], m[0]) for m in CROSS_ENCODER_MODEL_CHOICES
+                        ]
+                        reranker_cross_encoder_model = gr.Dropdown(
+                            choices=cross_encoder_model_choices,
+                            value="tomaarsen/Qwen3-Reranker-4B-seq-cls",
+                            label="Cross-Encoder Model",
+                            visible=False,
+                        )
                         # Embedding model selection for embedder reranker
                         reranker_embedding_model = gr.Dropdown(
                             choices=embedding_model_choices,
@@ -1230,7 +1366,10 @@ if __name__ == "__main__":
                             visible=False,
                         )
                         reranker_top_k = gr.Slider(
-                            minimum=1, maximum=20, value=10, step=1,
+                            minimum=1,
+                            maximum=20,
+                            value=10,
+                            step=1,
                             label="Top K",
                         )
 
@@ -1271,7 +1410,6 @@ if __name__ == "__main__":
                     value="custom",
                     visible=False,
                 )
-
 
             # ===== DOCUMENTATION TAB =====
             with gr.Tab("Help"):
@@ -1387,7 +1525,7 @@ Test files are available in `data/test/`:
         reranker_type.change(
             fn=update_reranker_params,
             inputs=[reranker_type],
-            outputs=[reranker_embedding_model],
+            outputs=[reranker_cross_encoder_model, reranker_embedding_model],
         )
 
         disambig_type.change(
@@ -1397,7 +1535,14 @@ Test files are available in `data/test/`:
         )
 
         # Memory estimate updates
-        memory_inputs = [ner_type, gliner_model, cand_type, reranker_type, disambig_type, llm_model]
+        memory_inputs = [
+            ner_type,
+            gliner_model,
+            cand_type,
+            reranker_type,
+            disambig_type,
+            llm_model,
+        ]
 
         for component in [ner_type, cand_type, reranker_type, disambig_type, llm_model]:
             component.change(
@@ -1414,45 +1559,59 @@ Test files are available in `data/test/`:
         )
 
         # Chain: clear outputs → run pipeline → apply filter → restore buttons
-        run_event = run_btn.click(
-            fn=clear_outputs_for_new_run,
-            inputs=None,
-            outputs=[preview_html, stats_output, json_output, full_result_state, run_btn, cancel_btn, input_tabs],
-        ).then(
-            fn=run_pipeline,
-            inputs=[
-                text_input,
-                file_input,
-                kb_file,
-                loader_type,
-                ner_type,
-                spacy_model,
-                gliner_model,
-                gliner_labels,
-                gliner_threshold,
-                simple_min_len,
-                cand_type,
-                cand_embedding_model,
-                cand_top_k,
-                cand_use_context,
-                reranker_type,
-                reranker_embedding_model,
-                reranker_top_k,
-                disambig_type,
-                llm_model,
-                lela_thinking,
-                lela_none_candidate,
-                kb_type,
-            ],
-            outputs=[preview_html, stats_output, full_result_state, input_tabs],
-        ).then(
-            fn=apply_confidence_filter,
-            inputs=[full_result_state, confidence_threshold],
-            outputs=[preview_html, stats_output, json_output],
-        ).then(
-            fn=restore_buttons_after_run,
-            inputs=None,
-            outputs=[run_btn, cancel_btn],
+        run_event = (
+            run_btn.click(
+                fn=clear_outputs_for_new_run,
+                inputs=None,
+                outputs=[
+                    preview_html,
+                    stats_output,
+                    json_output,
+                    full_result_state,
+                    run_btn,
+                    cancel_btn,
+                    input_tabs,
+                ],
+            )
+            .then(
+                fn=run_pipeline,
+                inputs=[
+                    text_input,
+                    file_input,
+                    kb_file,
+                    loader_type,
+                    ner_type,
+                    spacy_model,
+                    gliner_model,
+                    gliner_labels,
+                    gliner_threshold,
+                    simple_min_len,
+                    cand_type,
+                    cand_embedding_model,
+                    cand_top_k,
+                    cand_use_context,
+                    reranker_type,
+                    reranker_embedding_model,
+                    reranker_cross_encoder_model,
+                    reranker_top_k,
+                    disambig_type,
+                    llm_model,
+                    lela_thinking,
+                    lela_none_candidate,
+                    kb_type,
+                ],
+                outputs=[preview_html, stats_output, full_result_state, input_tabs],
+            )
+            .then(
+                fn=apply_confidence_filter,
+                inputs=[full_result_state, confidence_threshold],
+                outputs=[preview_html, stats_output, json_output],
+            )
+            .then(
+                fn=restore_buttons_after_run,
+                inputs=None,
+                outputs=[run_btn, cancel_btn],
+            )
         )
 
         # Cancel button: show "Cancelling..." and set flag
@@ -1470,4 +1629,6 @@ Test files are available in `data/test/`:
         )
 
     logger.info(f"Launching Gradio UI on port {args.port}...")
-    demo.launch(server_name="0.0.0.0", server_port=args.port, share=args.share, css=custom_css)
+    demo.launch(
+        server_name="0.0.0.0", server_port=args.port, share=args.share, css=custom_css
+    )

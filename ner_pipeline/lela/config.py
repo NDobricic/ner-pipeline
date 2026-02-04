@@ -20,10 +20,17 @@ AVAILABLE_LLM_MODELS = [
 
 # Available embedding models (model_id, display_name, vram_gb)
 AVAILABLE_EMBEDDING_MODELS = [
-    ("sentence-transformers/all-MiniLM-L6-v2", "MiniLM-L6 (~0.3GB)", 0.3),
-    ("BAAI/bge-base-en-v1.5", "BGE-Base (~0.5GB)", 0.5),
+    # ("sentence-transformers/all-MiniLM-L6-v2", "MiniLM-L6 (~0.3GB)", 0.3),
+    # ("BAAI/bge-base-en-v1.5", "BGE-Base (~0.5GB)", 0.5),
     ("Qwen/Qwen3-Embedding-0.6B", "Qwen3-Embed-0.6B (~2GB)", 2.0),
     ("Qwen/Qwen3-Embedding-4B", "Qwen3-Embed-4B (~9GB)", 9.0),
+]
+
+# Available cross-encoder models for reranking
+AVAILABLE_CROSS_ENCODER_MODELS = [
+    # ("cross-encoder/ms-marco-TinyBERT-L-2-v2", "TinyBERT (~0.1GB)", 0.1),
+    ("tomaarsen/Qwen3-Reranker-4B-seq-cls", "Qwen3-Reranker-4B (~9GB)", 9.0),
+    ("tomaarsen/Qwen3-Reranker-0.6B-seq-cls", "Qwen3-Reranker-0.6B (~2GB)", 2.0),
 ]
 
 # Retrieval settings
@@ -40,14 +47,16 @@ NOT_AN_ENTITY = "None"
 # vLLM settings
 DEFAULT_TENSOR_PARALLEL_SIZE = 1
 DEFAULT_MAX_MODEL_LEN = None
-VLLM_GPU_MEMORY_UTILIZATION = 0.8  # Fraction of GPU memory vLLM will use (0.8 leaves headroom for loading)
+VLLM_GPU_MEMORY_UTILIZATION = (
+    0.8  # Fraction of GPU memory vLLM will use (0.8 leaves headroom for loading)
+)
 
 # Embedding task descriptions
 RETRIEVER_TASK = (
     "Given an ambiguous mention, retrieve relevant entities that the mention refers to."
 )
 RERANKER_TASK = (
-    "Given a text with a marked mention enclosed in square brackets, "
+    "Given a text with a mention enclosed between the '[' and ']' characters, "
     "retrieve relevant entities that the mention refers to."
 )
 
