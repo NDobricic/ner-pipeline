@@ -98,19 +98,10 @@ A horizontal row of component configuration columns:
    - Color-coded by entity type (consistent colors based on label hash)
    - **Interactive popups on hover** showing entity details
 
-2. **Confidence Filter Slider**
-   - Adjusts threshold (0-1) for graying out low-confidence links
-   - Entities below threshold display in gray
-   - Statistics update to show above/below threshold counts
-
-3. **Statistics Panel**
+2. **Statistics Panel**
    - Total entities, linked vs. not-in-KB counts
-   - Average confidence score
-   - Threshold breakdown when filter is active
-
-4. **Full JSON Output** (collapsible accordion)
+3. **Full JSON Output** (collapsible accordion)
    - Complete pipeline output with all entity details
-   - Includes `linking_confidence_normalized` scores
 
 ## Configuration Options
 
@@ -260,7 +251,6 @@ Each NER option maps to a spaCy pipeline factory:
 
 5. **Explore Results**
    - Hover over highlighted entities to see details
-   - Adjust confidence threshold to filter low-confidence links
    - Expand JSON output for full details
 
 ### Default Configuration
@@ -307,19 +297,9 @@ The output shows detected entities with color-coded highlighting:
   - Entity title from knowledge base
   - Entity ID
   - Entity type/label
-  - Linking confidence (percentage)
   - Entity description (truncated if long)
 - Legend items also have hover popups with summary info
 - Hovering a legend item highlights only entities of that type (others turn gray)
-
-### Confidence Filtering
-
-Filter results by linking confidence in real-time:
-- **Confidence slider** (0.0 - 1.0) controls the threshold
-- Entities below threshold are grayed out (per-instance)
-- Legend is grayed only when ALL instances of that label are below threshold
-- Statistics panel shows above/below threshold breakdown
-- Filtering is instant (no re-run needed)
 
 ### Memory Estimation
 
@@ -361,7 +341,6 @@ The JSON viewer (collapsible accordion) shows complete results including:
 - All detected mentions with positions
 - Candidate lists with scores
 - Resolved entity information
-- `linking_confidence` and `linking_confidence_normalized` scores
 - Document metadata
 
 ## Troubleshooting
@@ -408,8 +387,6 @@ The web app is built using:
 ```
 app.py                              # Main Gradio application
 ├── run_pipeline()                  # Main processing generator function
-├── filter_entities_by_confidence() # Confidence threshold filtering
-├── format_highlighted_text_with_threshold() # Per-instance confidence coloring
 ├── highlighted_to_html()           # Entity highlighting with popups
 ├── compute_linking_stats()         # Statistics calculation
 ├── compute_memory_estimate()       # GPU memory estimation

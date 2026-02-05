@@ -319,7 +319,6 @@ def sample_pipeline_result() -> Dict:
                 "label": "PERSON",
                 "entity_title": "Barack Obama",
                 "entity_id": "Q76",
-                "linking_confidence": 0.95,
                 "candidates": [],
             }
         ],

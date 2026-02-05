@@ -68,8 +68,6 @@ Process a single document through the spaCy pipeline.
         "entity_id": Optional[str],    # Resolved entity ID
         "entity_title": Optional[str], # Entity title
         "entity_description": Optional[str],  # Entity description
-        "linking_confidence": Optional[float],  # Raw confidence score
-        "linking_confidence_normalized": Optional[float],  # Normalized confidence (0-1)
         "candidates": List[{      # Candidate list
             "entity_id": str,
             "score": float,
@@ -926,8 +924,6 @@ The pipeline outputs JSONL (JSON Lines) format:
       "entity_id": "Q937",
       "entity_title": "Albert Einstein",
       "entity_description": "German-born theoretical physicist",
-      "linking_confidence": 0.95,
-      "linking_confidence_normalized": 0.87,
       "candidates": [
         {
           "entity_id": "Q937",
@@ -950,8 +946,6 @@ The pipeline outputs JSONL (JSON Lines) format:
       "entity_id": "Q183",
       "entity_title": "Germany",
       "entity_description": "Country in Central Europe",
-      "linking_confidence": 0.88,
-      "linking_confidence_normalized": 0.75,
       "candidates": [...]
     }
   ],
@@ -960,12 +954,3 @@ The pipeline outputs JSONL (JSON Lines) format:
   }
 }
 ```
-
-### Confidence Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `linking_confidence` | float | Raw confidence score from the candidate generator (score of selected candidate) |
-| `linking_confidence_normalized` | float | Normalized confidence (0-1) based on score gap between top candidates. `null` if entity not linked or single candidate. `1.0` if only one candidate existed. |
-
-The normalized confidence is useful for filtering: entities with low normalized confidence may be ambiguous (multiple candidates with similar scores).

@@ -4,7 +4,7 @@ import pytest
 
 from app import (
     compute_linking_stats,
-    format_highlighted_text_with_threshold,
+    format_highlighted_text,
     get_available_components,
     highlighted_to_html,
     run_pipeline,
@@ -13,13 +13,13 @@ from tests.conftest import MockGradioFile, MockGradioProgress
 
 
 @pytest.mark.integration
-class TestFormatHighlightedTextWithThreshold:
-    """Tests for format_highlighted_text_with_threshold function."""
+class TestFormatHighlightedText:
+    """Tests for format_highlighted_text function."""
 
     def test_format_empty_entities(self):
         """No entities returns single tuple with full text."""
         result = {"text": "Hello world", "entities": []}
-        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        highlighted, color_map = format_highlighted_text(result)
         assert len(highlighted) == 1
         assert highlighted[0][0] == "Hello world"
         assert highlighted[0][1] is None
@@ -39,7 +39,7 @@ class TestFormatHighlightedTextWithThreshold:
                 }
             ],
         }
-        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        highlighted, color_map = format_highlighted_text(result)
         assert len(highlighted) == 2
         # First element: (text, label, entity_info)
         assert highlighted[0][0] == "Barack Obama"
@@ -71,7 +71,7 @@ class TestFormatHighlightedTextWithThreshold:
                 },
             ],
         }
-        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        highlighted, color_map = format_highlighted_text(result)
         assert len(highlighted) == 4
         assert highlighted[0][0] == "Albert Einstein"
         assert highlighted[0][1] == "PERSON: Albert Einstein"
@@ -96,7 +96,7 @@ class TestFormatHighlightedTextWithThreshold:
                 }
             ],
         }
-        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        highlighted, color_map = format_highlighted_text(result)
         assert highlighted[0][0] == "Obama"
         assert highlighted[0][1] == "PERSON: Barack Obama"
 
@@ -114,7 +114,7 @@ class TestFormatHighlightedTextWithThreshold:
                 }
             ],
         }
-        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        highlighted, color_map = format_highlighted_text(result)
         assert highlighted[0][0] == "John Doe"
         assert highlighted[0][1] == "PERSON [NOT IN KB]"
 
@@ -132,7 +132,7 @@ class TestFormatHighlightedTextWithThreshold:
                 }
             ],
         }
-        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        highlighted, color_map = format_highlighted_text(result)
         assert len(highlighted) == 1
         assert highlighted[0][0] == "Obama"
         assert highlighted[0][1] == "PERSON: Barack Obama"
@@ -150,7 +150,7 @@ class TestFormatHighlightedTextWithThreshold:
                 }
             ],
         }
-        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        highlighted, color_map = format_highlighted_text(result)
         assert highlighted[0][0] == "Entity"
         assert highlighted[0][1] == "ENT [NOT IN KB]"
 
@@ -175,7 +175,7 @@ class TestFormatHighlightedTextWithThreshold:
                 },
             ],
         }
-        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        highlighted, color_map = format_highlighted_text(result)
         assert "PERSON: Barack Obama" in color_map
         assert "GPE: Germany" in color_map
         # Colors should be hex strings
@@ -195,20 +195,16 @@ class TestFormatHighlightedTextWithThreshold:
                     "entity_title": "Barack Obama",
                     "entity_id": "Q76",
                     "entity_description": "44th President of the United States",
-                    "linking_confidence": 0.95,
-                    "linking_confidence_normalized": 0.85,
                 }
             ],
         }
-        highlighted, color_map = format_highlighted_text_with_threshold(result)
+        highlighted, color_map = format_highlighted_text(result)
         entity_info = highlighted[0][2]
         assert entity_info["mention"] == "Obama"
         assert entity_info["type"] == "PERSON"
         assert entity_info["kb_id"] == "Q76"
         assert entity_info["kb_title"] == "Barack Obama"
         assert entity_info["kb_description"] == "44th President of the United States"
-        assert entity_info["confidence"] == 0.95
-        assert entity_info["confidence_normalized"] == 0.85
 
 
 @pytest.mark.integration
@@ -253,8 +249,8 @@ class TestComputeLinkingStats:
         """All entities linked shows 100%."""
         result = {
             "entities": [
-                {"entity_title": "Entity 1", "linking_confidence": 0.9},
-                {"entity_title": "Entity 2", "linking_confidence": 0.8},
+                {"entity_title": "Entity 1"},
+                {"entity_title": "Entity 2"},
             ]
         }
         stats = compute_linking_stats(result)
@@ -277,9 +273,9 @@ class TestComputeLinkingStats:
         """Mixed linking shows correct percentages."""
         result = {
             "entities": [
-                {"entity_title": "Entity 1", "linking_confidence": 0.9},
+                {"entity_title": "Entity 1"},
                 {"entity_title": None},
-                {"entity_title": "Entity 3", "linking_confidence": 0.7},
+                {"entity_title": "Entity 3"},
                 {"entity_title": None},
             ]
         }
@@ -287,17 +283,6 @@ class TestComputeLinkingStats:
         assert "Total entities: 4" in stats
         assert "Linked to KB: 2 (50.0%)" in stats
         assert "Not in KB: 2 (50.0%)" in stats
-
-    def test_stats_with_confidence(self):
-        """Average confidence is calculated correctly."""
-        result = {
-            "entities": [
-                {"entity_title": "Entity 1", "linking_confidence": 0.9},
-                {"entity_title": "Entity 2", "linking_confidence": 0.7},
-            ]
-        }
-        stats = compute_linking_stats(result)
-        assert "Avg. confidence (linked): 0.800" in stats
 
     def test_stats_empty_result_dict(self):
         """Empty result dict returns no entities message."""

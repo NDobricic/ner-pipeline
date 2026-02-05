@@ -201,9 +201,6 @@ def highlighted_to_html(
                     popup_lines.append(
                         f"Mention: &quot;{escape_js_string(entity_info['mention'])}&quot;"
                     )
-                if entity_info.get("confidence_normalized") is not None:
-                    conf_pct = entity_info["confidence_normalized"] * 100
-                    popup_lines.append(f"Confidence: {conf_pct:.1f}%")
                 if entity_info.get("kb_description"):
                     desc = entity_info["kb_description"]
                     if len(desc) > 150:
@@ -272,7 +269,7 @@ def highlighted_to_html(
             enter_js = hover_in_js.format(cid=container_id, cls=css_class)
             leave_js = hover_out_js.format(cid=container_id)
 
-            # Build popup content for legend item (summary info, no instance-specific confidence)
+            # Build popup content for legend item (summary info, no instance-specific values)
             entity_info = label_entity_info.get(label)
             count = label_counts.get(label, 1)
             popup_lines = []
@@ -287,7 +284,7 @@ def highlighted_to_html(
                     )
                 if entity_info.get("type"):
                     popup_lines.append(f"Type: {escape_js_string(entity_info['type'])}")
-                # Show occurrence count instead of instance-specific confidence
+                # Show occurrence count for legend hover
                 popup_lines.append(f"Mentions: {count}")
                 if entity_info.get("kb_description"):
                     desc = entity_info["kb_description"]
@@ -409,8 +406,6 @@ def format_highlighted_text(
             "kb_id": entity.get("entity_id"),
             "kb_title": entity.get("entity_title"),
             "kb_description": entity.get("entity_description"),
-            "confidence": entity.get("linking_confidence"),
-            "confidence_normalized": entity.get("linking_confidence_normalized"),
             "display_color": instance_color,
         }
 
@@ -433,20 +428,10 @@ def compute_linking_stats(result: Dict) -> str:
     linked = sum(1 for e in entities if e.get("entity_title"))
     unlinked = total - linked
 
-    # Compute average confidence for linked entities
-    confidences = [
-        e.get("linking_confidence")
-        for e in entities
-        if e.get("linking_confidence") is not None
-    ]
-    avg_confidence = sum(confidences) / len(confidences) if confidences else 0
-
     stats = f"**Entity Linking Statistics**\n\n"
     stats += f"- Total entities: {total}\n"
     stats += f"- Linked to KB: {linked} ({100*linked/total:.1f}%)\n"
     stats += f"- Not in KB: {unlinked} ({100*unlinked/total:.1f}%)\n"
-    if confidences:
-        stats += f"- Avg. confidence (linked): {avg_confidence:.3f}\n"
 
     return stats
 
