@@ -76,30 +76,7 @@ def get_available_components() -> Dict[str, List[str]]:
     }
 
 
-def filter_entities_by_confidence(result: Dict, threshold: float) -> Dict:
-    """Filter entities by normalized linking confidence threshold.
 
-    Args:
-        result: Full pipeline result dict
-        threshold: Minimum normalized confidence (0-1) to include entity
-
-    Returns:
-        New result dict with filtered entities
-    """
-    if not result:
-        return result
-
-    filtered_entities = []
-    for entity in result.get("entities", []):
-        conf = entity.get("linking_confidence_normalized")
-        # Include entity if: no confidence score (keep unlinked), or confidence >= threshold
-        if conf is None or conf >= threshold:
-            filtered_entities.append(entity)
-
-    return {
-        **result,
-        "entities": filtered_entities,
-    }
 
 
 GRAY_COLOR = "#D1D5DB"  # Tailwind gray-300 (light gray)
@@ -382,14 +359,11 @@ def highlighted_to_html(
     return f'<div id="{container_id}" class="highlighted-container" style="position: relative;">{legend_html}{text_html}{popup_html}</div>'
 
 
-def format_highlighted_text_with_threshold(
+def format_highlighted_text(
     result: Dict,
-    threshold: float = 0.0,
 ) -> Tuple[List[Tuple[str, Optional[str], Optional[Dict]]], Dict[str, str]]:
-    """Convert pipeline result to highlighted format with confidence-based coloring.
-
-    Per-instance filtering: each mention is grayed individually based on its confidence.
-    Legend is grayed only when ALL instances of that entity are below threshold.
+    """Convert pipeline result to highlighted format.
+    
     Returns (highlighted_data, color_map) for use with highlighted_to_html().
     Each highlighted item is (text, label, entity_info) where entity_info contains details for popup.
     """
@@ -399,40 +373,21 @@ def format_highlighted_text_with_threshold(
     if not entities:
         return [(text, None, None)], {}
 
-    # Process entities: build labels and check per-instance confidence
-    entity_data = []  # (entity, label, conf, is_below_threshold)
-    label_has_above = {}  # Track if ANY instance of this label is above threshold
+    # Process entities: build labels
+    entity_data = []
+    labels = set()
 
     for entity in entities:
-        conf = entity.get("linking_confidence_normalized")
-
         label_type = entity.get("label", "ENT")
         if entity.get("entity_title"):
             label = f"{label_type}: {entity['entity_title']}"
         else:
             label = f"{label_type} [NOT IN KB]"
+        entity_data.append((entity, label))
+        labels.add(label)
 
-        # Per-instance: check if THIS instance is below threshold
-        # None confidence (unlinked) is treated as above threshold (not grayed)
-        is_below = conf is not None and conf < threshold
-        entity_data.append((entity, label, conf, is_below))
-
-        # Track if any instance of this label is above threshold (for legend)
-        if label not in label_has_above:
-            label_has_above[label] = not is_below
-        elif not is_below:
-            label_has_above[label] = True
-
-    # Build color_map for legend: gray only if ALL instances are below threshold
-    # Order: labels with at least one above-threshold instance first
-    color_map = {}
-    above_labels = [l for l, has_above in label_has_above.items() if has_above]
-    below_labels = [l for l, has_above in label_has_above.items() if not has_above]
-
-    for label in above_labels:
-        color_map[label] = get_label_color(label)
-    for label in below_labels:
-        color_map[label] = GRAY_COLOR
+    # Build color_map
+    color_map = {label: get_label_color(label) for label in labels}
 
     # Sort by position for text reconstruction
     entity_data.sort(key=lambda x: x[0]["start"])
@@ -441,14 +396,13 @@ def format_highlighted_text_with_threshold(
     highlighted = []
     last_end = 0
 
-    for entity, label, conf, is_below in entity_data:
+    for entity, label in entity_data:
         if entity["start"] > last_end:
             highlighted.append((text[last_end : entity["start"]], None, None))
 
-        # Determine color for THIS instance
-        instance_color = GRAY_COLOR if is_below else get_label_color(label)
+        instance_color = color_map.get(label)
 
-        # Build entity info dict for popup (includes per-instance color)
+        # Build entity info dict for popup
         entity_info = {
             "mention": entity["text"],
             "type": entity.get("label", "ENT"),
@@ -456,8 +410,8 @@ def format_highlighted_text_with_threshold(
             "kb_title": entity.get("entity_title"),
             "kb_description": entity.get("entity_description"),
             "confidence": entity.get("linking_confidence"),
-            "confidence_normalized": conf,
-            "display_color": instance_color,  # Per-instance color
+            "confidence_normalized": entity.get("linking_confidence_normalized"),
+            "display_color": instance_color,
         }
 
         highlighted.append((entity["text"], label, entity_info))
@@ -469,8 +423,8 @@ def format_highlighted_text_with_threshold(
     return highlighted, color_map
 
 
-def compute_linking_stats(result: Dict, threshold: float = 0.0) -> str:
-    """Compute statistics about entity linking results with threshold breakdown."""
+def compute_linking_stats(result: Dict) -> str:
+    """Compute statistics about entity linking results."""
     entities = result.get("entities", [])
     if not entities:
         return "No entities found."
@@ -487,27 +441,12 @@ def compute_linking_stats(result: Dict, threshold: float = 0.0) -> str:
     ]
     avg_confidence = sum(confidences) / len(confidences) if confidences else 0
 
-    # Count entities above/below threshold
-    above_threshold = 0
-    below_threshold = 0
-    for e in entities:
-        conf = e.get("linking_confidence_normalized")
-        if conf is not None and conf < threshold:
-            below_threshold += 1
-        else:
-            above_threshold += 1
-
     stats = f"**Entity Linking Statistics**\n\n"
     stats += f"- Total entities: {total}\n"
     stats += f"- Linked to KB: {linked} ({100*linked/total:.1f}%)\n"
     stats += f"- Not in KB: {unlinked} ({100*unlinked/total:.1f}%)\n"
     if confidences:
         stats += f"- Avg. confidence (linked): {avg_confidence:.3f}\n"
-
-    if threshold > 0:
-        stats += f"\n**Confidence Filter** (threshold: {threshold:.2f})\n\n"
-        stats += f"- Above threshold: {above_threshold}\n"
-        stats += f"- Below threshold (gray): {below_threshold}\n"
 
     return stats
 
@@ -821,13 +760,13 @@ def run_pipeline(
     sys.stderr.flush()
     progress(0.9, desc="Formatting output...")
 
-    logger.info("Calling format_highlighted_text_with_threshold...")
+    logger.info("Calling format_highlighted_text...")
     sys.stderr.flush()
-    highlighted, color_map = format_highlighted_text_with_threshold(
-        result, threshold=0.0
+    highlighted, color_map = format_highlighted_text(
+        result
     )
     logger.info(
-        f"format_highlighted_text_with_threshold done, got {len(highlighted)} segments"
+        f"format_highlighted_text done, got {len(highlighted)} segments"
     )
     sys.stderr.flush()
 
@@ -985,91 +924,7 @@ def compute_memory_estimate(
         return f"*Could not estimate memory: {e}*"
 
 
-def apply_confidence_filter(
-    full_result: Optional[Dict],
-    threshold: float,
-):
-    """Apply confidence threshold filter and regenerate outputs.
 
-    Args:
-        full_result: The complete unfiltered pipeline result (from State)
-        threshold: Confidence threshold from slider
-
-    Returns:
-        Tuple of (html_output, stats, full_json)
-    """
-    import sys
-
-    logger = logging.getLogger(__name__)
-    logger.info(
-        f"=== apply_confidence_filter STARTED (run #{_run_counter}, threshold={threshold}) ==="
-    )
-    sys.stderr.flush()
-
-    if not full_result:
-        logger.info("apply_confidence_filter: no result, returning empty")
-        return "", "*Run the pipeline to see results.*", {}
-
-    # Handle error results - pass through unchanged
-    if "error" in full_result:
-        error_stats = f"**Error**\n\n{full_result.get('details', 'Unknown error')}"
-        error_html = f'<div style="color: {ERROR_COLOR}; font-weight: bold;">Error: {full_result["error"]}</div>'
-        return error_html, error_stats, full_result
-
-    logger.info(
-        "apply_confidence_filter: calling format_highlighted_text_with_threshold..."
-    )
-    highlighted, color_map = format_highlighted_text_with_threshold(
-        full_result, threshold
-    )
-    logger.info(
-        f"apply_confidence_filter: got {len(highlighted)} segments, {len(color_map)} colors"
-    )
-
-    # Validate that all labels in highlighted have a color
-    labels_in_text = set(item[1] for item in highlighted if item[1] is not None)
-    labels_in_map = set(color_map.keys())
-    missing_labels = labels_in_text - labels_in_map
-    if missing_labels:
-        logger.warning(f"Labels missing from color_map: {missing_labels}")
-        # Add missing labels with default color
-        for label in missing_labels:
-            color_map[label] = "#808080"
-
-    logger.info("apply_confidence_filter: calling compute_linking_stats...")
-    stats = compute_linking_stats(full_result, threshold)
-
-    # Convert to HTML to bypass buggy HighlightedText component
-    html_output = highlighted_to_html(highlighted, color_map, show_legend=False)
-
-    logger.info(f"=== apply_confidence_filter RETURNING (run #{_run_counter}) ===")
-    sys.stderr.flush()
-
-    return html_output, stats, full_result
-
-
-def apply_confidence_filter_display(
-    full_result: Optional[Dict],
-    threshold: float,
-):
-    """Apply confidence filter to display components only (skip JSON for performance)."""
-    if not full_result:
-        return "", "*Run the pipeline to see results.*"
-
-    # Handle error results - pass through unchanged
-    if "error" in full_result:
-        error_stats = f"**Error**\n\n{full_result.get('details', 'Unknown error')}"
-        error_html = f'<div style="color: {ERROR_COLOR}; font-weight: bold;">Error: {full_result["error"]}</div>'
-        return error_html, error_stats
-
-    highlighted, color_map = format_highlighted_text_with_threshold(
-        full_result, threshold
-    )
-    stats = compute_linking_stats(full_result, threshold)
-
-    # Convert to HTML to bypass buggy HighlightedText component
-    html_output = highlighted_to_html(highlighted, color_map, show_legend=False)
-    return html_output, stats
 
 
 _run_counter = 0
@@ -1220,9 +1075,6 @@ if __name__ == "__main__":
     """
 
     with gr.Blocks(title="NER Pipeline", fill_height=True, head=custom_head) as demo:
-        # State for storing full pipeline result (before confidence filtering)
-        full_result_state = gr.State(value=None)
-
         gr.Markdown("# NER Pipeline", elem_classes=["main-header"])
         gr.Markdown(
             "*Modular entity recognition and linking pipeline. Upload a knowledge base, enter text, configure the pipeline, and run.*",
@@ -1245,14 +1097,6 @@ if __name__ == "__main__":
                                     value="Albert Einstein was born in Germany. Marie Curie was a pioneering scientist.",
                                 )
                             with gr.Tab("Preview", id=1):
-                                confidence_threshold = gr.Slider(
-                                    minimum=0.0,
-                                    maximum=1.0,
-                                    value=0.0,
-                                    step=0.01,
-                                    label="Confidence Filter",
-                                    info="Gray out low-confidence links",
-                                )
                                 preview_html = gr.HTML(
                                     elem_classes=["output-section"],
                                 )
@@ -1607,7 +1451,6 @@ Test files are available in `data/test/`:
                     preview_html,
                     stats_output,
                     json_output,
-                    full_result_state,
                     run_btn,
                     cancel_btn,
                     input_tabs,
@@ -1642,12 +1485,7 @@ Test files are available in `data/test/`:
                     lela_none_candidate,
                     kb_type,
                 ],
-                outputs=[preview_html, stats_output, full_result_state, input_tabs],
-            )
-            .then(
-                fn=apply_confidence_filter,
-                inputs=[full_result_state, confidence_threshold],
-                outputs=[preview_html, stats_output, json_output],
+                outputs=[preview_html, stats_output, json_output, input_tabs],
             )
             .then(
                 fn=restore_buttons_after_run,
@@ -1664,11 +1502,7 @@ Test files are available in `data/test/`:
             outputs=[cancel_btn],
         )
 
-        confidence_threshold.change(
-            fn=apply_confidence_filter_display,
-            inputs=[full_result_state, confidence_threshold],
-            outputs=[preview_html, stats_output],
-        )
+
 
     logger.info(f"Launching Gradio UI on port {args.port}...")
     demo.launch(
