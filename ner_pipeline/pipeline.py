@@ -57,7 +57,6 @@ DISAMBIGUATOR_COMPONENT_MAP = {
     "lela_vllm": "ner_pipeline_lela_vllm_disambiguator",
     "lela_transformers": "ner_pipeline_lela_transformers_disambiguator",
     "first": "ner_pipeline_first_disambiguator",
-    "popularity": "ner_pipeline_popularity_disambiguator",
 }
 
 

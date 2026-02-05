@@ -62,7 +62,6 @@ def get_available_components() -> Dict[str, List[str]]:
     available_disambiguators = [
         "none",
         "first",
-        "popularity",
         "lela_vllm",
         "lela_transformers",
     ]
