@@ -29,7 +29,10 @@ from ner_pipeline.lela.prompts import (
     DEFAULT_SYSTEM_PROMPT,
 )
 from ner_pipeline.lela.llm_pool import get_vllm_instance, release_vllm
-from ner_pipeline.utils import ensure_candidates_extension, ensure_resolved_entity_extension
+from ner_pipeline.utils import (
+    ensure_candidates_extension,
+    ensure_resolved_entity_extension,
+)
 from ner_pipeline.types import Candidate, ProgressCallback
 
 logger = logging.getLogger(__name__)
@@ -46,6 +49,7 @@ def _get_vllm():
         try:
             import vllm
             from vllm import SamplingParams
+
             _vllm = vllm
             _SamplingParams = SamplingParams
         except ImportError:
@@ -66,15 +70,16 @@ def _ensure_extensions():
 # LELA vLLM Disambiguator Component
 # ============================================================================
 
+
 @Language.factory(
     "ner_pipeline_lela_vllm_disambiguator",
     default_config={
         "model_name": DEFAULT_LLM_MODEL,
         "tensor_parallel_size": DEFAULT_TENSOR_PARALLEL_SIZE,
         "max_model_len": DEFAULT_MAX_MODEL_LEN,
-        "add_none_candidate": True,  # Enable NIL handling by default
+        "add_none_candidate": True,
         "add_descriptions": True,
-        "disable_thinking": True,  # Disable thinking by default for faster responses
+        "disable_thinking": False,
         "system_prompt": None,
         "generation_config": None,
         "self_consistency_k": 1,
@@ -115,7 +120,7 @@ class LELAvLLMDisambiguatorComponent:
     Uses vLLM for fast batched LLM inference to select the best entity.
     Sets span.kb_id_ to the selected entity ID and span._.resolved_entity
     to the full entity object.
-    
+
     Memory management: LLM is loaded on-demand and released after use,
     allowing previous stage models to be evicted to free memory.
     """
@@ -128,7 +133,7 @@ class LELAvLLMDisambiguatorComponent:
         max_model_len: Optional[int] = DEFAULT_MAX_MODEL_LEN,
         add_none_candidate: bool = False,
         add_descriptions: bool = True,
-        disable_thinking: bool = True,  # Default True for faster responses
+        disable_thinking: bool = False,
         system_prompt: Optional[str] = None,
         generation_config: Optional[dict] = None,
         self_consistency_k: int = 1,
@@ -153,7 +158,7 @@ class LELAvLLMDisambiguatorComponent:
 
         # Initialize lazily
         self.kb = None
-        
+
         # Optional progress callback for fine-grained progress reporting
         self.progress_callback: Optional[ProgressCallback] = None
 
@@ -166,7 +171,7 @@ class LELAvLLMDisambiguatorComponent:
     @staticmethod
     def _parse_output(output: str) -> int:
         """Parse LLM output to extract answer index.
-        
+
         Handles multiple formats:
         - "answer": 3  (standard format)
         - answer: 3
@@ -176,18 +181,18 @@ class LELAvLLMDisambiguatorComponent:
         match = re.search(r'"?answer"?\s*:\s*(\d+)', output, re.IGNORECASE)
         if match:
             return int(match.group(1))
-        
+
         # Try to find any standalone number (for /no_think mode which may output just "3")
         # Look for a number that's either at the start/end or surrounded by whitespace/punctuation
-        match = re.search(r'(?:^|\s)(\d+)(?:\s|$|\.)', output.strip())
+        match = re.search(r"(?:^|\s)(\d+)(?:\s|$|\.)", output.strip())
         if match:
             return int(match.group(1))
-        
+
         # Last resort: find any digit
-        match = re.search(r'(\d+)', output)
+        match = re.search(r"(\d+)", output)
         if match:
             return int(match.group(1))
-        
+
         logger.debug(f"Could not parse answer from output: {output}")
         return 0
 
@@ -206,10 +211,12 @@ class LELAvLLMDisambiguatorComponent:
         """Load LLM on-demand if not already loaded."""
         if self.llm is None:
             vllm, SamplingParams = _get_vllm()
-            
+
             if progress_callback:
-                progress_callback(0.0, f"Loading LLM model ({self.model_name.split('/')[-1]})...")
-            
+                progress_callback(
+                    0.0, f"Loading LLM model ({self.model_name.split('/')[-1]})..."
+                )
+
             self.llm, was_cached = get_vllm_instance(
                 model_name=self.model_name,
                 tensor_parallel_size=self.tensor_parallel_size,
@@ -217,7 +224,7 @@ class LELAvLLMDisambiguatorComponent:
             )
             sampling_config = {**self.generation_config, "n": self.self_consistency_k}
             self.sampling_params = SamplingParams(**sampling_config)
-            
+
             if progress_callback:
                 status = "Using cached LLM" if was_cached else "LLM loaded"
                 progress_callback(0.1, f"{status}, starting disambiguation...")
@@ -225,13 +232,15 @@ class LELAvLLMDisambiguatorComponent:
     def __call__(self, doc: Doc) -> Doc:
         """Disambiguate all entities in the document."""
         if self.kb is None:
-            logger.warning("vLLM disambiguator not initialized - call initialize(kb) first")
+            logger.warning(
+                "vLLM disambiguator not initialized - call initialize(kb) first"
+            )
             return doc
 
         text = doc.text
         entities = list(doc.ents)
         num_entities = len(entities)
-        
+
         if num_entities == 0:
             return doc
 
@@ -242,18 +251,29 @@ class LELAvLLMDisambiguatorComponent:
         processing_start = 0.1
         processing_range = 0.9
 
-        for i, ent in enumerate(entities):
-            ent_text = ent.text[:25] + "..." if len(ent.text) > 25 else ent.text
-            base_progress = processing_start + (i / num_entities) * processing_range
+        tokenizer = self.llm.get_tokenizer()
+        work_items = []
+
+        def make_reporter(idx: int, ent_text: str):
+            base_progress = processing_start + (idx / num_entities) * processing_range
             entity_progress_range = processing_range / num_entities
-            
+
             def report_entity_progress(sub_progress: float, sub_desc: str):
                 if self.progress_callback and num_entities > 0:
                     progress = base_progress + sub_progress * entity_progress_range
-                    self.progress_callback(progress, f"Entity {i+1}/{num_entities} ({ent_text}): {sub_desc}")
-            
+                    self.progress_callback(
+                        progress,
+                        f"Entity {idx+1}/{num_entities} ({ent_text}): {sub_desc}",
+                    )
+
+            return report_entity_progress
+
+        for i, ent in enumerate(entities):
+            ent_text = ent.text[:25] + "..." if len(ent.text) > 25 else ent.text
+            report_entity_progress = make_reporter(i, ent_text)
+
             report_entity_progress(0.0, "checking candidates")
-            
+
             candidates = getattr(ent._, "candidates", [])
             if not candidates:
                 continue
@@ -266,7 +286,9 @@ class LELAvLLMDisambiguatorComponent:
                     ent._.resolved_entity = entity
                 continue
 
-            report_entity_progress(0.1, f"preparing prompt ({len(candidates)} candidates)")
+            report_entity_progress(
+                0.1, f"preparing prompt ({len(candidates)} candidates)"
+            )
 
             # Mark mention in text
             marked_text = self._mark_mention(text, ent.start_char, ent.end_char)
@@ -282,67 +304,110 @@ class LELAvLLMDisambiguatorComponent:
                 disable_thinking=self.disable_thinking,
             )
 
-            report_entity_progress(0.2, "calling LLM...")
+            prompt = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
 
-            try:
-                # Apply chat template manually for more control
-                tokenizer = self.llm.get_tokenizer()
-                prompt = tokenizer.apply_chat_template(
-                    messages,
-                    tokenize=False,
-                    add_generation_prompt=True,
-                )
+            if logger.isEnabledFor(logging.DEBUG):
                 for msg in messages:
                     logger.debug(f"[{msg['role']}] {msg['content']}")
                 logger.debug(f"Formatted prompt for '{ent.text}':\n{prompt}")
 
+            report_entity_progress(0.2, "queued for LLM batch")
+
+            work_items.append(
+                {
+                    "ent": ent,
+                    "ent_text": ent.text,
+                    "candidates": candidates,
+                    "prompt": prompt,
+                    "report": report_entity_progress,
+                }
+            )
+
+        if not work_items:
+            self.progress_callback = None
+            return doc
+
+        batch_size = int(self.generation_config.get("batch_size", 0))
+        if batch_size <= 0:
+            batch_size = len(work_items)
+
+        total_batches = (len(work_items) + batch_size - 1) // batch_size
+
+        for batch_idx in range(total_batches):
+            start = batch_idx * batch_size
+            end = min(start + batch_size, len(work_items))
+            batch = work_items[start:end]
+            prompts = [item["prompt"] for item in batch]
+
+            for item in batch:
+                item["report"](
+                    0.2, f"calling LLM (batch {batch_idx+1}/{total_batches})"
+                )
+
+            try:
                 responses = self.llm.generate(
-                    [prompt],
+                    prompts,
                     sampling_params=self.sampling_params,
                     use_tqdm=False,
                 )
-                response = responses[0] if responses else None
             except Exception as e:
                 logger.error(f"LLM generation error: {e}")
                 continue
 
-            if response is None:
+            if not responses:
                 continue
 
-            report_entity_progress(0.9, "parsing LLM response")
+            for item, response in zip(batch, responses):
+                item["report"](0.9, "parsing LLM response")
 
-            try:
-                # Log the raw LLM output for debugging
-                raw_output = response.outputs[0].text if response.outputs else ""
-                logger.debug(f"LLM raw output for '{ent.text}': {raw_output}")
-                
-                answer = self._apply_self_consistency(response.outputs)
-                logger.debug(f"Parsed answer: {answer} (from {len(candidates)} candidates)")
+                try:
+                    # Log the raw LLM output for debugging
+                    raw_output = response.outputs[0].text if response.outputs else ""
+                    logger.debug(
+                        f"LLM raw output for '{item['ent_text']}': {raw_output}"
+                    )
 
-                # Answer 0 means "None" if add_none_candidate is True, or parsing failed
-                if answer == 0:
-                    logger.debug(f"Skipping entity '{ent.text}': answer was 0 (none or parse failure)")
+                    answer = self._apply_self_consistency(response.outputs)
+                    logger.debug(
+                        f"Parsed answer: {answer} (from {len(item['candidates'])} candidates)"
+                    )
+
+                    # Answer 0 means "None" if add_none_candidate is True, or parsing failed
+                    if answer == 0:
+                        logger.debug(
+                            f"Skipping entity '{item['ent_text']}': answer was 0 (none or parse failure)"
+                        )
+                        continue
+
+                    if 0 < answer <= len(item["candidates"]):
+                        selected = item["candidates"][answer - 1]
+                        logger.debug(f"Selected candidate: '{selected.entity_id}'")
+                        entity = self.kb.get_entity(selected.entity_id)
+                        if entity:
+                            item["ent"]._.resolved_entity = entity
+                            logger.debug(
+                                f"Resolved '{item['ent_text']}' to '{entity.title}' (id: {entity.id})"
+                            )
+                        else:
+                            logger.warning(
+                                f"Entity not found in KB: '{selected.entity_id}'"
+                            )
+                    else:
+                        logger.debug(
+                            f"Answer {answer} out of range for {len(item['candidates'])} candidates"
+                        )
+
+                except Exception as e:
+                    logger.error(f"Error processing LLM response: {e}")
                     continue
 
-                if 0 < answer <= len(candidates):
-                    selected = candidates[answer - 1]
-                    logger.debug(f"Selected candidate: '{selected.entity_id}'")
-                    entity = self.kb.get_entity(selected.entity_id)
-                    if entity:
-                        ent._.resolved_entity = entity
-                        logger.debug(f"Resolved '{ent.text}' to '{entity.title}' (id: {entity.id})")
-                    else:
-                        logger.warning(f"Entity not found in KB: '{selected.entity_id}'")
-                else:
-                    logger.debug(f"Answer {answer} out of range for {len(candidates)} candidates")
-
-            except Exception as e:
-                logger.error(f"Error processing LLM response: {e}")
-                continue
-        
         # Release LLM - stays cached but can be evicted if memory needed
         release_vllm(self.model_name, self.tensor_parallel_size)
-        
+
         # Clear progress callback after processing
         self.progress_callback = None
 
@@ -353,13 +418,14 @@ class LELAvLLMDisambiguatorComponent:
 # LELA Transformers Disambiguator Component (for older GPUs)
 # ============================================================================
 
+
 @Language.factory(
     "ner_pipeline_lela_transformers_disambiguator",
     default_config={
         "model_name": DEFAULT_LLM_MODEL,
         "add_none_candidate": True,  # Enable NIL handling by default
         "add_descriptions": True,
-        "disable_thinking": True,
+        "disable_thinking": False,
         "system_prompt": None,
         "generation_config": None,
     },
@@ -419,7 +485,9 @@ class LELATransformersDisambiguatorComponent:
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         logger.info(f"Loading transformers model: {model_name}")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name, trust_remote_code=True
+        )
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             torch_dtype=torch.float16,
@@ -452,12 +520,12 @@ class LELATransformersDisambiguatorComponent:
             return int(match.group(1))
 
         # Try standalone number
-        match = re.search(r'(?:^|\s)(\d+)(?:\s|$|\.)', output.strip())
+        match = re.search(r"(?:^|\s)(\d+)(?:\s|$|\.)", output.strip())
         if match:
             return int(match.group(1))
 
         # Last resort: find any digit
-        match = re.search(r'(\d+)', output)
+        match = re.search(r"(\d+)", output)
         if match:
             return int(match.group(1))
 
@@ -473,7 +541,9 @@ class LELATransformersDisambiguatorComponent:
         import torch
 
         if self.kb is None:
-            logger.warning("Transformers disambiguator not initialized - call initialize(kb) first")
+            logger.warning(
+                "Transformers disambiguator not initialized - call initialize(kb) first"
+            )
             return doc
 
         text = doc.text
@@ -488,7 +558,10 @@ class LELATransformersDisambiguatorComponent:
             def report_entity_progress(sub_progress: float, sub_desc: str):
                 if self.progress_callback and num_entities > 0:
                     progress = base_progress + sub_progress * entity_progress_range
-                    self.progress_callback(progress, f"Entity {i+1}/{num_entities} ({ent_text}): {sub_desc}")
+                    self.progress_callback(
+                        progress,
+                        f"Entity {i+1}/{num_entities} ({ent_text}): {sub_desc}",
+                    )
 
             report_entity_progress(0.0, "checking candidates")
 
@@ -503,7 +576,9 @@ class LELATransformersDisambiguatorComponent:
                     ent._.resolved_entity = entity
                 continue
 
-            report_entity_progress(0.1, f"preparing prompt ({len(candidates)} candidates)")
+            report_entity_progress(
+                0.1, f"preparing prompt ({len(candidates)} candidates)"
+            )
 
             marked_text = self._mark_mention(text, ent.start_char, ent.end_char)
             messages = create_disambiguation_messages(
@@ -533,13 +608,15 @@ class LELATransformersDisambiguatorComponent:
                     outputs = self.model.generate(
                         **inputs,
                         max_new_tokens=self.generation_config.get("max_tokens", 2048),
-                        temperature=self.generation_config.get("temperature", 0.1),
+                        temperature=self.generation_config.get("temperature"),
                         do_sample=True,
                         pad_token_id=self.tokenizer.eos_token_id,
                     )
                 # Extract only the generated part (remove the prompt)
-                generated_ids = outputs[0][inputs["input_ids"].shape[1]:]
-                raw_output = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
+                generated_ids = outputs[0][inputs["input_ids"].shape[1] :]
+                raw_output = self.tokenizer.decode(
+                    generated_ids, skip_special_tokens=True
+                )
                 logger.debug(f"LLM raw output for '{ent.text}': {raw_output}")
 
             except Exception as e:
@@ -550,10 +627,14 @@ class LELATransformersDisambiguatorComponent:
 
             try:
                 answer = self._parse_output(raw_output)
-                logger.debug(f"Parsed answer: {answer} (from {len(candidates)} candidates)")
+                logger.debug(
+                    f"Parsed answer: {answer} (from {len(candidates)} candidates)"
+                )
 
                 if answer == 0:
-                    logger.debug(f"Skipping entity '{ent.text}': answer was 0 (none or parse failure)")
+                    logger.debug(
+                        f"Skipping entity '{ent.text}': answer was 0 (none or parse failure)"
+                    )
                     continue
 
                 if 0 < answer <= len(candidates):
@@ -562,11 +643,17 @@ class LELATransformersDisambiguatorComponent:
                     entity = self.kb.get_entity(selected.entity_id)
                     if entity:
                         ent._.resolved_entity = entity
-                        logger.debug(f"Resolved '{ent.text}' to '{entity.title}' (id: {entity.id})")
+                        logger.debug(
+                            f"Resolved '{ent.text}' to '{entity.title}' (id: {entity.id})"
+                        )
                     else:
-                        logger.warning(f"Entity not found in KB: '{selected.entity_id}'")
+                        logger.warning(
+                            f"Entity not found in KB: '{selected.entity_id}'"
+                        )
                 else:
-                    logger.debug(f"Answer {answer} out of range for {len(candidates)} candidates")
+                    logger.debug(
+                        f"Answer {answer} out of range for {len(candidates)} candidates"
+                    )
 
             except Exception as e:
                 logger.error(f"Error processing LLM response: {e}")
@@ -579,6 +666,7 @@ class LELATransformersDisambiguatorComponent:
 # ============================================================================
 # First Candidate Disambiguator Component
 # ============================================================================
+
 
 @Language.factory(
     "ner_pipeline_first_disambiguator",
@@ -602,7 +690,7 @@ class FirstDisambiguatorComponent:
     def __init__(self, nlp: Language):
         self.nlp = nlp
         self.kb = None
-        
+
         # Optional progress callback for fine-grained progress reporting
         self.progress_callback: Optional[ProgressCallback] = None
 
@@ -615,7 +703,9 @@ class FirstDisambiguatorComponent:
     def __call__(self, doc: Doc) -> Doc:
         """Select first candidate for all entities."""
         if self.kb is None:
-            logger.warning("First disambiguator not initialized - call initialize(kb) first")
+            logger.warning(
+                "First disambiguator not initialized - call initialize(kb) first"
+            )
             return doc
 
         entities = list(doc.ents)
@@ -626,8 +716,10 @@ class FirstDisambiguatorComponent:
             if self.progress_callback and num_entities > 0:
                 progress = i / num_entities
                 ent_text = ent.text[:25] + "..." if len(ent.text) > 25 else ent.text
-                self.progress_callback(progress, f"Disambiguating entity {i+1}/{num_entities}: {ent_text}")
-            
+                self.progress_callback(
+                    progress, f"Disambiguating entity {i+1}/{num_entities}: {ent_text}"
+                )
+
             candidates = getattr(ent._, "candidates", [])
             if not candidates:
                 continue
@@ -641,6 +733,3 @@ class FirstDisambiguatorComponent:
         self.progress_callback = None
 
         return doc
-
-
-

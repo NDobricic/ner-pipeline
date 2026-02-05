@@ -6,18 +6,10 @@ if TYPE_CHECKING:
     from ner_pipeline.knowledge_bases.base import KnowledgeBase
     from ner_pipeline.types import Candidate
 
-DEFAULT_SYSTEM_PROMPT = """You are an expert designed to disambiguate entities in text, taking into account the overall context and a list of entity candidates. You are provided with an input text that includes a full contextual narrative, a marked mention enclosed in square brackets, and a list of candidates, each preceded by an index number.
+DEFAULT_SYSTEM_PROMPT = f"""You are an expert designed to disambiguate entities in text, taking into account the overall context and a list of entity candidates.
+You are provided with an input text that includes a full contextual narrative, the mention enclosed between the '[' and ']' characters, and a list of candidates, each preceded by an index number.
 Your task is to determine the most appropriate entity from the candidates based on the context and candidate entity descriptions.
 Please show your choice in the answer field with only the choice index number, e.g., "answer": 3."""
-
-# System prompt for non-thinking mode - explicitly asks for just the number
-NO_THINKING_SYSTEM_PROMPT = """You are an entity disambiguation expert. Given a text with a mention marked in [brackets] and a list of numbered candidates, output ONLY the number of the best matching candidate.
-
-Rules:
-- Output ONLY a single number (e.g., "1" or "2" or "3")
-- Do NOT explain your reasoning
-- Do NOT output any other text
-- If no candidate matches, output "0\""""
 
 
 def create_disambiguation_messages(
@@ -49,12 +41,7 @@ def create_disambiguation_messages(
     messages = []
 
     # Use appropriate system prompt
-    if system_prompt is not None:
-        final_system_prompt = system_prompt
-    elif disable_thinking:
-        final_system_prompt = NO_THINKING_SYSTEM_PROMPT
-    else:
-        final_system_prompt = DEFAULT_SYSTEM_PROMPT
+    final_system_prompt = system_prompt if system_prompt else DEFAULT_SYSTEM_PROMPT
 
     messages.append({"role": "system", "content": final_system_prompt})
 
@@ -80,7 +67,9 @@ def create_disambiguation_messages(
 
     candidate_str = none_option + "\n".join(candidate_lines)
 
-    user_message = f"Input text: {marked_text}\nList of candidate entities:\n{candidate_str}"
+    user_message = (
+        f"Input text: {marked_text}\nList of candidate entities:\n{candidate_str}"
+    )
 
     # Add /no_think soft switch for Qwen3 models when thinking is disabled
     # This is a soft switch that Qwen3 recognizes to skip chain-of-thought
