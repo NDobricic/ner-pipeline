@@ -139,12 +139,24 @@ class LELADenseCandidatesComponent:
         # Optional progress callback for fine-grained progress reporting
         self.progress_callback: Optional[ProgressCallback] = None
 
-    def initialize(self, kb: KnowledgeBase, cache_dir: Optional[Path] = None):
+    def initialize(
+        self,
+        kb: KnowledgeBase,
+        cache_dir: Optional[Path] = None,
+        progress_callback: Optional[ProgressCallback] = None,
+    ):
         """Initialize the component with a knowledge base."""
         if kb is None:
             raise ValueError("LELA dense retrieval requires a knowledge base.")
 
         self.kb = kb
+
+        if progress_callback is None:
+            progress_callback = self.progress_callback
+
+        def report(progress: float, desc: str):
+            if progress_callback:
+                progress_callback(progress, desc)
 
         faiss = _get_faiss()
 
@@ -162,11 +174,13 @@ class LELADenseCandidatesComponent:
             index_file = index_dir / "index.faiss"
             try:
                 if index_file.exists():
+                    report(0.0, "Loading FAISS index from cache...")
                     self.index = faiss.read_index(str(index_file))
                     logger.info(
                         f"Loaded LELA dense index from cache ({cache_hash[:12]}): "
                         f"{self.index.ntotal} vectors"
                     )
+                    report(1.0, "FAISS index loaded from cache.")
                     return
             except Exception:
                 logger.warning(
@@ -177,6 +191,7 @@ class LELADenseCandidatesComponent:
         entity_texts = [f"{e.title} {e.description or ''}" for e in self.entities]
 
         logger.info(f"Building dense index over {len(self.entities)} entities")
+        report(0.1, f"Building FAISS index over {len(self.entities)} entities...")
 
         # Load model for embedding, then release after index is built
         model, _ = get_sentence_transformer_instance(self.model_name, self.device)
@@ -191,6 +206,7 @@ class LELADenseCandidatesComponent:
         self.index.add(embeddings)
 
         logger.info(f"Dense index built: {self.index.ntotal} vectors, dim={dim}")
+        report(1.0, "FAISS index built.")
 
         # Save to cache
         if index_file is not None:
@@ -342,8 +358,14 @@ class FuzzyCandidatesComponent:
         # Optional progress callback for fine-grained progress reporting
         self.progress_callback: Optional[ProgressCallback] = None
 
-    def initialize(self, kb: KnowledgeBase, cache_dir: Optional[Path] = None):
+    def initialize(
+        self,
+        kb: KnowledgeBase,
+        cache_dir: Optional[Path] = None,
+        progress_callback: Optional[ProgressCallback] = None,
+    ):
         """Initialize the component with a knowledge base."""
+        _ = progress_callback
         self.kb = kb
         self.entities = list(kb.all_entities())
         self.titles = [e.title for e in self.entities]
@@ -496,8 +518,14 @@ class BM25CandidatesComponent:
         # Optional progress callback for fine-grained progress reporting
         self.progress_callback: Optional[ProgressCallback] = None
 
-    def initialize(self, kb: KnowledgeBase, cache_dir: Optional[Path] = None):
+    def initialize(
+        self,
+        kb: KnowledgeBase,
+        cache_dir: Optional[Path] = None,
+        progress_callback: Optional[ProgressCallback] = None,
+    ):
         """Initialize the component with a knowledge base."""
+        _ = progress_callback
         if kb is None:
             raise ValueError("BM25 requires a knowledge base.")
 
