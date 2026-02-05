@@ -36,7 +36,6 @@ from .types import Candidate, Document, ProgressCallback
 NER_COMPONENT_MAP = {
     "simple": "ner_pipeline_simple",
     "gliner": "ner_pipeline_gliner",
-    "transformers": "ner_pipeline_transformers",
     "spacy": None,  # Use built-in spaCy NER
 }
 
@@ -461,7 +460,6 @@ class NERPipeline:
         descriptions = {
             "ner_pipeline_simple": "NER (regex)",
             "ner_pipeline_gliner": "NER (GLiNER)",
-            "ner_pipeline_transformers": "NER (Transformers)",
             "ner_pipeline_ner_filter": "NER context extraction",
             "ner": "NER (spaCy)",
             "ner_pipeline_lela_dense_candidates": "Candidate generation (dense)",
@@ -482,7 +480,6 @@ class NERPipeline:
         return component_name in (
             "ner_pipeline_simple",
             "ner_pipeline_gliner",
-            "ner_pipeline_transformers",
             "ner",
             "ner_pipeline_ner_filter",
         )

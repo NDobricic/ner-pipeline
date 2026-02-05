@@ -105,7 +105,6 @@ doc = nlp("Albert Einstein visited Paris.")
 | `lela_gliner` | `ner_pipeline_lela_gliner` |
 | `simple` | `ner_pipeline_simple` |
 | `gliner` | `ner_pipeline_gliner` |
-| `transformers` | `ner_pipeline_transformers` |
 | `lela_bm25` | `ner_pipeline_lela_bm25_candidates` |
 | `lela_dense` | `ner_pipeline_lela_dense_candidates` |
 | `fuzzy` | `ner_pipeline_fuzzy_candidates` |
@@ -186,24 +185,6 @@ Standard GLiNER wrapper.
 | `threshold` | float | 0.5 | Detection threshold |
 | `context_mode` | str | "sentence" | Context extraction |
 
-### TransformersNERComponent
-
-HuggingFace transformers NER.
-
-**Factory:** `ner_pipeline_transformers`
-
-**Config:**
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `model_name` | str | "dslim/bert-base-NER" | HuggingFace model |
-| `context_mode` | str | "sentence" | Context extraction |
-| `aggregation_strategy` | str | "simple" | Token aggregation |
-
-**Popular Models:**
-- `dslim/bert-base-NER`: General English NER
-- `dbmdz/bert-large-cased-finetuned-conll03-english`: CoNLL-2003
-- `Jean-Baptiste/roberta-large-ner-english`: RoBERTa NER
-
 ### NER Filter Component
 
 Post-filter for spaCy's built-in NER.
@@ -265,46 +246,12 @@ Entity at chars 1450-1480:
 - Deduplication keeps one copy
 ```
 
-### Transformers NER Stride
-
-The Transformers NER component (`ner_pipeline_transformers`) uses HuggingFace's built-in stride mechanism:
-
-**Parameters:**
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `stride` | 128 | Token overlap between chunks |
-| `max_length` | Model-specific | Maximum tokens per chunk (auto-detected) |
-
-**Configuration:**
-```python
-nlp.add_pipe("ner_pipeline_transformers", config={
-    "model_name": "dslim/bert-base-NER",
-    "stride": 128  # Token overlap
-})
-```
-
-**How it works:**
-- HuggingFace's pipeline handles tokenization and chunking automatically
-- `stride` controls how many tokens overlap between chunks
-- Model's `max_length` is auto-detected from tokenizer (capped at 512 if too large)
-
-**Example:**
-```
-Document: 1000 tokens
-Model max_length: 512
-Stride: 128
-
-├── Chunk 1: tokens 0-512
-├── Chunk 2: tokens 384-896 (128-token overlap)
-└── Chunk 3: tokens 768-1000 (128-token overlap)
-```
-
 ### spaCy NER
 
 spaCy's built-in NER does not have explicit context limits and processes documents as a whole. For very long documents, consider:
 
 1. Using a pipeline-level document chunking strategy
-2. Switching to GLiNER or Transformers NER which handle chunking automatically
+2. Switching to GLiNER NER which handles chunking automatically
 
 ---
 

@@ -95,7 +95,6 @@ The configuration names map to spaCy component factories:
 | `simple` | `ner_pipeline_simple` | Regex-based NER |
 | `spacy` | Built-in + filter | spaCy's pretrained NER |
 | `gliner` | `ner_pipeline_gliner` | GLiNER zero-shot |
-| `transformers` | `ner_pipeline_transformers` | HuggingFace NER |
 | `lela_gliner` | `ner_pipeline_lela_gliner` | LELA GLiNER |
 | **Candidate Generators** | | |
 | `fuzzy` | `ner_pipeline_fuzzy_candidates` | RapidFuzz matching |

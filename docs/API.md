@@ -256,17 +256,6 @@ Standard GLiNER wrapper.
 | `threshold` | float | 0.5 | Detection threshold |
 | `context_mode` | str | "sentence" | Context extraction mode |
 
-#### `ner_pipeline_transformers`
-
-HuggingFace transformers NER.
-
-**Config Options:**
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `model_name` | str | "dslim/bert-base-NER" | HuggingFace model |
-| `context_mode` | str | "sentence" | Context extraction mode |
-| `aggregation_strategy` | str | "simple" | Token aggregation |
-
 #### `ner_pipeline_ner_filter`
 
 Post-filter for spaCy's built-in NER (adds context extension).
@@ -535,7 +524,6 @@ candidates = tuples_to_candidates(tuples_list)
 | `lela_gliner` | `ner_pipeline_lela_gliner` |
 | `simple` | `ner_pipeline_simple` |
 | `gliner` | `ner_pipeline_gliner` |
-| `transformers` | `ner_pipeline_transformers` |
 | `spacy` | Built-in NER + `ner_pipeline_ner_filter` |
 | **Candidate Generators** | |
 | `lela_bm25` | `ner_pipeline_lela_bm25_candidates` |

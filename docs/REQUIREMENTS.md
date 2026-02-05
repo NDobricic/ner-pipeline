@@ -30,7 +30,6 @@ This document details the hardware, software, and environment requirements for r
 |-----------|----------|--------------|-------------|
 | Simple NER (regex) | Yes | No | - |
 | GLiNER NER | Yes (slow) | Recommended | ~2 GB |
-| Transformers NER | Yes (slow) | Recommended | ~1-2 GB |
 | BM25 Candidates | Yes | No | - |
 | Fuzzy Candidates | Yes | No | - |
 | Dense Candidates | Yes (slow) | Recommended | ~8-10 GB |

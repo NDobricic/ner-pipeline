@@ -68,7 +68,7 @@ def get_available_components() -> Dict[str, List[str]]:
 
     return {
         "loaders": ["text", "pdf", "docx", "html", "json", "jsonl"],
-        "ner": ["simple", "spacy", "gliner", "transformers"],
+        "ner": ["simple", "spacy", "gliner"],
         "candidates": ["none", "fuzzy", "bm25", "lela_dense"],
         "rerankers": ["none", "cross_encoder", "vllm_api_client"],
         "disambiguators": available_disambiguators,

@@ -61,7 +61,7 @@ The pipeline uses spaCy's component system where each stage is a registered fact
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │  NER Component (doc.ents populated)                     │  │
 │  │  Factories: ner_pipeline_lela_gliner, _simple, _gliner, │  │
-│  │             _transformers, or spaCy's built-in NER      │  │
+│  │             or spaCy's built-in NER                     │  │
 │  └─────────────────────────────────────────────────────────┘  │
 │                              │                                │
 │                              ▼                                │

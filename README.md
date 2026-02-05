@@ -78,7 +78,7 @@ results = pipeline.run(["docs/file1.txt"])
 
 ## Available components
 - Loaders: `text`, `json`, `jsonl`, `pdf`, `docx`, `html`
-- NER: `spacy`, `gliner`, `transformers`, `simple` (regex)
+- NER: `spacy`, `gliner`, `simple` (regex)
 - Candidate generators: `bm25`, `dense`, `fuzzy`
 - Rerankers: `cross_encoder`, `none`
 - Disambiguators: `popularity`, `first`, `llm`

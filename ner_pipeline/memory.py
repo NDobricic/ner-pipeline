@@ -28,10 +28,6 @@ NER_MODEL_MEMORY: Dict[str, float] = {
     "urchade/gliner_base": 1.5,
     "urchade/gliner_large": 2.0,
     "urchade/gliner_multi": 2.0,
-    # Transformers NER models
-    "dslim/bert-base-NER": 1.0,
-    "dbmdz/bert-large-cased-finetuned-conll03-english": 1.5,
-    "Jean-Baptiste/roberta-large-ner-english": 1.5,
 }
 
 # Embedding models (used by dense candidates and rerankers)
@@ -82,7 +78,6 @@ COMPONENT_DEFAULT_MEMORY: Dict[str, float] = {
     "spacy": 0.5,
     "gliner": 2.0,
     "lela_gliner": 2.0,
-    "transformers": 1.5,
     # Candidates (CPU-based have 0 GPU memory)
     "fuzzy": 0.0,
     "bm25": 0.0,
@@ -257,11 +252,6 @@ def estimate_component_memory(
     # GLiNER NER
     if component_name in ("gliner", "lela_gliner"):
         model = params.get("model_name", "numind/NuNER_Zero-span")
-        return estimate_model_memory(model, "ner"), model
-
-    # Transformers NER
-    if component_name == "transformers":
-        model = params.get("model_name", "dslim/bert-base-NER")
         return estimate_model_memory(model, "ner"), model
 
     # Dense candidates

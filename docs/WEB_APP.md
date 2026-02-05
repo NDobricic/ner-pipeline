@@ -149,11 +149,6 @@ Each NER option maps to a spaCy pipeline factory:
 - **labels**: Comma-separated entity labels to detect
 - Zero-shot NER with custom labels
 
-#### Transformers
-- **spaCy Factory:** `ner_pipeline_transformers`
-- **model_name**: HuggingFace model (default: `dslim/bert-base-NER`)
-- Standard transformer-based NER
-
 #### LELA GLiNER
 - **spaCy Factory:** `ner_pipeline_lela_gliner`
 - **model_name**: Default `numind/NuNER_Zero-span`
