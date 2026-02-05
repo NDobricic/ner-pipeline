@@ -42,13 +42,13 @@ SPAN_OPEN = "["
 SPAN_CLOSE = "]"
 
 # Special entity label
-NOT_AN_ENTITY = "None"
+NOT_AN_ENTITY = ""
 
 # vLLM settings
 DEFAULT_TENSOR_PARALLEL_SIZE = 1
-DEFAULT_MAX_MODEL_LEN = None
+DEFAULT_MAX_MODEL_LEN = 8192
 VLLM_GPU_MEMORY_UTILIZATION = (
-    0.8  # Fraction of GPU memory vLLM will use (0.8 leaves headroom for loading)
+    0.9  # Fraction of GPU memory vLLM will use (0.8 leaves headroom for loading)
 )
 
 # Embedding task descriptions
@@ -63,8 +63,8 @@ RERANKER_TASK = (
 # Default generation config for LLM disambiguation
 # Qwen3 needs more tokens due to thinking mode
 DEFAULT_GENERATION_CONFIG = {
-    "max_tokens": 2048,  # More tokens for thinking mode + answer
-    "temperature": 0.1,  # Low temperature for deterministic outputs
-    "top_p": 0.9,
-    "repetition_penalty": 1.1,  # Prevent repetitive garbage output
+    "max_tokens": 8192,  # More tokens for thinking mode + answer
+    # "temperature": 0.1,  # Low temperature for deterministic outputs
+    # "top_p": 0.9,
+    # "repetition_penalty": 1.1,  # Prevent repetitive garbage output
 }
