@@ -589,7 +589,7 @@ def run_pipeline(
 
     # Build disambiguator params
     disambig_params = {}
-    if disambig_type in ("lela_vllm", "lela_transformers", "lela_openai_api"):
+    if disambig_type in ("lela_vllm", "lela_transformers"):
         disambig_params["model_name"] = llm_model
         disambig_params["disable_thinking"] = not lela_thinking
         disambig_params["add_none_candidate"] = lela_none_candidate
@@ -846,7 +846,7 @@ def update_reranker_params(reranker_choice: str):
 
 def update_disambig_params(disambig_choice: str):
     """Show/hide disambiguator-specific parameters based on selection."""
-    show_llm = disambig_choice in ("lela_vllm", "lela_transformers", "lela_openai_api")
+    show_llm = disambig_choice in ("lela_vllm", "lela_transformers")
     show_openai_api = disambig_choice == "lela_openai_api"
     return (
         gr.update(visible=show_llm),

@@ -424,7 +424,7 @@ class LELAvLLMDisambiguatorComponent:
 @Language.factory(
     "ner_pipeline_lela_openai_api_disambiguator",
     default_config={
-        "model_name": DEFAULT_LLM_MODEL,
+        "model_name": None,
         "base_url": "http://localhost:8000/v1",
         "api_key": None,
         "add_none_candidate": True,
@@ -438,7 +438,7 @@ class LELAvLLMDisambiguatorComponent:
 def create_lela_openai_api_disambiguator_component(
     nlp: Language,
     name: str,
-    model_name: str,
+    model_name: Optional[str],
     base_url: str,
     api_key: Optional[str],
     add_none_candidate: bool,
@@ -475,7 +475,7 @@ class LELAOpenAIAPIDisambiguatorComponent:
     def __init__(
         self,
         nlp: Language,
-        model_name: str = DEFAULT_LLM_MODEL,
+        model_name: Optional[str] = None,
         base_url: str = "http://localhost:8000/v1",
         api_key: Optional[str] = None,
         add_none_candidate: bool = False,
@@ -507,7 +507,7 @@ class LELAOpenAIAPIDisambiguatorComponent:
         self.api_url = f"{self.base_url}/chat/completions"
 
         logger.info(
-            f"LELA OpenAI API disambiguator initialized: {model_name} at {self.api_url}"
+            f"LELA OpenAI API disambiguator initialized: {model_name or 'default'} at {self.api_url}"
         )
 
     def initialize(self, kb: KnowledgeBase):
@@ -641,9 +641,10 @@ class LELAOpenAIAPIDisambiguatorComponent:
             report_entity_progress(0.2, "calling LLM API")
 
             payload = {
-                "model": self.model_name,
                 "messages": messages,
             }
+            if self.model_name:
+                payload["model"] = self.model_name
 
             # generation_config = dict(self.generation_config)
             # generation_config["n"] = self.self_consistency_k

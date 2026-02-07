@@ -56,6 +56,7 @@ RERANKER_COMPONENT_MAP = {
 DISAMBIGUATOR_COMPONENT_MAP = {
     "lela_vllm": "ner_pipeline_lela_vllm_disambiguator",
     "lela_transformers": "ner_pipeline_lela_transformers_disambiguator",
+    "lela_openai_api": "ner_pipeline_lela_openai_api_disambiguator",
     "first": "ner_pipeline_first_disambiguator",
 }
 
@@ -472,6 +473,7 @@ class NERPipeline:
             "ner_pipeline_noop_reranker": "Reranking (pass-through)",
             "ner_pipeline_lela_vllm_disambiguator": "Disambiguation (LLM)",
             "ner_pipeline_lela_transformers_disambiguator": "Disambiguation (LLM)",
+            "ner_pipeline_lela_openai_api_disambiguator": "Disambiguation (LLM)",
             "ner_pipeline_first_disambiguator": "Disambiguation",
             "ner_pipeline_popularity_disambiguator": "Disambiguation",
         }
@@ -497,6 +499,7 @@ class NERPipeline:
             "ner_pipeline_cross_encoder_reranker",
             "ner_pipeline_lela_vllm_disambiguator",
             "ner_pipeline_lela_transformers_disambiguator",
+            "ner_pipeline_lela_openai_api_disambiguator",
             "ner_pipeline_first_disambiguator",
             "ner_pipeline_popularity_disambiguator",
         )
