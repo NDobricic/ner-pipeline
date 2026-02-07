@@ -64,6 +64,7 @@ def get_available_components() -> Dict[str, List[str]]:
         "first",
         "lela_vllm",
         "lela_transformers",
+        "lela_openai_api",
     ]
 
     return {
@@ -488,6 +489,8 @@ def run_pipeline(
     llm_model: str,
     lela_thinking: bool,
     lela_none_candidate: bool,
+    disambig_api_base_url: str,
+    disambig_api_key: str,
     kb_type: str,
     progress=gr.Progress(),
 ):
@@ -575,6 +578,9 @@ def run_pipeline(
         disambig_params["model_name"] = llm_model
         disambig_params["disable_thinking"] = not lela_thinking
         disambig_params["add_none_candidate"] = lela_none_candidate
+    if disambig_type == "lela_openai_api":
+        disambig_params["base_url"] = disambig_api_base_url
+        disambig_params["api_key"] = disambig_api_key or None
 
     # Override components if candidate_generator is "none" for NER-only pipeline
     if cand_type == "none":
@@ -826,7 +832,12 @@ def update_reranker_params(reranker_choice: str):
 def update_disambig_params(disambig_choice: str):
     """Show/hide disambiguator-specific parameters based on selection."""
     show_llm = disambig_choice in ("lela_vllm", "lela_transformers")
-    return gr.update(visible=show_llm), gr.update(visible=show_llm)
+    show_openai_api = disambig_choice == "lela_openai_api"
+    return (
+        gr.update(visible=show_llm),
+        gr.update(visible=show_llm),
+        gr.update(visible=show_openai_api),
+    )
 
 
 def update_loader_from_file(file: Optional[gr.File]):
@@ -1267,6 +1278,16 @@ if __name__ == "__main__":
                                 label="'None' Candidate",
                                 value=True,
                             )
+                        with gr.Group(visible=False) as lela_openai_api_params:
+                            disambig_api_base_url = gr.Textbox(
+                                label="OpenAI API Base URL",
+                                value="http://localhost:8000/v1",
+                            )
+                            disambig_api_key = gr.Textbox(
+                                label="OpenAI API Key",
+                                value="",
+                                type="password",
+                            )
                 # Hidden loader and KB type (auto-detected)
                 loader_type = gr.Dropdown(
                     choices=components["loaders"],
@@ -1329,6 +1350,7 @@ Test files are available in `data/test/`:
 | **first** | Select first candidate |
 | **popularity** | Select by popularity |
 | **lela_vllm** | vLLM-based disambiguation |
+| **lela_openai_api** | OpenAI-compatible API disambiguation |
 
 ---
 
@@ -1339,6 +1361,7 @@ Test files are available in `data/test/`:
 | simple | ner_pipeline_simple |
 | lela_embedder | ner_pipeline_lela_embedder_reranker |
 | lela_vllm | ner_pipeline_lela_vllm_disambiguator |
+| lela_openai_api | ner_pipeline_lela_openai_api_disambiguator |
 
 ---
 
@@ -1399,7 +1422,7 @@ Test files are available in `data/test/`:
         disambig_type.change(
             fn=update_disambig_params,
             inputs=[disambig_type],
-            outputs=[llm_model, lela_common_params],
+            outputs=[llm_model, lela_common_params, lela_openai_api_params],
         )
 
         # Memory estimate updates
@@ -1467,6 +1490,8 @@ Test files are available in `data/test/`:
                     llm_model,
                     lela_thinking,
                     lela_none_candidate,
+                    disambig_api_base_url,
+                    disambig_api_key,
                     kb_type,
                 ],
                 outputs=[preview_html, stats_output, json_output, input_tabs],

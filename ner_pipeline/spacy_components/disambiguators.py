@@ -3,6 +3,7 @@ spaCy disambiguator components for the NER pipeline.
 
 Provides factories and components for entity disambiguation:
 - LELAvLLMDisambiguatorComponent: vLLM-based LLM disambiguation (all candidates at once)
+- LELAOpenAIAPIDisambiguatorComponent: OpenAI-compatible API disambiguation
 - FirstDisambiguatorComponent: Select first candidate
 - PopularityDisambiguatorComponent: Select by highest score
 """
@@ -12,6 +13,7 @@ import re
 from collections import Counter
 from typing import List, Optional
 
+import requests
 from spacy.language import Language
 from spacy.tokens import Doc, Span
 
@@ -409,6 +411,299 @@ class LELAvLLMDisambiguatorComponent:
         release_vllm(self.model_name, self.tensor_parallel_size)
 
         # Clear progress callback after processing
+        self.progress_callback = None
+
+        return doc
+
+
+# ============================================================================
+# LELA OpenAI-Compatible API Disambiguator Component
+# ============================================================================
+
+
+@Language.factory(
+    "ner_pipeline_lela_openai_api_disambiguator",
+    default_config={
+        "model_name": None,
+        "base_url": "http://localhost:8000/v1",
+        "api_key": None,
+        "add_none_candidate": True,
+        "add_descriptions": True,
+        "disable_thinking": False,
+        "system_prompt": None,
+        "self_consistency_k": 1,
+    },
+)
+def create_lela_openai_api_disambiguator_component(
+    nlp: Language,
+    name: str,
+    model_name: Optional[str],
+    base_url: str,
+    api_key: Optional[str],
+    add_none_candidate: bool,
+    add_descriptions: bool,
+    disable_thinking: bool,
+    system_prompt: Optional[str],
+    self_consistency_k: int,
+):
+    """Factory for LELA OpenAI-compatible API disambiguator component."""
+    return LELAOpenAIAPIDisambiguatorComponent(
+        nlp=nlp,
+        model_name=model_name,
+        base_url=base_url,
+        api_key=api_key,
+        add_none_candidate=add_none_candidate,
+        add_descriptions=add_descriptions,
+        disable_thinking=disable_thinking,
+        system_prompt=system_prompt,
+        self_consistency_k=self_consistency_k,
+    )
+
+
+class LELAOpenAIAPIDisambiguatorComponent:
+    """
+    OpenAI-compatible API entity disambiguator component for spaCy.
+
+    Uses an OpenAI-compatible chat completions endpoint to select the best entity.
+    Sets span.kb_id_ to the selected entity ID and span._.resolved_entity
+    to the full entity object.
+    """
+
+    def __init__(
+        self,
+        nlp: Language,
+        model_name: Optional[str] = None,
+        base_url: str = "http://localhost:8000/v1",
+        api_key: Optional[str] = None,
+        add_none_candidate: bool = False,
+        add_descriptions: bool = True,
+        disable_thinking: bool = False,
+        system_prompt: Optional[str] = None,
+        self_consistency_k: int = 1,
+    ):
+        self.nlp = nlp
+        self.model_name = model_name
+        self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
+        self.add_none_candidate = add_none_candidate
+        self.add_descriptions = add_descriptions
+        self.disable_thinking = disable_thinking
+        self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
+        self.self_consistency_k = self_consistency_k
+
+        _ensure_extensions()
+
+        # Initialize lazily
+        self.kb = None
+
+        # Optional progress callback for fine-grained progress reporting
+        self.progress_callback: Optional[ProgressCallback] = None
+
+        self.api_url = f"{self.base_url}/chat/completions"
+
+        logger.info(
+            f"LELA OpenAI API disambiguator initialized: {model_name or 'default'} at {self.api_url}"
+        )
+
+    def initialize(self, kb: KnowledgeBase):
+        """Initialize the component with a knowledge base."""
+        self.kb = kb
+
+    @staticmethod
+    def _parse_output(output: str) -> int:
+        """Parse LLM output to extract answer index.
+
+        Handles multiple formats:
+        - "answer": 3  (standard format)
+        - answer: 3
+        - 3  (just a number, common with /no_think mode)
+        """
+        match = re.search(r'"?answer"?\s*:\s*(\d+)', output, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+
+        match = re.search(r"(?:^|\s)(\d+)(?:\s|$|\.)", output.strip())
+        if match:
+            return int(match.group(1))
+
+        match = re.search(r"(\d+)", output)
+        if match:
+            return int(match.group(1))
+
+        logger.debug(f"Could not parse answer from output: {output}")
+        return 0
+
+    def _apply_self_consistency(self, outputs: list) -> int:
+        """Apply self-consistency voting over multiple outputs."""
+        if self.self_consistency_k == 1:
+            return self._parse_output(outputs[0])
+        answers = [self._parse_output(o) for o in outputs]
+        return Counter(answers).most_common(1)[0][0]
+
+    def _mark_mention(self, text: str, start: int, end: int) -> str:
+        """Mark mention in text with brackets."""
+        return f"{text[:start]}{SPAN_OPEN}{text[start:end]}{SPAN_CLOSE}{text[end:]}"
+
+    def _post_chat_completion(self, payload: dict) -> dict:
+        headers = {"User-Agent": "LELA Client"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        response = requests.post(
+            self.api_url,
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    @staticmethod
+    def _extract_choice_text(choice: dict) -> str:
+        if "message" in choice and choice["message"]:
+            return choice["message"].get("content", "") or ""
+        if "text" in choice:
+            return choice.get("text", "") or ""
+        return ""
+
+    def __call__(self, doc: Doc) -> Doc:
+        """Disambiguate all entities in the document."""
+        if self.kb is None:
+            logger.warning(
+                "OpenAI API disambiguator not initialized - call initialize(kb) first"
+            )
+            return doc
+
+        text = doc.text
+        entities = list(doc.ents)
+        num_entities = len(entities)
+
+        if num_entities == 0:
+            return doc
+
+        processing_start = 0.0
+        processing_range = 1.0
+
+        def make_reporter(idx: int, ent_text: str):
+            base_progress = processing_start + (idx / num_entities) * processing_range
+            entity_progress_range = processing_range / num_entities
+
+            def report_entity_progress(sub_progress: float, sub_desc: str):
+                if self.progress_callback and num_entities > 0:
+                    progress = base_progress + sub_progress * entity_progress_range
+                    self.progress_callback(
+                        progress,
+                        f"Entity {idx+1}/{num_entities} ({ent_text}): {sub_desc}",
+                    )
+
+            return report_entity_progress
+
+        for i, ent in enumerate(entities):
+            ent_text = ent.text[:25] + "..." if len(ent.text) > 25 else ent.text
+            report_entity_progress = make_reporter(i, ent_text)
+
+            report_entity_progress(0.0, "checking candidates")
+
+            candidates = getattr(ent._, "candidates", [])
+            if not candidates:
+                continue
+
+            if len(candidates) == 1 and not self.add_none_candidate:
+                report_entity_progress(0.4, "single candidate, selecting")
+                entity = self.kb.get_entity(candidates[0].entity_id)
+                if entity:
+                    ent._.resolved_entity = entity
+                continue
+
+            report_entity_progress(
+                0.1, f"preparing prompt ({len(candidates)} candidates)"
+            )
+
+            marked_text = self._mark_mention(text, ent.start_char, ent.end_char)
+
+            messages = create_disambiguation_messages(
+                marked_text=marked_text,
+                candidates=candidates,
+                kb=self.kb,
+                system_prompt=self.system_prompt,
+                add_none_candidate=self.add_none_candidate,
+                add_descriptions=self.add_descriptions,
+                disable_thinking=self.disable_thinking,
+            )
+
+            if logger.isEnabledFor(logging.DEBUG):
+                for msg in messages:
+                    logger.debug(f"[{msg['role']}] {msg['content']}")
+
+            report_entity_progress(0.2, "calling LLM API")
+
+            payload = {
+                "messages": messages,
+                "n": self.self_consistency_k,
+            }
+            if self.model_name:
+                payload["model"] = self.model_name
+
+            # generation_config = dict(self.generation_config)
+            # generation_config["n"] = self.self_consistency_k
+            # payload.update(generation_config)
+
+            try:
+                response = self._post_chat_completion(payload)
+            except (requests.exceptions.RequestException, ValueError) as e:
+                logger.error(f"OpenAI API request failed: {e}")
+                continue
+
+            choices = response.get("choices", [])
+            if not choices:
+                logger.error(f"OpenAI API response has no choices: {response}")
+                continue
+
+            outputs = [self._extract_choice_text(c) for c in choices]
+            outputs = [o for o in outputs if o]
+
+            if not outputs:
+                logger.error(f"OpenAI API response had empty outputs: {response}")
+                continue
+
+            report_entity_progress(0.9, "parsing LLM response")
+
+            try:
+                if logger.isEnabledFor(logging.DEBUG):
+                    for output in outputs:
+                        logger.debug(f"LLM raw output for '{ent_text}': {output}")
+
+                answer = self._apply_self_consistency(outputs)
+                logger.debug(
+                    f"Parsed answer: {answer} (from {len(candidates)} candidates)"
+                )
+
+                if answer == 0:
+                    logger.debug(
+                        f"Skipping entity '{ent_text}': answer was 0 (none or parse failure)"
+                    )
+                    continue
+
+                if 0 < answer <= len(candidates):
+                    selected = candidates[answer - 1]
+                    logger.debug(f"Selected candidate: '{selected.entity_id}'")
+                    entity = self.kb.get_entity(selected.entity_id)
+                    if entity:
+                        ent._.resolved_entity = entity
+                        logger.debug(
+                            f"Resolved '{ent_text}' to '{entity.title}' (id: {entity.id})"
+                        )
+                    else:
+                        logger.warning(
+                            f"Entity not found in KB: '{selected.entity_id}'"
+                        )
+                else:
+                    logger.debug(
+                        f"Answer {answer} out of range for {len(candidates)} candidates"
+                    )
+
+            except Exception as e:
+                logger.error(f"Error processing LLM response: {e}")
+                continue
+
         self.progress_callback = None
 
         return doc
