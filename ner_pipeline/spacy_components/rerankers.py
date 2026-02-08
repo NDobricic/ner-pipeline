@@ -377,6 +377,7 @@ class LlamaServerReranker:
         logger.info(
             f"Using Llama Server reranker for model '{self.model_name}' at {self.api_url}"
         )
+        self.progress_callback: Optional[ProgressCallback] = None
 
     @staticmethod
     def post_http_request(payload: dict, api_url: str) -> requests.Response:
@@ -386,7 +387,17 @@ class LlamaServerReranker:
         return response
 
     def __call__(self, doc: Doc) -> Doc:
-        for ent in doc.ents:
+        entities = list(doc.ents)
+        num_entities = len(entities)
+
+        for i, ent in enumerate(entities):
+            if self.progress_callback and num_entities > 0:
+                progress = i / num_entities
+                ent_text = ent.text[:25] + "..." if len(ent.text) > 25 else ent.text
+                self.progress_callback(
+                    progress, f"Reranking {i+1}/{num_entities}: {ent_text}"
+                )
+
             candidates = getattr(ent._, "candidates", [])
             if not candidates:
                 continue
@@ -449,4 +460,5 @@ class LlamaServerReranker:
                 # Keep original candidates on failure
                 ent._.candidates = candidates[: self.top_k]
                 ent._.candidate_scores = [c.score for c in candidates[: self.top_k]]
+        self.progress_callback = None
         return doc
