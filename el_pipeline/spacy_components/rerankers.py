@@ -748,16 +748,14 @@ class LELACrossEncoderVLLMRerankerComponent:
 
         self._ensure_model_loaded(self.progress_callback)
 
-        processing_start = 0.1
-        processing_range = 0.9
-
         try:
-            for i, ent in enumerate(entities):
-                if self.progress_callback and num_entities > 0:
-                    progress = processing_start + (i / num_entities) * processing_range
-                    ent_text = ent.text[:25] + "..." if len(ent.text) > 25 else ent.text
-                    self.progress_callback(progress, f"Reranking {i+1}/{num_entities}: {ent_text}")
+            # Collect all (query, document) pairs across entities for batched scoring
+            all_queries = []
+            all_documents = []
+            # Track which entities need reranking and how many pairs each has
+            work_items = []  # (entity_index, candidates, num_pairs)
 
+            for i, ent in enumerate(entities):
                 candidates = getattr(ent._, "candidates", [])
                 if not candidates or len(candidates) <= self.top_k:
                     continue
@@ -765,29 +763,45 @@ class LELACrossEncoderVLLMRerankerComponent:
                 query = self._format_query(text, ent.start_char, ent.end_char)
                 documents = [self._format_document(c) for c in candidates]
 
-                outputs = self.model.score(query, documents)
-                scores = [out.outputs.score for out in outputs]
+                work_items.append((i, candidates, len(documents)))
+                all_queries.extend([query] * len(documents))
+                all_documents.extend(documents)
 
-                scored_candidates = list(zip(candidates, scores))
-                scored_candidates.sort(key=lambda x: x[1], reverse=True)
-                top_candidates = scored_candidates[:self.top_k]
+            if all_queries:
+                if self.progress_callback:
+                    self.progress_callback(0.2, f"Scoring {len(all_queries)} pairs across {len(work_items)} entities...")
 
-                reranked = []
-                reranked_scores = []
-                for candidate, score in top_candidates:
-                    reranked.append(Candidate(
-                        entity_id=candidate.entity_id,
-                        score=float(score),
-                        description=candidate.description,
-                    ))
-                    reranked_scores.append(float(score))
+                # Single batched score call using vLLM's N -> N pattern
+                outputs = self.model.score(all_queries, all_documents)
+                all_scores = [out.outputs.score for out in outputs]
 
-                ent._.candidates = reranked
-                ent._.candidate_scores = reranked_scores
+                # Split scores back per entity and apply top_k selection
+                offset = 0
+                for ent_idx, candidates, num_pairs in work_items:
+                    ent = entities[ent_idx]
+                    scores = all_scores[offset:offset + num_pairs]
+                    offset += num_pairs
 
-                logger.debug(
-                    f"Cross-encoder (vLLM) reranked {len(candidates)} to {len(ent._.candidates)} for '{ent.text}'"
-                )
+                    scored_candidates = list(zip(candidates, scores))
+                    scored_candidates.sort(key=lambda x: x[1], reverse=True)
+                    top_candidates = scored_candidates[:self.top_k]
+
+                    reranked = []
+                    reranked_scores = []
+                    for candidate, score in top_candidates:
+                        reranked.append(Candidate(
+                            entity_id=candidate.entity_id,
+                            score=float(score),
+                            description=candidate.description,
+                        ))
+                        reranked_scores.append(float(score))
+
+                    ent._.candidates = reranked
+                    ent._.candidate_scores = reranked_scores
+
+                    logger.debug(
+                        f"Cross-encoder (vLLM) reranked {len(candidates)} to {len(ent._.candidates)} for '{ent.text}'"
+                    )
         finally:
             release_vllm(self.model_name, task="score")
             self.model = None  # Drop reference so pool eviction can free GPU memory

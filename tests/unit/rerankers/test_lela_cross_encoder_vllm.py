@@ -133,10 +133,10 @@ class TestLELACrossEncoderVLLMRerankerComponent:
     @patch("el_pipeline.spacy_components.rerankers.release_vllm")
     @patch("el_pipeline.spacy_components.rerankers.get_vllm_instance")
     @patch("el_pipeline.spacy_components.rerankers._get_vllm")
-    def test_score_called_with_query_and_documents(
+    def test_score_called_with_batched_queries_and_documents(
         self, mock_get_vllm_mod, mock_get_instance, mock_release, sample_candidates, nlp
     ):
-        """score() should be called with a query string and list of document strings."""
+        """score() should be called with batched N->N queries and documents."""
         mock_model = MagicMock()
         mock_model.score.return_value = [_make_score_output(0.5)] * 5
         mock_get_instance.return_value = (mock_model, False)
@@ -154,15 +154,16 @@ class TestLELACrossEncoderVLLMRerankerComponent:
         doc.ents[0]._.candidates = sample_candidates
         doc = reranker(doc)
 
+        mock_model.score.assert_called_once()
         call_args = mock_model.score.call_args
-        query = call_args[0][0]
+        queries = call_args[0][0]
         documents = call_args[0][1]
-        assert isinstance(query, str)
+        # Batched: queries is a list of repeated query strings (one per candidate)
+        assert isinstance(queries, list)
+        assert len(queries) == 5
+        assert all("[Obama]" in q for q in queries)
         assert isinstance(documents, list)
         assert len(documents) == 5
-        assert "[Obama]" in query
-        assert "<Instruct>" in query
-        assert "<Query>" in query
         assert "<Document>" in documents[0]
         assert "E1 (Description 1)" in documents[0]
 
