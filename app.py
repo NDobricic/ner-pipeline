@@ -574,7 +574,6 @@ def run_pipeline(
     if reranker_type == "cross_encoder":
         reranker_params["model_name"] = reranker_cross_encoder_model
     if reranker_type == "vllm_api_client":
-        reranker_params["model_name"] = reranker_cross_encoder_model
         reranker_params["base_url"] = reranker_api_url
         reranker_params["port"] = reranker_api_port
 

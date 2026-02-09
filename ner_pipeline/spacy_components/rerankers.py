@@ -173,7 +173,6 @@ class CrossEncoderRerankerComponent:
 @Language.factory(
     "ner_pipeline_vllm_api_client_reranker",
     default_config={
-        "model_name": "Qwen/Qwen3-Reranker-4B-seq-cls",
         "top_k": 10,
         "base_url": "http://localhost",
         "port": 8000,
@@ -182,7 +181,6 @@ class CrossEncoderRerankerComponent:
 def create_vllm_api_client_reranker_component(
     nlp: Language,
     name: str,
-    model_name: str,
     top_k: int,
     base_url: str,
     port: int,
@@ -190,7 +188,6 @@ def create_vllm_api_client_reranker_component(
     """Factory for vLLM API client reranker component."""
     return VLLMAPIClientReranker(
         nlp=nlp,
-        model_name=model_name,
         top_k=top_k,
         base_url=base_url,
         port=port,
@@ -206,19 +203,15 @@ class VLLMAPIClientReranker:
     def __init__(
         self,
         nlp: Language,
-        model_name: str,
         top_k: int = 10,
         base_url: str = "http://localhost",
         port: int = 8000,
     ):
         self.nlp = nlp
-        self.model_name = model_name
         self.top_k = top_k
         self.api_url = f"{base_url}:{port}/score"
         ensure_candidates_extension()
-        logger.info(
-            f"Using vLLM API reranker for model '{self.model_name}' at {self.api_url}"
-        )
+        logger.info(f"Using vLLM API reranker at {self.api_url}")
         self.progress_callback: Optional[ProgressCallback] = None
 
     @staticmethod
@@ -258,7 +251,6 @@ class VLLMAPIClientReranker:
             try:
                 response = self.post_http_request(
                     prompt={
-                        "model": self.model_name,
                         "text_1": query,
                         "text_2": documents,
                     },
