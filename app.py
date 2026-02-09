@@ -1534,5 +1534,5 @@ Test files are available in `data/test/`:
         server_port=args.port,
         share=args.share,
         css=custom_css,
-        primary_hue="#FF5733",
+        theme=gr.themes.Default(primary_hue="#FF5733"),
     )
