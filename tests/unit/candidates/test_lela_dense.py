@@ -10,8 +10,8 @@ import numpy as np
 import spacy
 from spacy.tokens import Span
 
-from ner_pipeline.types import Candidate, Document, Mention
-from ner_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
+from el_pipeline.types import Candidate, Document, Mention
+from el_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
 
 
 class TestLELADenseCandidatesComponent:
@@ -46,13 +46,13 @@ class TestLELADenseCandidatesComponent:
     def nlp(self):
         return spacy.blank("en")
 
-    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
-    @patch("ner_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
+    @patch("el_pipeline.spacy_components.candidates._get_faiss")
+    @patch("el_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
     def test_requires_knowledge_base(self, mock_get_st, mock_faiss, nlp):
         mock_model = MagicMock()
         mock_get_st.return_value = mock_model
 
-        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
         component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         # Component returns doc unchanged when not initialized (logs warning)
         doc = nlp("Test")
@@ -61,8 +61,8 @@ class TestLELADenseCandidatesComponent:
         # Candidates should remain empty since KB not initialized
         assert result.ents[0]._.candidates == []
 
-    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
-    @patch("ner_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
+    @patch("el_pipeline.spacy_components.candidates._get_faiss")
+    @patch("el_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
     def test_initialization_embeds_entities(self, mock_get_st, mock_faiss, kb, nlp):
         # Setup mocks
         mock_faiss_module = MagicMock()
@@ -80,7 +80,7 @@ class TestLELADenseCandidatesComponent:
         ])
         mock_get_st.return_value = mock_model
 
-        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
         component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb)
 
@@ -92,8 +92,8 @@ class TestLELADenseCandidatesComponent:
         # Index should have been created
         mock_faiss_module.IndexFlatIP.assert_called_once_with(3)  # dim=3
 
-    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
-    @patch("ner_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
+    @patch("el_pipeline.spacy_components.candidates._get_faiss")
+    @patch("el_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
     def test_generate_returns_candidates(self, mock_get_st, mock_faiss, kb, sample_doc, nlp):
         mock_faiss_module = MagicMock()
         mock_faiss.return_value = mock_faiss_module
@@ -115,7 +115,7 @@ class TestLELADenseCandidatesComponent:
         ]
         mock_get_st.return_value = mock_model
 
-        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
         component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb)
 
@@ -133,8 +133,8 @@ class TestLELADenseCandidatesComponent:
         assert len(candidates) == 2
         assert all(isinstance(c, Candidate) for c in candidates)
 
-    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
-    @patch("ner_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
+    @patch("el_pipeline.spacy_components.candidates._get_faiss")
+    @patch("el_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
     def test_candidates_have_descriptions(self, mock_get_st, mock_faiss, kb, sample_doc, nlp):
         mock_faiss_module = MagicMock()
         mock_faiss.return_value = mock_faiss_module
@@ -149,7 +149,7 @@ class TestLELADenseCandidatesComponent:
         ]
         mock_get_st.return_value = mock_model
 
-        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
         component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb)
 
@@ -167,8 +167,8 @@ class TestLELADenseCandidatesComponent:
         assert candidates[0].entity_id == "Barack Obama"
         assert candidates[0].description == "44th US President"
 
-    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
-    @patch("ner_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
+    @patch("el_pipeline.spacy_components.candidates._get_faiss")
+    @patch("el_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
     def test_query_includes_task_instruction(self, mock_get_st, mock_faiss, kb, sample_doc, nlp):
         mock_faiss_module = MagicMock()
         mock_faiss.return_value = mock_faiss_module
@@ -184,7 +184,7 @@ class TestLELADenseCandidatesComponent:
         mock_model.encode.side_effect = capture_encode
         mock_get_st.return_value = mock_model
 
-        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
         component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb)
 
@@ -200,8 +200,8 @@ class TestLELADenseCandidatesComponent:
         assert "Query:" in query_text
         assert "Obama" in query_text
 
-    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
-    @patch("ner_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
+    @patch("el_pipeline.spacy_components.candidates._get_faiss")
+    @patch("el_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
     def test_use_context_includes_context(self, mock_get_st, mock_faiss, kb, sample_doc, nlp):
         from spacy.tokens import Span as SpacySpan
         if not SpacySpan.has_extension("context"):
@@ -221,7 +221,7 @@ class TestLELADenseCandidatesComponent:
         mock_model.encode.side_effect = capture_encode
         mock_get_st.return_value = mock_model
 
-        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
         component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=True)
         component.initialize(kb)
 
@@ -236,8 +236,8 @@ class TestLELADenseCandidatesComponent:
         assert "Obama" in query_text
         assert "44th President" in query_text
 
-    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
-    @patch("ner_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
+    @patch("el_pipeline.spacy_components.candidates._get_faiss")
+    @patch("el_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
     def test_respects_top_k(self, mock_get_st, mock_faiss, kb, sample_doc, nlp):
         mock_faiss_module = MagicMock()
         mock_faiss.return_value = mock_faiss_module
@@ -252,7 +252,7 @@ class TestLELADenseCandidatesComponent:
         ]
         mock_get_st.return_value = mock_model
 
-        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
         component = LELADenseCandidatesComponent(nlp=nlp, top_k=2, use_context=False)
         component.initialize(kb)
 

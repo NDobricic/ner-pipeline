@@ -4,9 +4,9 @@ import pytest
 import spacy
 from spacy.tokens import Span
 
-from ner_pipeline import spacy_components  # Register factories
-from ner_pipeline.spacy_components.candidates import FuzzyCandidatesComponent
-from ner_pipeline.types import Candidate, Entity
+from el_pipeline import spacy_components  # Register factories
+from el_pipeline.spacy_components.candidates import FuzzyCandidatesComponent
+from el_pipeline.types import Candidate, Entity
 
 from tests.conftest import MockKnowledgeBase
 
@@ -31,8 +31,8 @@ class TestFuzzyCandidatesComponent:
     @pytest.fixture
     def nlp(self, kb: MockKnowledgeBase) -> spacy.language.Language:
         nlp = spacy.blank("en")
-        nlp.add_pipe("ner_pipeline_simple", config={"min_len": 3})
-        component = nlp.add_pipe("ner_pipeline_fuzzy_candidates", config={"top_k": 3})
+        nlp.add_pipe("el_pipeline_simple", config={"min_len": 3})
+        component = nlp.add_pipe("el_pipeline_fuzzy_candidates", config={"top_k": 3})
         component.initialize(kb)
         return nlp
 
@@ -71,8 +71,8 @@ class TestFuzzyCandidatesComponent:
 
     def test_respects_top_k(self, kb: MockKnowledgeBase):
         nlp = spacy.blank("en")
-        nlp.add_pipe("ner_pipeline_simple", config={"min_len": 3})
-        component = nlp.add_pipe("ner_pipeline_fuzzy_candidates", config={"top_k": 2})
+        nlp.add_pipe("el_pipeline_simple", config={"min_len": 3})
+        component = nlp.add_pipe("el_pipeline_fuzzy_candidates", config={"top_k": 2})
         component.initialize(kb)
 
         text = "United States."

@@ -2,7 +2,7 @@
 
 import pytest
 
-from ner_pipeline.context import (
+from el_pipeline.context import (
     extract_context,
     extract_sentence_context,
     extract_window_context,

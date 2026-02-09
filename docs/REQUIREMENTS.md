@@ -1,6 +1,6 @@
 # System Requirements
 
-This document details the hardware, software, and environment requirements for running the NER Pipeline.
+This document details the hardware, software, and environment requirements for running the EL Pipeline.
 
 ## Table of Contents
 
@@ -291,7 +291,7 @@ export CUDA_VISIBLE_DEVICES=0,1
 
 # Configure vLLM tensor parallelism
 python -c "
-from ner_pipeline.config import PipelineConfig
+from el_pipeline.config import PipelineConfig
 config = PipelineConfig.from_dict({
     'disambiguator': {
         'name': 'lela_vllm',
@@ -310,7 +310,7 @@ Run this script to verify your environment is correctly configured:
 
 ```python
 #!/usr/bin/env python3
-"""Verify NER Pipeline environment setup."""
+"""Verify EL Pipeline environment setup."""
 
 import sys
 
@@ -361,7 +361,7 @@ def check_gliner():
         print("GLiNER: NOT INSTALLED")
 
 if __name__ == "__main__":
-    print("=== NER Pipeline Environment Check ===\n")
+    print("=== EL Pipeline Environment Check ===\n")
     check_python()
     check_torch()
     check_vllm()

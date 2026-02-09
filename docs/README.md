@@ -1,4 +1,4 @@
-# NER Pipeline Documentation
+# EL Pipeline Documentation
 
 A modular Named Entity Recognition (NER) and Entity Linking pipeline built on **spaCy's component architecture**. This project provides a complete solution for extracting named entities from documents and linking them to entities in a knowledge base.
 
@@ -13,7 +13,7 @@ A modular Named Entity Recognition (NER) and Entity Linking pipeline built on **
 
 ## Overview
 
-The NER Pipeline leverages spaCy's native pipeline system to create a configurable entity linking solution. It features:
+The EL Pipeline leverages spaCy's native pipeline system to create a configurable entity linking solution. It features:
 
 - **spaCy Integration**: All core components (NER, candidate generation, reranking, disambiguation) are implemented as spaCy pipeline components
 - **Modular Architecture**: Each pipeline stage is a pluggable spaCy component that can be swapped independently
@@ -60,14 +60,14 @@ The pipeline uses spaCy's component system where each stage is a registered fact
 ├───────────────────────────────────────────────────────────────┤
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │  NER Component (doc.ents populated)                     │  │
-│  │  Factories: ner_pipeline_lela_gliner, _simple, _gliner, │  │
+│  │  Factories: el_pipeline_lela_gliner, _simple, _gliner, │  │
 │  │             or spaCy's built-in NER                     │  │
 │  └─────────────────────────────────────────────────────────┘  │
 │                              │                                │
 │                              ▼                                │
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │  Candidate Generator (ent._.candidates populated)       │  │
-│  │  Factories: ner_pipeline_lela_bm25_candidates,          │  │
+│  │  Factories: el_pipeline_lela_bm25_candidates,          │  │
 │  │             _lela_dense_candidates, _fuzzy_candidates,  │  │
 │  │             _bm25_candidates                            │  │
 │  └─────────────────────────────────────────────────────────┘  │
@@ -75,14 +75,14 @@ The pipeline uses spaCy's component system where each stage is a registered fact
 │                              ▼                                │
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │  Reranker (ent._.candidates reordered)                  │  │
-│  │  Factories: ner_pipeline_lela_embedder_reranker,        │  │
+│  │  Factories: el_pipeline_lela_embedder_reranker,        │  │
 │  │             _cross_encoder_reranker, _noop_reranker     │  │
 │  └─────────────────────────────────────────────────────────┘  │
 │                              │                                │
 │                              ▼                                │
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │  Disambiguator (ent._.resolved_entity set)              │  │
-│  │  Factories: ner_pipeline_lela_vllm_disambiguator,       │  │
+│  │  Factories: el_pipeline_lela_vllm_disambiguator,       │  │
 │  │             _lela_transformers_disambiguator,            │  │
 │  │             _first_disambiguator,                       │  │
 │  │             _popularity_disambiguator                   │  │
@@ -109,13 +109,13 @@ The pipeline uses spaCy's custom extension system on `Span` objects:
 ## Project Structure
 
 ```
-ner-pipeline/
-├── ner_pipeline/              # Main Python package
+el-pipeline/
+├── el_pipeline/              # Main Python package
 │   ├── __init__.py            # Package exports
 │   ├── types.py               # Data models (Document, Mention, Entity, etc.)
 │   ├── config.py              # PipelineConfig for configuration parsing
 │   ├── registry.py            # Component registries (loaders, KBs)
-│   ├── pipeline.py            # Main NERPipeline orchestrator (spaCy-based)
+│   ├── pipeline.py            # Main ELPipeline orchestrator (spaCy-based)
 │   ├── context.py             # Context extraction utilities
 │   ├── cli.py                 # CLI entry point
 │   │
@@ -147,7 +147,7 @@ ner-pipeline/
 **Requirements:** Python 3.10 (recommended), CUDA 11.8 for GPU support
 
 ```bash
-cd ner-pipeline
+cd el-pipeline
 
 # Create virtual environment with Python 3.10
 python3.10 -m venv .venv
@@ -168,7 +168,7 @@ python -m spacy download en_core_web_sm
 
 **Using the CLI:**
 ```bash
-python -m ner_pipeline.cli \
+python -m el_pipeline.cli \
   --config config/lela_bm25_only.json \
   --input document.txt \
   --output results.jsonl
@@ -176,8 +176,8 @@ python -m ner_pipeline.cli \
 
 **Using the Python API:**
 ```python
-from ner_pipeline.config import PipelineConfig
-from ner_pipeline.pipeline import NERPipeline
+from el_pipeline.config import PipelineConfig
+from el_pipeline.pipeline import ELPipeline
 import json
 
 # Load configuration
@@ -185,23 +185,23 @@ with open("config.json") as f:
     config = PipelineConfig.from_dict(json.load(f))
 
 # Create and run pipeline
-pipeline = NERPipeline(config)
+pipeline = ELPipeline(config)
 results = pipeline.run(["document.txt"], output_path="results.jsonl")
 ```
 
 **Using spaCy directly (advanced):**
 ```python
 import spacy
-from ner_pipeline import spacy_components  # Register factories
+from el_pipeline import spacy_components  # Register factories
 
 # Build custom pipeline
 nlp = spacy.blank("en")
-nlp.add_pipe("ner_pipeline_simple", config={"min_len": 3})
-nlp.add_pipe("ner_pipeline_fuzzy_candidates", config={"top_k": 10})
-nlp.add_pipe("ner_pipeline_first_disambiguator")
+nlp.add_pipe("el_pipeline_simple", config={"min_len": 3})
+nlp.add_pipe("el_pipeline_fuzzy_candidates", config={"top_k": 10})
+nlp.add_pipe("el_pipeline_first_disambiguator")
 
 # Initialize components with KB
-from ner_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
+from el_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
 kb = CustomJSONLKnowledgeBase(path="kb.jsonl")
 
 for name, component in nlp.pipeline:

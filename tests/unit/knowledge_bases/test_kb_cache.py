@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from ner_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
+from el_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
 
 
 class TestKBCaching:

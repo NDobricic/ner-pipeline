@@ -9,8 +9,8 @@ import pytest
 import spacy
 from spacy.tokens import Span
 
-from ner_pipeline.types import Candidate, Document, Entity, Mention
-from ner_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
+from el_pipeline.types import Candidate, Document, Entity, Mention
+from el_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
 
 
 class TestLELABM25CandidatesComponent:
@@ -51,9 +51,9 @@ class TestLELABM25CandidatesComponent:
         return spacy.blank("en")
 
     def test_requires_knowledge_base(self, nlp):
-        with patch("ner_pipeline.spacy_components.candidates._get_bm25s"):
-            with patch("ner_pipeline.spacy_components.candidates._get_stemmer"):
-                from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        with patch("el_pipeline.spacy_components.candidates._get_bm25s"):
+            with patch("el_pipeline.spacy_components.candidates._get_stemmer"):
+                from el_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
                 component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
                 # Component returns doc unchanged when not initialized (logs warning)
                 doc = nlp("Test")
@@ -62,8 +62,8 @@ class TestLELABM25CandidatesComponent:
                 # Candidates should remain empty since KB not initialized
                 assert result.ents[0]._.candidates == []
 
-    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
-    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
+    @patch("el_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("el_pipeline.spacy_components.candidates._get_bm25s")
     def test_generate_returns_candidates(
         self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp
     ):
@@ -89,7 +89,7 @@ class TestLELABM25CandidatesComponent:
 
         mock_bm25s.return_value.tokenize.return_value = [["obama"]]
 
-        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
         component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb)
 
@@ -101,8 +101,8 @@ class TestLELABM25CandidatesComponent:
         assert len(candidates) == 2
         assert all(isinstance(c, Candidate) for c in candidates)
 
-    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
-    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
+    @patch("el_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("el_pipeline.spacy_components.candidates._get_bm25s")
     def test_candidates_have_entity_ids(
         self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp
     ):
@@ -124,7 +124,7 @@ class TestLELABM25CandidatesComponent:
         mock_retriever.retrieve.return_value = mock_results
         mock_bm25s.return_value.tokenize.return_value = [["obama"]]
 
-        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
         component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb)
 
@@ -135,8 +135,8 @@ class TestLELABM25CandidatesComponent:
         candidates = doc.ents[0]._.candidates
         assert candidates[0].entity_id == "Barack Obama"
 
-    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
-    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
+    @patch("el_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("el_pipeline.spacy_components.candidates._get_bm25s")
     def test_candidates_have_descriptions(
         self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp
     ):
@@ -158,7 +158,7 @@ class TestLELABM25CandidatesComponent:
         mock_retriever.retrieve.return_value = mock_results
         mock_bm25s.return_value.tokenize.return_value = [["obama"]]
 
-        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
         component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb)
 
@@ -169,8 +169,8 @@ class TestLELABM25CandidatesComponent:
         candidates = doc.ents[0]._.candidates
         assert candidates[0].description == "44th US President"
 
-    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
-    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
+    @patch("el_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("el_pipeline.spacy_components.candidates._get_bm25s")
     def test_empty_tokenization_returns_empty(
         self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp
     ):
@@ -187,7 +187,7 @@ class TestLELABM25CandidatesComponent:
         # Empty tokenization
         mock_bm25s.return_value.tokenize.return_value = [[]]
 
-        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
         component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb)
 
@@ -198,8 +198,8 @@ class TestLELABM25CandidatesComponent:
         candidates = doc.ents[0]._.candidates
         assert candidates == []
 
-    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
-    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
+    @patch("el_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("el_pipeline.spacy_components.candidates._get_bm25s")
     def test_use_context_includes_context_in_query(
         self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp
     ):
@@ -224,7 +224,7 @@ class TestLELABM25CandidatesComponent:
             return [[]]
         mock_bm25s.return_value.tokenize.side_effect = capture_tokenize
 
-        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
         component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=True)
         component.initialize(kb)
 
@@ -240,8 +240,8 @@ class TestLELABM25CandidatesComponent:
         assert "Barack Obama" in query
         assert "44th President" in query
 
-    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
-    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
+    @patch("el_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("el_pipeline.spacy_components.candidates._get_bm25s")
     def test_use_context_false_excludes_context(
         self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp
     ):
@@ -266,7 +266,7 @@ class TestLELABM25CandidatesComponent:
             return [[]]
         mock_bm25s.return_value.tokenize.side_effect = capture_tokenize
 
-        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
         component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb)
 
@@ -280,8 +280,8 @@ class TestLELABM25CandidatesComponent:
         query = tokenize_calls[0][0]
         assert query == "Barack Obama"
 
-    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
-    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
+    @patch("el_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("el_pipeline.spacy_components.candidates._get_bm25s")
     def test_respects_top_k(self, mock_bm25s, mock_stemmer, kb, sample_doc, nlp):
         mock_stemmer_instance = MagicMock()
         mock_stemmer.return_value.Stemmer.return_value = mock_stemmer_instance
@@ -295,7 +295,7 @@ class TestLELABM25CandidatesComponent:
 
         mock_bm25s.return_value.tokenize.return_value = [["test"]]
 
-        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
         component = LELABM25CandidatesComponent(nlp=nlp, top_k=3, use_context=False)
         component.initialize(kb)
 

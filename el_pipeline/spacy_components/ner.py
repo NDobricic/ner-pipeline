@@ -1,5 +1,5 @@
 """
-spaCy NER components for the NER pipeline.
+spaCy NER components for the EL pipeline.
 
 Provides factories and components for various NER implementations:
 - LELAGLiNERComponent: Zero-shot GLiNER NER
@@ -8,6 +8,8 @@ Provides factories and components for various NER implementations:
 - NERFilterComponent: Post-filter for spaCy's built-in NER
 """
 
+EXCLUDE_NER = ("CARDINAL", "DATE", "ORDINAL", "PERCENT", "QUANTITY", "TIME")
+
 import logging
 import re
 from typing import List, Optional, Callable
@@ -15,12 +17,12 @@ from typing import List, Optional, Callable
 from spacy.language import Language
 from spacy.tokens import Doc, Span
 
-from ner_pipeline.context import extract_context
-from ner_pipeline.lela.config import (
+from el_pipeline.context import extract_context
+from el_pipeline.lela.config import (
     DEFAULT_GLINER_MODEL,
     NER_LABELS,
 )
-from ner_pipeline.utils import filter_spans, ensure_context_extension
+from el_pipeline.utils import filter_spans, ensure_context_extension
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,7 @@ def _get_gliner():
     if _GLiNER is None:
         try:
             from gliner import GLiNER
+
             _GLiNER = GLiNER
         except ImportError:
             raise ImportError(
@@ -47,8 +50,9 @@ def _get_gliner():
 # LELA GLiNER NER Component
 # ============================================================================
 
+
 @Language.factory(
-    "ner_pipeline_lela_gliner",
+    "el_pipeline_lela_gliner",
     default_config={
         "model_name": DEFAULT_GLINER_MODEL,
         "labels": list(NER_LABELS),
@@ -136,7 +140,7 @@ class LELAGLiNERComponent:
                 # Try to break at sentence boundary
                 if end < len(text):
                     # Look for sentence end near chunk boundary
-                    for sep in ['. ', '.\n', '? ', '!\n', '\n\n']:
+                    for sep in [". ", ".\n", "? ", "!\n", "\n\n"]:
                         last_sep = text[start:end].rfind(sep)
                         if last_sep > chunk_size // 2:
                             end = start + last_sep + len(sep)
@@ -174,7 +178,9 @@ class LELAGLiNERComponent:
             new_span = Span(doc, span.start, span.end, label=label)
 
             # Store context
-            context = extract_context(text, start_char, end_char, mode=self.context_mode)
+            context = extract_context(
+                text, start_char, end_char, mode=self.context_mode
+            )
             new_span._.context = context
 
             spans.append(new_span)
@@ -182,7 +188,9 @@ class LELAGLiNERComponent:
         # Filter overlapping spans (keep longest)
         doc.ents = filter_spans(spans)
 
-        logger.debug(f"Extracted {len(doc.ents)} entities from document ({len(text)} chars)")
+        logger.debug(
+            f"Extracted {len(doc.ents)} entities from document ({len(text)} chars)"
+        )
         return doc
 
 
@@ -190,8 +198,9 @@ class LELAGLiNERComponent:
 # Simple Regex NER Component
 # ============================================================================
 
+
 @Language.factory(
-    "ner_pipeline_simple",
+    "el_pipeline_simple",
     default_config={
         "min_len": 3,
         "context_mode": "sentence",
@@ -248,7 +257,9 @@ class SimpleNERComponent:
                 continue
 
             new_span = Span(doc, span.start, span.end, label="ENT")
-            context = extract_context(text, start_char, end_char, mode=self.context_mode)
+            context = extract_context(
+                text, start_char, end_char, mode=self.context_mode
+            )
             new_span._.context = context
             spans.append(new_span)
 
@@ -260,8 +271,9 @@ class SimpleNERComponent:
 # Standard GLiNER Component (non-LELA)
 # ============================================================================
 
+
 @Language.factory(
-    "ner_pipeline_gliner",
+    "el_pipeline_gliner",
     default_config={
         "model_name": "urchade/gliner_base",
         "labels": ["person", "organization", "location"],
@@ -337,7 +349,9 @@ class GLiNERComponent:
 
             label = pred.get("label", "ENT")
             new_span = Span(doc, span.start, span.end, label=label)
-            context = extract_context(text, start_char, end_char, mode=self.context_mode)
+            context = extract_context(
+                text, start_char, end_char, mode=self.context_mode
+            )
             new_span._.context = context
             spans.append(new_span)
 
@@ -349,7 +363,8 @@ class GLiNERComponent:
 # NER Filter Component (for spaCy's built-in NER)
 # ============================================================================
 
-@Language.component("ner_pipeline_ner_filter")
+
+@Language.component("el_pipeline_ner_filter")
 def ner_filter_component(doc: Doc) -> Doc:
     """
     Post-filter for spaCy's built-in NER.
@@ -359,9 +374,10 @@ def ner_filter_component(doc: Doc) -> Doc:
     """
     ensure_context_extension()
 
+    filtered_ents = [ent for ent in doc.ents if ent.label_ not in EXCLUDE_NER]
     text = doc.text
-    for ent in doc.ents:
+    for ent in filtered_ents:
         context = extract_context(text, ent.start_char, ent.end_char, mode="sentence")
         ent._.context = context
-
+    doc.set_ents(filtered_ents, default="outside")
     return doc

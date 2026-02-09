@@ -2,12 +2,12 @@ import argparse
 import json
 from pathlib import Path
 
-from ner_pipeline.config import PipelineConfig
-from ner_pipeline.pipeline import NERPipeline
+from el_pipeline.config import PipelineConfig
+from el_pipeline.pipeline import ELPipeline
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run modular NER pipeline.")
+    parser = argparse.ArgumentParser(description="Run modular EL pipeline.")
     parser.add_argument(
         "--config",
         type=str,
@@ -31,7 +31,7 @@ def main():
     config_data = json.loads(Path(args.config).read_text(encoding="utf-8"))
     config = PipelineConfig.from_dict(config_data)
 
-    pipeline = NERPipeline(config)
+    pipeline = ELPipeline(config)
     pipeline.run(args.input, output_path=args.output)
 
 

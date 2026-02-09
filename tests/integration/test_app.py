@@ -431,7 +431,7 @@ class TestRunPipeline:
         """Without KB file, pipeline uses default YAGO KB."""
         from unittest.mock import patch
         # Mock the downloader to return the sample KB instead of downloading YAGO
-        with patch("ner_pipeline.knowledge_bases.yago_downloader.ensure_yago_kb", return_value=mock_kb_file.name):
+        with patch("el_pipeline.knowledge_bases.yago_downloader.ensure_yago_kb", return_value=mock_kb_file.name):
             gen = run_pipeline(
                 text_input="Some text",
                 file_input=None,

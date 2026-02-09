@@ -1,6 +1,6 @@
 # Testing Guide
 
-This guide documents the test infrastructure, how to run tests, and how to write new tests for the NER Pipeline.
+This guide documents the test infrastructure, how to run tests, and how to write new tests for the EL Pipeline.
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ pytest tests/unit
 pytest tests/
 
 # Run with coverage
-pytest tests/ --cov=ner_pipeline --cov-report=html
+pytest tests/ --cov=el_pipeline --cov-report=html
 
 # Run specific test file
 pytest tests/unit/test_types.py
@@ -151,8 +151,8 @@ pytest tests/ -n 4  # Use 4 workers
 """Tests for the document loader module."""
 
 import pytest
-from ner_pipeline.types import Document
-from ner_pipeline.loaders.text import TextLoader
+from el_pipeline.types import Document
+from el_pipeline.loaders.text import TextLoader
 
 
 class TestTextLoader:
@@ -256,14 +256,14 @@ def test_with_temp_files(temp_text_file, temp_jsonl_kb):
 ```python
 import pytest
 import spacy
-from ner_pipeline import spacy_components
+from el_pipeline import spacy_components
 
 
 @pytest.fixture
 def nlp_with_simple_ner():
     """Create a spaCy pipeline with simple NER."""
     nlp = spacy.blank("en")
-    nlp.add_pipe("ner_pipeline_simple", config={"min_len": 3})
+    nlp.add_pipe("el_pipeline_simple", config={"min_len": 3})
     return nlp
 
 
@@ -289,12 +289,12 @@ def test_simple_ner_context_extension(nlp_with_simple_ner):
 
 ```python
 from unittest.mock import Mock, patch
-from ner_pipeline.pipeline import NERPipeline
+from el_pipeline.pipeline import ELPipeline
 
 
 def test_pipeline_with_mock_kb(minimal_config_dict):
     """Test pipeline with mocked knowledge base."""
-    with patch("ner_pipeline.pipeline.knowledge_bases") as mock_registry:
+    with patch("el_pipeline.pipeline.knowledge_bases") as mock_registry:
         mock_kb = Mock()
         mock_kb.get_entity.return_value = None
         mock_registry.get.return_value = lambda **kwargs: mock_kb
@@ -305,7 +305,7 @@ def test_pipeline_with_mock_kb(minimal_config_dict):
 
 def test_vllm_disambiguator_output_parsing():
     """Test LLM output parsing without running actual model."""
-    from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+    from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
 
     # Test the static parsing method
     assert LELAvLLMDisambiguatorComponent._parse_output('"answer": 3') == 3
@@ -396,17 +396,17 @@ def test_example(
 
 ```bash
 # Run tests with coverage
-pytest tests/ --cov=ner_pipeline
+pytest tests/ --cov=el_pipeline
 
 # Generate HTML report
-pytest tests/ --cov=ner_pipeline --cov-report=html
+pytest tests/ --cov=el_pipeline --cov-report=html
 open htmlcov/index.html  # View in browser
 
 # Generate XML report (for CI)
-pytest tests/ --cov=ner_pipeline --cov-report=xml
+pytest tests/ --cov=el_pipeline --cov-report=xml
 
 # Show coverage in terminal
-pytest tests/ --cov=ner_pipeline --cov-report=term-missing
+pytest tests/ --cov=el_pipeline --cov-report=term-missing
 ```
 
 ### Coverage Configuration
@@ -415,9 +415,9 @@ From `pyproject.toml`:
 
 ```toml
 [tool.coverage.run]
-source = ["ner_pipeline"]
+source = ["el_pipeline"]
 omit = [
-    "ner_pipeline/scripts/*",
+    "el_pipeline/scripts/*",
     "*/__pycache__/*",
 ]
 
@@ -476,7 +476,7 @@ jobs:
 
     - name: Run fast tests
       run: |
-        pytest tests/unit -m "not slow" --cov=ner_pipeline --cov-report=xml
+        pytest tests/unit -m "not slow" --cov=el_pipeline --cov-report=xml
 
     - name: Upload coverage
       uses: codecov/codecov-action@v4

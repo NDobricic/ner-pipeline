@@ -2,12 +2,12 @@
 
 import pytest
 
-from ner_pipeline.lela.prompts import (
+from el_pipeline.lela.prompts import (
     DEFAULT_SYSTEM_PROMPT,
     create_disambiguation_messages,
     mark_mention_in_text,
 )
-from ner_pipeline.types import Candidate
+from el_pipeline.types import Candidate
 
 
 class TestDefaultSystemPrompt:

@@ -2,7 +2,7 @@
 
 import pytest
 
-from ner_pipeline.lela import config
+from el_pipeline.lela import config
 
 
 class TestLELAConfig:

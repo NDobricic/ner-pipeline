@@ -2,7 +2,7 @@
 
 import pytest
 
-from ner_pipeline.types import Candidate, Document, Entity, Mention, ResolvedMention
+from el_pipeline.types import Candidate, Document, Entity, Mention, ResolvedMention
 
 
 class TestDocument:

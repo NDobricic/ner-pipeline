@@ -2,7 +2,7 @@
 
 import pytest
 
-from ner_pipeline.config import ComponentConfig, PipelineConfig
+from el_pipeline.config import ComponentConfig, PipelineConfig
 
 
 class TestComponentConfig:

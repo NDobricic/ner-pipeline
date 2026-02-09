@@ -1,6 +1,6 @@
 from typing import Iterable, List, Optional, Protocol
 
-from ner_pipeline.types import Entity
+from el_pipeline.types import Entity
 
 
 class KnowledgeBase(Protocol):

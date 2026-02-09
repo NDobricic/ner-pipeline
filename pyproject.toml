@@ -1,5 +1,5 @@
 [project]
-name = "ner-pipeline"
+name = "el-pipeline"
 version = "0.1.0"
 description = "A modular NER and entity linking pipeline"
 requires-python = ">=3.10,<3.13"
@@ -38,9 +38,9 @@ filterwarnings = [
 addopts = "-v --tb=short"
 
 [tool.coverage.run]
-source = ["ner_pipeline"]
+source = ["el_pipeline"]
 omit = [
-    "ner_pipeline/scripts/*",
+    "el_pipeline/scripts/*",
     "*/__pycache__/*",
 ]
 

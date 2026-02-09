@@ -18,10 +18,10 @@ import torch
 # Global cancellation event for cooperative cancellation
 _cancel_event = threading.Event()
 
-from ner_pipeline.config import PipelineConfig
-from ner_pipeline.pipeline import NERPipeline
-from ner_pipeline.memory import get_system_resources
-from ner_pipeline.lela.config import (
+from el_pipeline.config import PipelineConfig
+from el_pipeline.pipeline import ELPipeline
+from el_pipeline.memory import get_system_resources
+from el_pipeline.lela.config import (
     AVAILABLE_LLM_MODELS as LLM_MODEL_CHOICES,
     AVAILABLE_EMBEDDING_MODELS as EMBEDDING_MODEL_CHOICES,
     AVAILABLE_CROSS_ENCODER_MODELS as CROSS_ENCODER_MODEL_CHOICES,
@@ -29,7 +29,7 @@ from ner_pipeline.lela.config import (
 )
 
 DESCRIPTION = """
-# NER Pipeline 🔗
+# EL Pipeline 🔗
 
 Modular NER → candidate generation → rerank → disambiguation pipeline built on spaCy.
 Swap components, configure parameters, and test with your own knowledge bases.
@@ -58,7 +58,7 @@ def _is_vllm_usable() -> bool:
 
 def get_available_components() -> Dict[str, List[str]]:
     """Get list of available spaCy pipeline components."""
-    # These map to spaCy factories registered in ner_pipeline.spacy_components
+    # These map to spaCy factories registered in el_pipeline.spacy_components
     available_disambiguators = [
         "none",
         "first",
@@ -496,7 +496,7 @@ def run_pipeline(
     kb_type: str,
     progress=gr.Progress(),
 ):
-    """Run the NER pipeline with selected configuration.
+    """Run the EL pipeline with selected configuration.
 
     This is a generator function that yields (html_output, stats, result) tuples.
     Yielding allows Gradio to check for cancellation between steps.
@@ -520,7 +520,7 @@ def run_pipeline(
     no_tab_switch = gr.update()
 
     if not kb_file:
-        from ner_pipeline.knowledge_bases.yago_downloader import ensure_yago_kb
+        from el_pipeline.knowledge_bases.yago_downloader import ensure_yago_kb
 
         kb_path = ensure_yago_kb()
     else:
@@ -574,7 +574,6 @@ def run_pipeline(
     if reranker_type == "cross_encoder":
         reranker_params["model_name"] = reranker_cross_encoder_model
     if reranker_type == "vllm_api_client":
-        reranker_params["model_name"] = reranker_cross_encoder_model
         reranker_params["base_url"] = reranker_api_url
         reranker_params["port"] = reranker_api_port
 
@@ -637,7 +636,7 @@ def run_pipeline(
             if _cancel_event.is_set():
                 raise InterruptedError("Pipeline cancelled by user")
 
-        pipeline = NERPipeline(
+        pipeline = ELPipeline(
             config, progress_callback=init_progress_callback, cancel_event=_cancel_event
         )
     except InterruptedError:
@@ -878,9 +877,9 @@ def compute_memory_estimate(
     llm_model: str,
 ) -> str:
     """Compute and format memory estimate for current configuration."""
-    from ner_pipeline.lela.config import VLLM_GPU_MEMORY_UTILIZATION
-    from ner_pipeline.lela.llm_pool import get_cached_models_info
-    from ner_pipeline.knowledge_bases.custom import get_kb_cache_info
+    from el_pipeline.lela.config import VLLM_GPU_MEMORY_UTILIZATION
+    from el_pipeline.lela.llm_pool import get_cached_models_info
+    from el_pipeline.knowledge_bases.custom import get_kb_cache_info
 
     try:
         resources = get_system_resources()
@@ -979,7 +978,7 @@ def start_cancellation():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="NER Pipeline Gradio UI")
+    parser = argparse.ArgumentParser(description="EL Pipeline Gradio UI")
     parser.add_argument(
         "--log",
         type=str,
@@ -1040,7 +1039,7 @@ if __name__ == "__main__":
         }
 
         function setupPageCloseHandler() {
-            console.log("NER Pipeline: Page close handler initialized");
+            console.log("EL Pipeline: Page close handler initialized");
 
             // Find the cancel button if visible (indicates pipeline is running)
             function findCancelButton() {
@@ -1062,7 +1061,7 @@ if __name__ == "__main__":
                 const cancelBtn = findCancelButton();
                 if (cancelBtn) {
                     cancelBtn.click();
-                    console.log("NER Pipeline: Triggered cancellation on pagehide");
+                    console.log("EL Pipeline: Triggered cancellation on pagehide");
                 }
             }, { capture: true });
 
@@ -1071,7 +1070,7 @@ if __name__ == "__main__":
                 const cancelBtn = findCancelButton();
                 if (cancelBtn) {
                     cancelBtn.click();
-                    console.log("NER Pipeline: Triggered cancellation on beforeunload");
+                    console.log("EL Pipeline: Triggered cancellation on beforeunload");
                 }
             }, { capture: true });
         }
@@ -1079,8 +1078,8 @@ if __name__ == "__main__":
     </script>
     """
 
-    with gr.Blocks(title="NER Pipeline", fill_height=True, head=custom_head) as demo:
-        gr.Markdown("# NER Pipeline", elem_classes=["main-header"])
+    with gr.Blocks(title="EL Pipeline", fill_height=True, head=custom_head) as demo:
+        gr.Markdown("# EL Pipeline", elem_classes=["main-header"])
         gr.Markdown(
             "*Modular entity recognition and linking pipeline. Upload a knowledge base, enter text, configure the pipeline, and run.*",
             elem_classes=["subtitle"],
@@ -1378,10 +1377,10 @@ Test files are available in `data/test/`:
 
 | Config Name | spaCy Factory |
 |-------------|---------------|
-| simple | ner_pipeline_simple |
-| lela_embedder | ner_pipeline_lela_embedder_reranker |
-| lela_vllm | ner_pipeline_lela_vllm_disambiguator |
-| lela_openai_api | ner_pipeline_lela_openai_api_disambiguator |
+| simple | el_pipeline_simple |
+| lela_embedder | el_pipeline_lela_embedder_reranker |
+| lela_vllm | el_pipeline_lela_vllm_disambiguator |
+| lela_openai_api | el_pipeline_lela_openai_api_disambiguator |
 
 ---
 

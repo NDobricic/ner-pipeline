@@ -1,6 +1,6 @@
 # Pipeline Architecture and spaCy Components
 
-This document provides detailed documentation of the NER Pipeline architecture built on spaCy's component system.
+This document provides detailed documentation of the EL Pipeline architecture built on spaCy's component system.
 
 ## Table of Contents
 
@@ -34,19 +34,19 @@ Input Files → Loader → Documents → spaCy Pipeline → Serialization → Ou
 | Stage | spaCy Component | Output | Purpose |
 |-------|-----------------|--------|---------|
 | Loader | Registry-based | Document(s) | Parse file format, extract text |
-| NER | `ner_pipeline_*` | `doc.ents` | Identify entity mentions |
-| Candidate Gen | `ner_pipeline_*_candidates` | `ent._.candidates` | Find KB matches |
-| Reranker | `ner_pipeline_*_reranker` | `ent._.candidates` (reordered) | Reorder by relevance |
-| Disambiguator | `ner_pipeline_*_disambiguator` | `ent._.resolved_entity` | Select final entity |
+| NER | `el_pipeline_*` | `doc.ents` | Identify entity mentions |
+| Candidate Gen | `el_pipeline_*_candidates` | `ent._.candidates` | Find KB matches |
+| Reranker | `el_pipeline_*_reranker` | `ent._.candidates` (reordered) | Reorder by relevance |
+| Disambiguator | `el_pipeline_*_disambiguator` | `ent._.resolved_entity` | Select final entity |
 
 ## spaCy Integration
 
 ### How the Pipeline Works
 
-The NER Pipeline uses spaCy's native component architecture:
+The EL Pipeline uses spaCy's native component architecture:
 
 1. **Factory Registration**: All components are registered as spaCy factories on import
-2. **Pipeline Building**: `NERPipeline` creates a blank English `Language` and adds components
+2. **Pipeline Building**: `ELPipeline` creates a blank English `Language` and adds components
 3. **Component Initialization**: Components requiring KB are initialized after being added
 4. **Document Processing**: Text is passed through `nlp(text)` which runs all components
 
@@ -67,29 +67,29 @@ Span.set_extension("resolved_entity", default=None)
 
 ```python
 import spacy
-from ner_pipeline import spacy_components  # Register all factories
+from el_pipeline import spacy_components  # Register all factories
 
 nlp = spacy.blank("en")
 
 # Add NER
-nlp.add_pipe("ner_pipeline_lela_gliner", config={
+nlp.add_pipe("el_pipeline_lela_gliner", config={
     "threshold": 0.5,
     "labels": ["person", "organization"]
 })
 
 # Add candidate generation
-cand = nlp.add_pipe("ner_pipeline_lela_bm25_candidates", config={
+cand = nlp.add_pipe("el_pipeline_lela_bm25_candidates", config={
     "top_k": 64
 })
 
 # Add reranker
-nlp.add_pipe("ner_pipeline_noop_reranker")
+nlp.add_pipe("el_pipeline_noop_reranker")
 
 # Add disambiguator
-disamb = nlp.add_pipe("ner_pipeline_first_disambiguator")
+disamb = nlp.add_pipe("el_pipeline_first_disambiguator")
 
 # Initialize components with KB
-from ner_pipeline.knowledge_bases.lela import LELAJSONLKnowledgeBase
+from el_pipeline.knowledge_bases.lela import LELAJSONLKnowledgeBase
 kb = LELAJSONLKnowledgeBase(path="kb.jsonl")
 cand.initialize(kb)
 disamb.initialize(kb)
@@ -102,20 +102,20 @@ doc = nlp("Albert Einstein visited Paris.")
 
 | Config Name | spaCy Factory Name |
 |-------------|-------------------|
-| `lela_gliner` | `ner_pipeline_lela_gliner` |
-| `simple` | `ner_pipeline_simple` |
-| `gliner` | `ner_pipeline_gliner` |
-| `lela_bm25` | `ner_pipeline_lela_bm25_candidates` |
-| `lela_dense` | `ner_pipeline_lela_dense_candidates` |
-| `fuzzy` | `ner_pipeline_fuzzy_candidates` |
-| `bm25` | `ner_pipeline_bm25_candidates` |
-| `lela_embedder` | `ner_pipeline_lela_embedder_reranker` |
-| `cross_encoder` | `ner_pipeline_cross_encoder_reranker` |
-| `none` | `ner_pipeline_noop_reranker` |
-| `lela_vllm` | `ner_pipeline_lela_vllm_disambiguator` |
-| `lela_transformers` | `ner_pipeline_lela_transformers_disambiguator` |
-| `first` | `ner_pipeline_first_disambiguator` |
-| `popularity` | `ner_pipeline_popularity_disambiguator` |
+| `lela_gliner` | `el_pipeline_lela_gliner` |
+| `simple` | `el_pipeline_simple` |
+| `gliner` | `el_pipeline_gliner` |
+| `lela_bm25` | `el_pipeline_lela_bm25_candidates` |
+| `lela_dense` | `el_pipeline_lela_dense_candidates` |
+| `fuzzy` | `el_pipeline_fuzzy_candidates` |
+| `bm25` | `el_pipeline_bm25_candidates` |
+| `lela_embedder` | `el_pipeline_lela_embedder_reranker` |
+| `cross_encoder` | `el_pipeline_cross_encoder_reranker` |
+| `none` | `el_pipeline_noop_reranker` |
+| `lela_vllm` | `el_pipeline_lela_vllm_disambiguator` |
+| `lela_transformers` | `el_pipeline_lela_transformers_disambiguator` |
+| `first` | `el_pipeline_first_disambiguator` |
+| `popularity` | `el_pipeline_popularity_disambiguator` |
 
 ---
 
@@ -123,13 +123,13 @@ doc = nlp("Albert Einstein visited Paris.")
 
 NER components populate `doc.ents` with detected entity spans and set `ent._.context`.
 
-**Location:** `ner_pipeline/spacy_components/ner.py`
+**Location:** `el_pipeline/spacy_components/ner.py`
 
 ### LELAGLiNERComponent
 
 Zero-shot GLiNER NER with LELA defaults.
 
-**Factory:** `ner_pipeline_lela_gliner`
+**Factory:** `el_pipeline_lela_gliner`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -156,7 +156,7 @@ Zero-shot GLiNER NER with LELA defaults.
 
 Lightweight regex-based NER.
 
-**Factory:** `ner_pipeline_simple`
+**Factory:** `el_pipeline_simple`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -175,7 +175,7 @@ Lightweight regex-based NER.
 
 Standard GLiNER wrapper.
 
-**Factory:** `ner_pipeline_gliner`
+**Factory:** `el_pipeline_gliner`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -189,14 +189,14 @@ Standard GLiNER wrapper.
 
 Post-filter for spaCy's built-in NER.
 
-**Component:** `ner_pipeline_ner_filter` (not a factory, use `@Language.component`)
+**Component:** `el_pipeline_ner_filter` (not a factory, use `@Language.component`)
 
 **Usage:**
 ```python
 # Use spaCy's built-in NER
 spacy_nlp = spacy.load("en_core_web_sm")
 nlp.add_pipe("ner", source=spacy_nlp)
-nlp.add_pipe("ner_pipeline_ner_filter")
+nlp.add_pipe("el_pipeline_ner_filter")
 ```
 
 **Behavior:**
@@ -211,7 +211,7 @@ NER components automatically handle documents that exceed model context limits t
 
 ### GLiNER Chunking
 
-The LELA GLiNER component (`ner_pipeline_lela_gliner`) chunks long documents with overlap:
+The LELA GLiNER component (`el_pipeline_lela_gliner`) chunks long documents with overlap:
 
 **Parameters:**
 - Chunk size: ~1500 characters
@@ -259,13 +259,13 @@ spaCy's built-in NER does not have explicit context limits and processes documen
 
 Candidate components populate `ent._.candidates` with `List[Candidate]` objects (each with `entity_id`, `score`, and `description` fields).
 
-**Location:** `ner_pipeline/spacy_components/candidates.py`
+**Location:** `el_pipeline/spacy_components/candidates.py`
 
 ### LELABM25CandidatesComponent
 
 Fast BM25 retrieval using bm25s library.
 
-**Factory:** `ner_pipeline_lela_bm25_candidates`
+**Factory:** `el_pipeline_lela_bm25_candidates`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -285,7 +285,7 @@ Fast BM25 retrieval using bm25s library.
 
 Dense retrieval using embeddings and FAISS.
 
-**Factory:** `ner_pipeline_lela_dense_candidates`
+**Factory:** `el_pipeline_lela_dense_candidates`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -308,7 +308,7 @@ Query: {mention_text}: {context}
 
 RapidFuzz string matching.
 
-**Factory:** `ner_pipeline_fuzzy_candidates`
+**Factory:** `el_pipeline_fuzzy_candidates`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -325,7 +325,7 @@ RapidFuzz string matching.
 
 Standard BM25 using rank-bm25 library.
 
-**Factory:** `ner_pipeline_bm25_candidates`
+**Factory:** `el_pipeline_bm25_candidates`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -340,13 +340,13 @@ Standard BM25 using rank-bm25 library.
 
 Reranker components reorder `ent._.candidates` by relevance.
 
-**Location:** `ner_pipeline/spacy_components/rerankers.py`
+**Location:** `el_pipeline/spacy_components/rerankers.py`
 
 ### LELAEmbedderRerankerComponent
 
 Embedding-based cosine similarity reranking.
 
-**Factory:** `ner_pipeline_lela_embedder_reranker`
+**Factory:** `el_pipeline_lela_embedder_reranker`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -373,7 +373,7 @@ Query: {marked_text}
 
 Cross-encoder reranking using sentence-transformers.
 
-**Factory:** `ner_pipeline_cross_encoder_reranker`
+**Factory:** `el_pipeline_cross_encoder_reranker`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -390,7 +390,7 @@ Cross-encoder reranking using sentence-transformers.
 
 Pass-through reranker.
 
-**Factory:** `ner_pipeline_noop_reranker`
+**Factory:** `el_pipeline_noop_reranker`
 
 **Config:** None
 
@@ -402,13 +402,13 @@ Pass-through reranker.
 
 Disambiguator components set `ent._.resolved_entity` with the selected `Entity`.
 
-**Location:** `ner_pipeline/spacy_components/disambiguators.py`
+**Location:** `el_pipeline/spacy_components/disambiguators.py`
 
 ### LELAvLLMDisambiguatorComponent
 
 vLLM-based LLM disambiguation - sends all candidates at once.
 
-**Factory:** `ner_pipeline_lela_vllm_disambiguator`
+**Factory:** `el_pipeline_lela_vllm_disambiguator`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -442,7 +442,7 @@ Candidates:
 
 Select first candidate.
 
-**Factory:** `ner_pipeline_first_disambiguator`
+**Factory:** `el_pipeline_first_disambiguator`
 
 **Config:** None
 
@@ -452,7 +452,7 @@ Select first candidate.
 
 Select by highest score (first in sorted list).
 
-**Factory:** `ner_pipeline_popularity_disambiguator`
+**Factory:** `el_pipeline_popularity_disambiguator`
 
 **Config:** None
 
@@ -464,7 +464,7 @@ Select by highest score (first in sorted list).
 
 Loaders are registry-based (not spaCy components) and parse file formats.
 
-**Location:** `ner_pipeline/loaders/`
+**Location:** `el_pipeline/loaders/`
 
 ### TextLoader
 
@@ -515,7 +515,7 @@ Loaders are registry-based (not spaCy components) and parse file formats.
 
 Knowledge bases are registry-based (not spaCy components).
 
-**Location:** `ner_pipeline/knowledge_bases/`
+**Location:** `el_pipeline/knowledge_bases/`
 
 ### CustomJSONLKnowledgeBase
 
@@ -548,7 +548,7 @@ Knowledge bases are registry-based (not spaCy components).
 
 ## Context Extraction
 
-**Location:** `ner_pipeline/context.py`
+**Location:** `el_pipeline/context.py`
 
 ### Sentence Mode
 

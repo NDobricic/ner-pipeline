@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-This guide provides solutions for common issues encountered when installing and running the NER Pipeline.
+This guide provides solutions for common issues encountered when installing and running the EL Pipeline.
 
 ## Table of Contents
 
@@ -140,11 +140,11 @@ The pipeline automatically chunks long documents. The default settings are:
 - Overlap: 200 characters
 - Sentence boundary detection to avoid splitting mid-sentence
 
-The chunking behavior is handled in `ner_pipeline/spacy_components/ner.py` (lines 118-162). If you need to adjust:
+The chunking behavior is handled in `el_pipeline/spacy_components/ner.py` (lines 118-162). If you need to adjust:
 
 ```python
 # In your custom code, you can configure chunk parameters
-nlp.add_pipe("ner_pipeline_lela_gliner", config={
+nlp.add_pipe("el_pipeline_lela_gliner", config={
     "threshold": 0.5,
     "labels": ["person", "organization", "location"]
 })
@@ -164,13 +164,13 @@ nlp.add_pipe("ner_pipeline_lela_gliner", config={
 When building pipelines manually with spaCy:
 ```python
 import spacy
-from ner_pipeline import spacy_components
-from ner_pipeline.knowledge_bases.lela_jsonl import LELAJSONLKnowledgeBase
+from el_pipeline import spacy_components
+from el_pipeline.knowledge_bases.lela_jsonl import LELAJSONLKnowledgeBase
 
 nlp = spacy.blank("en")
-nlp.add_pipe("ner_pipeline_simple")
-cand = nlp.add_pipe("ner_pipeline_fuzzy_candidates")
-disamb = nlp.add_pipe("ner_pipeline_first_disambiguator")
+nlp.add_pipe("el_pipeline_simple")
+cand = nlp.add_pipe("el_pipeline_fuzzy_candidates")
+disamb = nlp.add_pipe("el_pipeline_first_disambiguator")
 
 # Initialize with knowledge base
 kb = LELAJSONLKnowledgeBase(path="kb.jsonl")
@@ -178,7 +178,7 @@ cand.initialize(kb)
 disamb.initialize(kb)
 ```
 
-When using `NERPipeline`, initialization is automatic.
+When using `ELPipeline`, initialization is automatic.
 
 ---
 
@@ -333,13 +333,13 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 
 # Or for specific modules:
-logging.getLogger("ner_pipeline").setLevel(logging.DEBUG)
-logging.getLogger("ner_pipeline.spacy_components").setLevel(logging.DEBUG)
+logging.getLogger("el_pipeline").setLevel(logging.DEBUG)
+logging.getLogger("el_pipeline.spacy_components").setLevel(logging.DEBUG)
 ```
 
 **CLI:**
 ```bash
-python -m ner_pipeline.cli --config config.json --input doc.txt --output out.jsonl 2>&1 | tee debug.log
+python -m el_pipeline.cli --config config.json --input doc.txt --output out.jsonl 2>&1 | tee debug.log
 ```
 
 **Web App:**
@@ -353,11 +353,11 @@ python app.py --log DEBUG
 
 ```python
 import spacy
-from ner_pipeline import spacy_components
+from el_pipeline import spacy_components
 
 nlp = spacy.blank("en")
 # List available factories
-print(nlp.factory_names)  # Should include ner_pipeline_* factories
+print(nlp.factory_names)  # Should include el_pipeline_* factories
 ```
 
 ---
@@ -394,7 +394,7 @@ for ent in doc.ents:
 
 If you encounter issues not covered here:
 
-1. Check the [GitHub Issues](https://github.com/NDobricic/ner-pipeline/issues)
+1. Check the [GitHub Issues](https://github.com/NDobricic/el-pipeline/issues)
 2. Enable debug logging and examine the output
 3. Verify your environment matches the [Requirements](REQUIREMENTS.md)
 4. Try a minimal configuration to isolate the issue

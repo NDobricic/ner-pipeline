@@ -6,7 +6,7 @@ import tempfile
 
 import pytest
 
-from ner_pipeline.loaders.text import JSONLoader, JSONLLoader, TextLoader
+from el_pipeline.loaders.text import JSONLoader, JSONLLoader, TextLoader
 
 
 class TestTextLoader:

@@ -6,8 +6,8 @@ import tempfile
 
 import pytest
 
-from ner_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
-from ner_pipeline.types import Entity
+from el_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
+from el_pipeline.types import Entity
 
 
 class TestCustomJSONLKnowledgeBase:

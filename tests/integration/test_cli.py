@@ -1,4 +1,4 @@
-"""Integration tests for the CLI interface (ner_pipeline/cli.py)."""
+"""Integration tests for the CLI interface (el_pipeline/cli.py)."""
 
 import json
 import os
@@ -21,7 +21,7 @@ class TestCLIExecution:
             [
                 sys.executable,
                 "-m",
-                "ner_pipeline.cli",
+                "el_pipeline.cli",
                 "--config",
                 temp_config_file,
                 "--input",
@@ -39,7 +39,7 @@ class TestCLIExecution:
             [
                 sys.executable,
                 "-m",
-                "ner_pipeline.cli",
+                "el_pipeline.cli",
                 "--config",
                 temp_config_file,
                 "--input",
@@ -65,7 +65,7 @@ class TestCLIExecution:
                 [
                     sys.executable,
                     "-m",
-                    "ner_pipeline.cli",
+                    "el_pipeline.cli",
                     "--config",
                     temp_config_file,
                     "--input",
@@ -90,7 +90,7 @@ class TestCLIExecution:
                 [
                     sys.executable,
                     "-m",
-                    "ner_pipeline.cli",
+                    "el_pipeline.cli",
                     "--config",
                     temp_config_file,
                     "--input",
@@ -123,7 +123,7 @@ class TestCLIExecution:
                 [
                     sys.executable,
                     "-m",
-                    "ner_pipeline.cli",
+                    "el_pipeline.cli",
                     "--config",
                     temp_config_file,
                     "--input",
@@ -156,7 +156,7 @@ class TestCLIErrorHandling:
             [
                 sys.executable,
                 "-m",
-                "ner_pipeline.cli",
+                "el_pipeline.cli",
                 "--input",
                 temp_text_file,
             ],
@@ -173,7 +173,7 @@ class TestCLIErrorHandling:
             [
                 sys.executable,
                 "-m",
-                "ner_pipeline.cli",
+                "el_pipeline.cli",
                 "--config",
                 temp_config_file,
             ],
@@ -190,7 +190,7 @@ class TestCLIErrorHandling:
             [
                 sys.executable,
                 "-m",
-                "ner_pipeline.cli",
+                "el_pipeline.cli",
                 "--config",
                 "/nonexistent/path/config.json",
                 "--input",
@@ -213,7 +213,7 @@ class TestCLIErrorHandling:
                 [
                     sys.executable,
                     "-m",
-                    "ner_pipeline.cli",
+                    "el_pipeline.cli",
                     "--config",
                     bad_config,
                     "--input",
@@ -233,7 +233,7 @@ class TestCLIErrorHandling:
             [
                 sys.executable,
                 "-m",
-                "ner_pipeline.cli",
+                "el_pipeline.cli",
                 "--config",
                 temp_config_file,
                 "--input",

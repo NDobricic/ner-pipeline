@@ -1,1 +1,1 @@
-# NER Pipeline Tests
+# EL Pipeline Tests

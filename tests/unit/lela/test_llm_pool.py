@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from ner_pipeline.lela.llm_pool import (
+from el_pipeline.lela.llm_pool import (
     _get_sentence_transformers,
     get_sentence_transformer_instance,
     clear_sentence_transformer_instances,
@@ -20,7 +20,7 @@ class TestSentenceTransformerPool:
         # Just verify the function exists and is callable
         assert callable(_get_sentence_transformers)
 
-    @patch("ner_pipeline.lela.llm_pool._get_sentence_transformers")
+    @patch("el_pipeline.lela.llm_pool._get_sentence_transformers")
     @patch.dict("sys.modules", {"torch": MagicMock()})
     def test_get_sentence_transformer_instance_creates_model(self, mock_get_st):
         import sys
@@ -46,7 +46,7 @@ class TestSentenceTransformerPool:
         assert call_kwargs[1]["device"] == "cuda"
         assert call_kwargs[1]["trust_remote_code"] is True
 
-    @patch("ner_pipeline.lela.llm_pool._get_sentence_transformers")
+    @patch("el_pipeline.lela.llm_pool._get_sentence_transformers")
     @patch.dict("sys.modules", {"torch": MagicMock()})
     def test_get_sentence_transformer_instance_reuses_model(self, mock_get_st):
         import sys
@@ -67,7 +67,7 @@ class TestSentenceTransformerPool:
         assert mock_st_module.SentenceTransformer.call_count == 1
         assert model1 is model2
 
-    @patch("ner_pipeline.lela.llm_pool._get_sentence_transformers")
+    @patch("el_pipeline.lela.llm_pool._get_sentence_transformers")
     @patch.dict("sys.modules", {"torch": MagicMock()})
     def test_different_devices_create_different_instances(self, mock_get_st):
         import sys
@@ -90,7 +90,7 @@ class TestSentenceTransformerPool:
         # Should not raise and should do nothing without force=True
         clear_sentence_transformer_instances()
 
-    @patch("ner_pipeline.lela.llm_pool._get_sentence_transformers")
+    @patch("el_pipeline.lela.llm_pool._get_sentence_transformers")
     @patch.dict("sys.modules", {"torch": MagicMock()})
     def test_clear_sentence_transformer_instances_force(self, mock_get_st):
         import sys
@@ -131,7 +131,7 @@ class TestVLLMInstanceManagement:
         # Should not raise
         clear_vllm_instances()
 
-    @patch("ner_pipeline.lela.llm_pool._get_vllm")
+    @patch("el_pipeline.lela.llm_pool._get_vllm")
     def test_get_vllm_instance_creates_model(self, mock_get_vllm):
         mock_vllm = MagicMock()
         mock_llm = MagicMock()
@@ -151,7 +151,7 @@ class TestVLLMInstanceManagement:
         assert call_kwargs["model"] == "test-model"
         assert call_kwargs["tensor_parallel_size"] == 1
 
-    @patch("ner_pipeline.lela.llm_pool._get_vllm")
+    @patch("el_pipeline.lela.llm_pool._get_vllm")
     def test_get_vllm_instance_reuses_model(self, mock_get_vllm):
         mock_vllm = MagicMock()
         mock_llm = MagicMock()
@@ -167,7 +167,7 @@ class TestVLLMInstanceManagement:
         assert mock_vllm.LLM.call_count == 1
         assert llm1 is llm2
 
-    @patch("ner_pipeline.lela.llm_pool._get_vllm")
+    @patch("el_pipeline.lela.llm_pool._get_vllm")
     def test_different_configs_create_different_instances(self, mock_get_vllm):
         mock_vllm = MagicMock()
         mock_vllm.LLM.side_effect = [MagicMock(), MagicMock()]
@@ -181,7 +181,7 @@ class TestVLLMInstanceManagement:
         # Different tensor_parallel_size should create different instances
         assert mock_vllm.LLM.call_count == 2
 
-    @patch("ner_pipeline.lela.llm_pool._get_vllm")
+    @patch("el_pipeline.lela.llm_pool._get_vllm")
     def test_max_model_len_passed_when_specified(self, mock_get_vllm):
         mock_vllm = MagicMock()
         mock_get_vllm.return_value = mock_vllm

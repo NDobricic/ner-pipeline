@@ -1,5 +1,5 @@
 """
-spaCy candidate generation components for the NER pipeline.
+spaCy candidate generation components for the EL pipeline.
 
 Provides factories and components for candidate generation:
 - LELADenseCandidatesComponent: Dense retrieval using embeddings + FAISS
@@ -19,18 +19,18 @@ import requests
 from spacy.language import Language
 from spacy.tokens import Doc, Span
 
-from ner_pipeline.knowledge_bases.base import KnowledgeBase
-from ner_pipeline.lela.config import (
+from el_pipeline.knowledge_bases.base import KnowledgeBase
+from el_pipeline.lela.config import (
     CANDIDATES_TOP_K,
     DEFAULT_EMBEDDER_MODEL,
     RETRIEVER_TASK,
 )
-from ner_pipeline.lela.llm_pool import (
+from el_pipeline.lela.llm_pool import (
     get_sentence_transformer_instance,
     release_sentence_transformer,
 )
-from ner_pipeline.utils import ensure_candidates_extension
-from ner_pipeline.types import Candidate, ProgressCallback
+from el_pipeline.utils import ensure_candidates_extension
+from el_pipeline.types import Candidate, ProgressCallback
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ def _get_faiss():
 
 
 @Language.factory(
-    "ner_pipeline_lela_dense_candidates",
+    "el_pipeline_lela_dense_candidates",
     default_config={
         "model_name": DEFAULT_EMBEDDER_MODEL,
         "top_k": CANDIDATES_TOP_K,
@@ -321,10 +321,10 @@ class LELADenseCandidatesComponent:
 
 
 @Language.factory(
-    "ner_pipeline_lela_openai_api_dense_candidates",
+    "el_pipeline_lela_openai_api_dense_candidates",
     default_config={
         "model_name": None,
-        "base_url": "http://localhost:8001/v1",
+        "base_url": "http://localhost:8000/v1",
         "api_key": None,
         "top_k": CANDIDATES_TOP_K,
         "use_context": False,
@@ -367,7 +367,7 @@ class LELAOpenAIAPIDenseCandidatesComponent:
         self,
         nlp: Language,
         model_name: Optional[str] = None,
-        base_url: str = "http://localhost:8001/v1",
+        base_url: str = "http://localhost:8000/v1",
         api_key: Optional[str] = None,
         top_k: int = CANDIDATES_TOP_K,
         use_context: bool = False,
@@ -622,7 +622,7 @@ class LELAOpenAIAPIDenseCandidatesComponent:
 
 
 @Language.factory(
-    "ner_pipeline_fuzzy_candidates",
+    "el_pipeline_fuzzy_candidates",
     default_config={
         "top_k": 20,
     },
@@ -781,7 +781,7 @@ class FuzzyCandidatesComponent:
 
 
 @Language.factory(
-    "ner_pipeline_bm25_candidates",
+    "el_pipeline_bm25_candidates",
     default_config={
         "top_k": 20,
     },

@@ -1,5 +1,5 @@
 """
-Component registry for NER pipeline.
+Component registry for EL pipeline.
 
 Provides pluggable component registration for document loaders
 and knowledge bases. NER, candidate generation, reranking, and

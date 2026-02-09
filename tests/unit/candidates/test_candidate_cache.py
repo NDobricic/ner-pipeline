@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 import spacy
 
-from ner_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
-from ner_pipeline.types import Entity
+from el_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
+from el_pipeline.types import Entity
 
 
 class TestLELABM25Cache:
@@ -48,8 +48,8 @@ class TestLELABM25Cache:
     def nlp(self):
         return spacy.blank("en")
 
-    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
-    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
+    @patch("el_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("el_pipeline.spacy_components.candidates._get_bm25s")
     def test_initialize_saves_cache(
         self, mock_bm25s, mock_stemmer, kb, cache_dir, nlp
     ):
@@ -64,7 +64,7 @@ class TestLELABM25Cache:
         mock_retriever = MagicMock()
         mock_bm25s.return_value.BM25.return_value = mock_retriever
 
-        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
         # Use real picklable objects for stemmer/tokenizer so pickle.dump succeeds
         component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb, cache_dir=Path(cache_dir))
@@ -80,8 +80,8 @@ class TestLELABM25Cache:
         index_dir = save_path.parent
         assert index_dir.exists()
 
-    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
-    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
+    @patch("el_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("el_pipeline.spacy_components.candidates._get_bm25s")
     def test_initialize_loads_from_cache(
         self, mock_bm25s, mock_stemmer, kb, cache_dir, nlp
     ):
@@ -101,7 +101,7 @@ class TestLELABM25Cache:
         mock_loaded_retriever = MagicMock()
         mock_bm25s.return_value.BM25.load.return_value = mock_loaded_retriever
 
-        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
 
         # Compute the expected cache hash to pre-populate cache
         raw = f"lela_bm25:{kb.identity_hash}:english".encode()
@@ -137,8 +137,8 @@ class TestLELABM25Cache:
         # stemmer should be recreated (not from pickle)
         mock_stemmer.return_value.Stemmer.assert_called_with("english")
 
-    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
-    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
+    @patch("el_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("el_pipeline.spacy_components.candidates._get_bm25s")
     def test_no_cache_dir_skips_caching(
         self, mock_bm25s, mock_stemmer, kb, nlp
     ):
@@ -153,7 +153,7 @@ class TestLELABM25Cache:
         mock_retriever = MagicMock()
         mock_bm25s.return_value.BM25.return_value = mock_retriever
 
-        from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
         component = LELABM25CandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb)
 
@@ -197,9 +197,9 @@ class TestLELADenseCache:
     def nlp(self):
         return spacy.blank("en")
 
-    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
-    @patch("ner_pipeline.spacy_components.candidates.release_sentence_transformer")
-    @patch("ner_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
+    @patch("el_pipeline.spacy_components.candidates._get_faiss")
+    @patch("el_pipeline.spacy_components.candidates.release_sentence_transformer")
+    @patch("el_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
     def test_initialize_saves_cache(
         self, mock_get_st, mock_release_st, mock_faiss, kb, cache_dir, nlp
     ):
@@ -219,7 +219,7 @@ class TestLELADenseCache:
         ])
         mock_get_st.return_value = mock_model
 
-        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
         component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb, cache_dir=Path(cache_dir))
 
@@ -230,9 +230,9 @@ class TestLELADenseCache:
         assert "lela_dense_" in write_args[1]
         assert write_args[1].endswith("index.faiss")
 
-    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
-    @patch("ner_pipeline.spacy_components.candidates.release_sentence_transformer")
-    @patch("ner_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
+    @patch("el_pipeline.spacy_components.candidates._get_faiss")
+    @patch("el_pipeline.spacy_components.candidates.release_sentence_transformer")
+    @patch("el_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
     def test_initialize_loads_from_cache(
         self, mock_get_st, mock_release_st, mock_faiss, kb, cache_dir, nlp
     ):
@@ -252,7 +252,7 @@ class TestLELADenseCache:
         ])
         mock_get_st.return_value = mock_model
 
-        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
 
         # First call: builds and saves
         component1 = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
@@ -286,9 +286,9 @@ class TestLELADenseCache:
         # The cached index should be assigned
         assert component2.index is mock_cached_index
 
-    @patch("ner_pipeline.spacy_components.candidates._get_faiss")
-    @patch("ner_pipeline.spacy_components.candidates.release_sentence_transformer")
-    @patch("ner_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
+    @patch("el_pipeline.spacy_components.candidates._get_faiss")
+    @patch("el_pipeline.spacy_components.candidates.release_sentence_transformer")
+    @patch("el_pipeline.spacy_components.candidates.get_sentence_transformer_instance")
     def test_no_cache_dir_skips_caching(
         self, mock_get_st, mock_release_st, mock_faiss, kb, nlp
     ):
@@ -304,7 +304,7 @@ class TestLELADenseCache:
         mock_model.encode.return_value = np.array([[0.1, 0.2, 0.3]] * 3)
         mock_get_st.return_value = mock_model
 
-        from ner_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
+        from el_pipeline.spacy_components.candidates import LELADenseCandidatesComponent
         component = LELADenseCandidatesComponent(nlp=nlp, top_k=5, use_context=False)
         component.initialize(kb)
 
@@ -351,7 +351,7 @@ class TestBM25Cache:
 
     def test_initialize_saves_cache(self, kb, cache_dir, nlp):
         """First initialize with cache_dir creates a pickle file."""
-        from ner_pipeline.spacy_components.candidates import BM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import BM25CandidatesComponent
         component = BM25CandidatesComponent(nlp=nlp, top_k=5)
         component.initialize(kb, cache_dir=Path(cache_dir))
 
@@ -369,7 +369,7 @@ class TestBM25Cache:
 
     def test_initialize_loads_from_cache(self, kb, cache_dir, nlp):
         """Second initialize loads from pickle cache."""
-        from ner_pipeline.spacy_components.candidates import BM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import BM25CandidatesComponent
 
         # First call: builds and saves
         component1 = BM25CandidatesComponent(nlp=nlp, top_k=5)
@@ -388,7 +388,7 @@ class TestBM25Cache:
 
     def test_no_cache_dir_works(self, kb, nlp):
         """Without cache_dir, initialization works normally."""
-        from ner_pipeline.spacy_components.candidates import BM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import BM25CandidatesComponent
         component = BM25CandidatesComponent(nlp=nlp, top_k=5)
         component.initialize(kb)
         assert component.bm25 is not None
@@ -396,7 +396,7 @@ class TestBM25Cache:
 
     def test_corrupt_cache_falls_back_to_build(self, kb, cache_dir, nlp):
         """Corrupt cache file triggers rebuild."""
-        from ner_pipeline.spacy_components.candidates import BM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import BM25CandidatesComponent
 
         # First call to create cache
         component1 = BM25CandidatesComponent(nlp=nlp, top_k=5)
@@ -446,7 +446,7 @@ class TestFuzzyCache:
     def test_initialize_accepts_cache_dir(self, kb, nlp):
         """FuzzyCandidatesComponent.initialize accepts cache_dir without error."""
         with tempfile.TemporaryDirectory() as cache_dir:
-            from ner_pipeline.spacy_components.candidates import FuzzyCandidatesComponent
+            from el_pipeline.spacy_components.candidates import FuzzyCandidatesComponent
             component = FuzzyCandidatesComponent(nlp=nlp, top_k=5)
             component.initialize(kb, cache_dir=Path(cache_dir))
             assert component.entities is not None
@@ -454,7 +454,7 @@ class TestFuzzyCache:
 
     def test_initialize_without_cache_dir(self, kb, nlp):
         """FuzzyCandidatesComponent.initialize works without cache_dir."""
-        from ner_pipeline.spacy_components.candidates import FuzzyCandidatesComponent
+        from el_pipeline.spacy_components.candidates import FuzzyCandidatesComponent
         component = FuzzyCandidatesComponent(nlp=nlp, top_k=5)
         component.initialize(kb)
         assert component.entities is not None
@@ -481,7 +481,7 @@ class TestCacheInvalidation:
 
     def test_bm25_cache_invalidated_on_kb_change(self, cache_dir, nlp):
         """BM25 cache is invalidated when the KB file changes."""
-        from ner_pipeline.spacy_components.candidates import BM25CandidatesComponent
+        from el_pipeline.spacy_components.candidates import BM25CandidatesComponent
 
         data_v1 = [
             {"title": "Barack Obama", "description": "44th US President"},
@@ -515,8 +515,8 @@ class TestCacheInvalidation:
         finally:
             os.unlink(path)
 
-    @patch("ner_pipeline.spacy_components.candidates._get_stemmer")
-    @patch("ner_pipeline.spacy_components.candidates._get_bm25s")
+    @patch("el_pipeline.spacy_components.candidates._get_stemmer")
+    @patch("el_pipeline.spacy_components.candidates._get_bm25s")
     def test_lela_bm25_different_stemmer_different_cache(
         self, mock_bm25s, mock_stemmer, cache_dir, nlp
     ):
@@ -537,7 +537,7 @@ class TestCacheInvalidation:
             mock_retriever = MagicMock()
             mock_bm25s.return_value.BM25.return_value = mock_retriever
 
-            from ner_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
+            from el_pipeline.spacy_components.candidates import LELABM25CandidatesComponent
 
             kb = CustomJSONLKnowledgeBase(path=path)
 

@@ -16,7 +16,7 @@ import logging
 import os
 from typing import Dict, Set, Optional, Any
 
-from ner_pipeline.lela.config import VLLM_GPU_MEMORY_UTILIZATION
+from el_pipeline.lela.config import VLLM_GPU_MEMORY_UTILIZATION
 
 # Disable vLLM V1 engine and configure multiprocessing to work from worker threads
 os.environ.setdefault("VLLM_USE_V1", "0")

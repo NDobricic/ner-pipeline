@@ -9,9 +9,9 @@ from typing import Callable, Dict, Iterable, List, Optional, Tuple, Any
 
 from rapidfuzz import process
 
-from ner_pipeline.registry import knowledge_bases
-from ner_pipeline.types import Entity
-from ner_pipeline.knowledge_bases.base import KnowledgeBase
+from el_pipeline.registry import knowledge_bases
+from el_pipeline.types import Entity
+from el_pipeline.knowledge_bases.base import KnowledgeBase
 
 logger = logging.getLogger(__name__)
 

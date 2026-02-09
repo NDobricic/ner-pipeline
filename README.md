@@ -1,4 +1,4 @@
-# Modular NER Pipeline
+# Modular EL Pipeline
 
 Standalone, swappable NER → candidate generation → rerank → disambiguation pipeline. Uses file-based storage (JSONL for KB and outputs) and optional caching in `.ner_cache/`.
 
@@ -7,7 +7,7 @@ Standalone, swappable NER → candidate generation → rerank → disambiguation
 **Requirements:** Python 3.10-3.12 (Python 3.13 is NOT supported due to vLLM), CUDA 11.8 for GPU support
 
 ```bash
-cd ner-pipeline
+cd el-pipeline
 python3.10 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
@@ -53,12 +53,12 @@ If you encounter issues, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) 
 ```
 3) Run:
 ```bash
-python -m ner_pipeline.cli --config config.json --input docs/file1.pdf docs/file2.pdf --output outputs.jsonl
+python -m el_pipeline.cli --config config.json --input docs/file1.pdf docs/file2.pdf --output outputs.jsonl
 ```
 
 ### Example: lightweight fuzzy run (no heavy models)
 ```bash
-python -m ner_pipeline.cli \
+python -m el_pipeline.cli \
   --config data/configs/simplewiki_fuzzy_simple.json \
   --input data/docs/simple-english-wiki/corpus.txt \
   --output outputs.jsonl
@@ -67,12 +67,12 @@ This uses the `simple` regex NER, fuzzy candidates, first-candidate disambiguati
 
 ## Python API
 ```python
-from ner_pipeline.config import PipelineConfig
-from ner_pipeline.pipeline import NERPipeline
+from el_pipeline.config import PipelineConfig
+from el_pipeline.pipeline import ELPipeline
 import json
 
 config = PipelineConfig.from_dict(json.load(open("config.json")))
-pipeline = NERPipeline(config)
+pipeline = ELPipeline(config)
 results = pipeline.run(["docs/file1.txt"])
 ```
 
@@ -92,7 +92,7 @@ results = pipeline.run(["docs/file1.txt"])
 ## Conversion utilities
 - YAGO labels TSV → JSONL KB:
   ```bash
-  python -m ner_pipeline.scripts.convert_yago_labels data/kb/yagoLabels.tsv data/kb/yago_labels_en.jsonl
+  python -m el_pipeline.scripts.convert_yago_labels data/kb/yagoLabels.tsv data/kb/yago_labels_en.jsonl
   ```
 
 ## Notes

@@ -9,8 +9,8 @@ import pytest
 import spacy
 from spacy.tokens import Span
 
-from ner_pipeline.types import Candidate, Document, Entity, Mention
-from ner_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
+from el_pipeline.types import Candidate, Document, Entity, Mention
+from el_pipeline.knowledge_bases.custom import CustomJSONLKnowledgeBase
 
 
 class TestLELAvLLMDisambiguatorComponent:
@@ -49,14 +49,14 @@ class TestLELAvLLMDisambiguatorComponent:
     def nlp(self):
         return spacy.blank("en")
 
-    @patch("ner_pipeline.spacy_components.disambiguators._get_vllm")
-    @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.disambiguators._get_vllm")
+    @patch("el_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_requires_knowledge_base(self, mock_get_instance, mock_get_vllm, nlp):
         mock_vllm = MagicMock()
         mock_get_vllm.return_value = (mock_vllm, MagicMock())
         mock_get_instance.return_value = MagicMock()
 
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         component = LELAvLLMDisambiguatorComponent(nlp=nlp)
         # Component returns doc unchanged when KB not initialized (logs warning)
         doc = nlp("Test")
@@ -66,8 +66,8 @@ class TestLELAvLLMDisambiguatorComponent:
         # resolved_entity should remain None since KB is not set
         assert result.ents[0]._.resolved_entity is None
 
-    @patch("ner_pipeline.spacy_components.disambiguators._get_vllm")
-    @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.disambiguators._get_vllm")
+    @patch("el_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_disambiguate_returns_entity(
         self, mock_get_instance, mock_get_vllm, kb, sample_candidates, nlp
     ):
@@ -85,7 +85,7 @@ class TestLELAvLLMDisambiguatorComponent:
         mock_response.outputs = [mock_output]
         mock_llm.generate.return_value = [mock_response]
 
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         component = LELAvLLMDisambiguatorComponent(nlp=nlp)
         component.initialize(kb)
 
@@ -98,8 +98,8 @@ class TestLELAvLLMDisambiguatorComponent:
         assert result is not None
         assert result.id == "Barack Obama"
 
-    @patch("ner_pipeline.spacy_components.disambiguators._get_vllm")
-    @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.disambiguators._get_vllm")
+    @patch("el_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_disambiguate_empty_candidates(
         self, mock_get_instance, mock_get_vllm, kb, nlp
     ):
@@ -107,7 +107,7 @@ class TestLELAvLLMDisambiguatorComponent:
         mock_get_vllm.return_value = (mock_vllm, MagicMock())
         mock_get_instance.return_value = MagicMock()
 
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         component = LELAvLLMDisambiguatorComponent(nlp=nlp)
         component.initialize(kb)
 
@@ -119,8 +119,8 @@ class TestLELAvLLMDisambiguatorComponent:
         result = doc.ents[0]._.resolved_entity
         assert result is None
 
-    @patch("ner_pipeline.spacy_components.disambiguators._get_vllm")
-    @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.disambiguators._get_vllm")
+    @patch("el_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_single_candidate_no_none_option(
         self, mock_get_instance, mock_get_vllm, kb, nlp
     ):
@@ -128,7 +128,7 @@ class TestLELAvLLMDisambiguatorComponent:
         mock_get_vllm.return_value = (mock_vllm, MagicMock())
         mock_get_instance.return_value = MagicMock()
 
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         component = LELAvLLMDisambiguatorComponent(nlp=nlp, add_none_candidate=False)
         component.initialize(kb)
 
@@ -144,8 +144,8 @@ class TestLELAvLLMDisambiguatorComponent:
         assert result is not None
         assert result.id == "Barack Obama"
 
-    @patch("ner_pipeline.spacy_components.disambiguators._get_vllm")
-    @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.disambiguators._get_vllm")
+    @patch("el_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_answer_zero_returns_none(
         self, mock_get_instance, mock_get_vllm, kb, sample_candidates, nlp
     ):
@@ -162,7 +162,7 @@ class TestLELAvLLMDisambiguatorComponent:
         mock_response.outputs = [mock_output]
         mock_llm.generate.return_value = [mock_response]
 
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         component = LELAvLLMDisambiguatorComponent(nlp=nlp, add_none_candidate=True)
         component.initialize(kb)
 
@@ -174,8 +174,8 @@ class TestLELAvLLMDisambiguatorComponent:
         result = doc.ents[0]._.resolved_entity
         assert result is None
 
-    @patch("ner_pipeline.spacy_components.disambiguators._get_vllm")
-    @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.disambiguators._get_vllm")
+    @patch("el_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_selects_second_candidate(
         self, mock_get_instance, mock_get_vllm, kb, sample_candidates, nlp
     ):
@@ -192,7 +192,7 @@ class TestLELAvLLMDisambiguatorComponent:
         mock_response.outputs = [mock_output]
         mock_llm.generate.return_value = [mock_response]
 
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         component = LELAvLLMDisambiguatorComponent(nlp=nlp)
         component.initialize(kb)
 
@@ -205,8 +205,8 @@ class TestLELAvLLMDisambiguatorComponent:
         assert result is not None
         assert result.id == "Michelle Obama"
 
-    @patch("ner_pipeline.spacy_components.disambiguators._get_vllm")
-    @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.disambiguators._get_vllm")
+    @patch("el_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_out_of_range_answer_returns_none(
         self, mock_get_instance, mock_get_vllm, kb, sample_candidates, nlp
     ):
@@ -223,7 +223,7 @@ class TestLELAvLLMDisambiguatorComponent:
         mock_response.outputs = [mock_output]
         mock_llm.generate.return_value = [mock_response]
 
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         component = LELAvLLMDisambiguatorComponent(nlp=nlp)
         component.initialize(kb)
 
@@ -235,8 +235,8 @@ class TestLELAvLLMDisambiguatorComponent:
         result = doc.ents[0]._.resolved_entity
         assert result is None
 
-    @patch("ner_pipeline.spacy_components.disambiguators._get_vllm")
-    @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.disambiguators._get_vllm")
+    @patch("el_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_invalid_output_format_returns_none(
         self, mock_get_instance, mock_get_vllm, kb, sample_candidates, nlp
     ):
@@ -253,7 +253,7 @@ class TestLELAvLLMDisambiguatorComponent:
         mock_response.outputs = [mock_output]
         mock_llm.generate.return_value = [mock_response]
 
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         component = LELAvLLMDisambiguatorComponent(nlp=nlp)
         component.initialize(kb)
 
@@ -266,8 +266,8 @@ class TestLELAvLLMDisambiguatorComponent:
         # Should return None (answer 0) when parsing fails
         assert result is None
 
-    @patch("ner_pipeline.spacy_components.disambiguators._get_vllm")
-    @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.disambiguators._get_vllm")
+    @patch("el_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_llm_error_returns_none(
         self, mock_get_instance, mock_get_vllm, kb, sample_candidates, nlp
     ):
@@ -278,7 +278,7 @@ class TestLELAvLLMDisambiguatorComponent:
         mock_get_instance.return_value = mock_llm
         mock_llm.generate.side_effect = Exception("LLM error")
 
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         component = LELAvLLMDisambiguatorComponent(nlp=nlp)
         component.initialize(kb)
 
@@ -295,23 +295,23 @@ class TestLELAvLLMDisambiguatorParsing:
     """Tests for output parsing logic."""
 
     def test_parse_output_standard_format(self):
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         assert LELAvLLMDisambiguatorComponent._parse_output('"answer": 1') == 1
         assert LELAvLLMDisambiguatorComponent._parse_output('"answer": 2') == 2
         assert LELAvLLMDisambiguatorComponent._parse_output('"answer": 0') == 0
 
     def test_parse_output_without_quotes(self):
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         assert LELAvLLMDisambiguatorComponent._parse_output('answer: 1') == 1
         assert LELAvLLMDisambiguatorComponent._parse_output('answer: 3') == 3
 
     def test_parse_output_with_surrounding_text(self):
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         assert LELAvLLMDisambiguatorComponent._parse_output('Based on context, "answer": 2') == 2
         assert LELAvLLMDisambiguatorComponent._parse_output('{"answer": 1}') == 1
 
     def test_parse_output_invalid_returns_zero(self):
-        from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+        from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
         assert LELAvLLMDisambiguatorComponent._parse_output('no answer here') == 0
         assert LELAvLLMDisambiguatorComponent._parse_output('') == 0
         assert LELAvLLMDisambiguatorComponent._parse_output('Barack Obama') == 0
@@ -320,8 +320,8 @@ class TestLELAvLLMDisambiguatorParsing:
 class TestLELAvLLMDisambiguatorConfig:
     """Tests for disambiguator configuration."""
 
-    @patch("ner_pipeline.spacy_components.disambiguators._get_vllm")
-    @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.disambiguators._get_vllm")
+    @patch("el_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_custom_model_name(self, mock_get_instance, mock_get_vllm):
         mock_vllm = MagicMock()
         mock_sampling_params = MagicMock()
@@ -340,8 +340,8 @@ class TestLELAvLLMDisambiguatorConfig:
         try:
             kb = CustomJSONLKnowledgeBase(path=path)
 
-            from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
-            from ner_pipeline.utils import ensure_candidates_extension, ensure_resolved_entity_extension
+            from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+            from el_pipeline.utils import ensure_candidates_extension, ensure_resolved_entity_extension
             ensure_candidates_extension()
             ensure_resolved_entity_extension()
 
@@ -365,8 +365,8 @@ class TestLELAvLLMDisambiguatorConfig:
         finally:
             os.unlink(path)
 
-    @patch("ner_pipeline.spacy_components.disambiguators._get_vllm")
-    @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.disambiguators._get_vllm")
+    @patch("el_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_tensor_parallel_size(self, mock_get_instance, mock_get_vllm):
         mock_vllm = MagicMock()
         mock_sampling_params = MagicMock()
@@ -384,8 +384,8 @@ class TestLELAvLLMDisambiguatorConfig:
         try:
             kb = CustomJSONLKnowledgeBase(path=path)
 
-            from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
-            from ner_pipeline.utils import ensure_candidates_extension, ensure_resolved_entity_extension
+            from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+            from el_pipeline.utils import ensure_candidates_extension, ensure_resolved_entity_extension
             ensure_candidates_extension()
             ensure_resolved_entity_extension()
 
@@ -407,8 +407,8 @@ class TestLELAvLLMDisambiguatorConfig:
         finally:
             os.unlink(path)
 
-    @patch("ner_pipeline.spacy_components.disambiguators._get_vllm")
-    @patch("ner_pipeline.spacy_components.disambiguators.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.disambiguators._get_vllm")
+    @patch("el_pipeline.spacy_components.disambiguators.get_vllm_instance")
     def test_custom_system_prompt(self, mock_get_instance, mock_get_vllm):
         mock_vllm = MagicMock()
         mock_get_vllm.return_value = (mock_vllm, MagicMock())
@@ -421,7 +421,7 @@ class TestLELAvLLMDisambiguatorConfig:
         try:
             kb = CustomJSONLKnowledgeBase(path=path)
 
-            from ner_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
+            from el_pipeline.spacy_components.disambiguators import LELAvLLMDisambiguatorComponent
             nlp = spacy.blank("en")
             custom_prompt = "Custom disambiguation prompt"
             component = LELAvLLMDisambiguatorComponent(nlp=nlp, system_prompt=custom_prompt)

@@ -4,9 +4,9 @@ import pytest
 import spacy
 from spacy.tokens import Span
 
-from ner_pipeline import spacy_components  # Register factories
-from ner_pipeline.spacy_components.disambiguators import FirstDisambiguatorComponent
-from ner_pipeline.types import Candidate, Entity
+from el_pipeline import spacy_components  # Register factories
+from el_pipeline.spacy_components.disambiguators import FirstDisambiguatorComponent
+from el_pipeline.types import Candidate, Entity
 
 from tests.conftest import MockKnowledgeBase
 
@@ -29,9 +29,9 @@ class TestFirstDisambiguatorComponent:
     @pytest.fixture
     def nlp(self, kb: MockKnowledgeBase) -> spacy.language.Language:
         nlp = spacy.blank("en")
-        nlp.add_pipe("ner_pipeline_simple", config={"min_len": 3})
-        nlp.add_pipe("ner_pipeline_fuzzy_candidates", config={"top_k": 3})
-        component = nlp.add_pipe("ner_pipeline_first_disambiguator")
+        nlp.add_pipe("el_pipeline_simple", config={"min_len": 3})
+        nlp.add_pipe("el_pipeline_fuzzy_candidates", config={"top_k": 3})
+        component = nlp.add_pipe("el_pipeline_first_disambiguator")
 
         # Initialize components with KB
         for name, proc in nlp.pipeline:
@@ -64,7 +64,7 @@ class TestFirstDisambiguatorComponent:
             ]
 
         # Get the disambiguator component and call it
-        disambiguator = nlp.get_pipe("ner_pipeline_first_disambiguator")
+        disambiguator = nlp.get_pipe("el_pipeline_first_disambiguator")
         doc = disambiguator(doc)
 
         # Should select first candidate
@@ -88,7 +88,7 @@ class TestFirstDisambiguatorComponent:
             doc.ents = [span]
             span._.candidates = []
 
-        disambiguator = nlp.get_pipe("ner_pipeline_first_disambiguator")
+        disambiguator = nlp.get_pipe("el_pipeline_first_disambiguator")
         doc = disambiguator(doc)
 
         if doc.ents:
@@ -109,7 +109,7 @@ class TestFirstDisambiguatorComponent:
             doc.ents = [span]
             span._.candidates = [Candidate(entity_id="Q2", description="Second entity")]
 
-        disambiguator = nlp.get_pipe("ner_pipeline_first_disambiguator")
+        disambiguator = nlp.get_pipe("el_pipeline_first_disambiguator")
         doc = disambiguator(doc)
 
         if doc.ents:
@@ -133,7 +133,7 @@ class TestFirstDisambiguatorComponent:
             doc.ents = [span]
             span._.candidates = [Candidate(entity_id="unknown_entity", description="Not in KB")]
 
-        disambiguator = nlp.get_pipe("ner_pipeline_first_disambiguator")
+        disambiguator = nlp.get_pipe("el_pipeline_first_disambiguator")
         doc = disambiguator(doc)
 
         if doc.ents:
@@ -155,7 +155,7 @@ class TestFirstDisambiguatorComponent:
             doc.ents = [span]
             span._.candidates = [Candidate(entity_id="Q1", description="First entity")]
 
-        disambiguator = nlp.get_pipe("ner_pipeline_first_disambiguator")
+        disambiguator = nlp.get_pipe("el_pipeline_first_disambiguator")
         doc = disambiguator(doc)
 
         if doc.ents:

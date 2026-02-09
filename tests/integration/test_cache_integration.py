@@ -7,9 +7,9 @@ import time
 
 import pytest
 
-from ner_pipeline.config import PipelineConfig
-from ner_pipeline.pipeline import NERPipeline
-from ner_pipeline.types import Document
+from el_pipeline.config import PipelineConfig
+from el_pipeline.pipeline import ELPipeline
+from el_pipeline.types import Document
 
 
 @pytest.mark.integration
@@ -32,7 +32,7 @@ class TestPipelineCacheDirWiring:
     ):
         """KB receives cache_dir and creates kb/ cache subdirectory."""
         config = PipelineConfig.from_dict(config_dict)
-        pipeline = NERPipeline(config)
+        pipeline = ELPipeline(config)
 
         assert pipeline.kb is not None
         assert hasattr(pipeline.kb, "source_path")
@@ -50,11 +50,11 @@ class TestPipelineCacheDirWiring:
     ):
         """Second pipeline init uses KB cache (produces identical entities)."""
         config1 = PipelineConfig.from_dict(config_dict)
-        pipeline1 = NERPipeline(config1)
+        pipeline1 = ELPipeline(config1)
         entities1 = {e.id: e.title for e in pipeline1.kb.all_entities()}
 
         config2 = PipelineConfig.from_dict(config_dict)
-        pipeline2 = NERPipeline(config2)
+        pipeline2 = ELPipeline(config2)
         entities2 = {e.id: e.title for e in pipeline2.kb.all_entities()}
 
         assert entities1 == entities2
@@ -64,12 +64,12 @@ class TestPipelineCacheDirWiring:
     ):
         """Pipeline produces identical results on cold and warm runs."""
         config1 = PipelineConfig.from_dict(config_dict)
-        pipeline1 = NERPipeline(config1)
+        pipeline1 = ELPipeline(config1)
         doc = Document(id="test", text="Barack Obama visited New York City yesterday.")
         result1 = pipeline1.process_document(doc)
 
         config2 = PipelineConfig.from_dict(config_dict)
-        pipeline2 = NERPipeline(config2)
+        pipeline2 = ELPipeline(config2)
         result2 = pipeline2.process_document(doc)
 
         assert result1["text"] == result2["text"]
@@ -109,7 +109,7 @@ class TestKBCacheInvalidationIntegration:
 
             # First run
             config1 = PipelineConfig.from_dict(config_dict)
-            pipeline1 = NERPipeline(config1)
+            pipeline1 = ELPipeline(config1)
             assert len(list(pipeline1.kb.all_entities())) == 2
 
             # Modify file
@@ -122,7 +122,7 @@ class TestKBCacheInvalidationIntegration:
 
             # Second run - should see new entity
             config2 = PipelineConfig.from_dict(config_dict)
-            pipeline2 = NERPipeline(config2)
+            pipeline2 = ELPipeline(config2)
             assert len(list(pipeline2.kb.all_entities())) == 3
             assert pipeline2.kb.get_entity("Q3") is not None
         finally:
@@ -142,7 +142,7 @@ class TestKBCacheInvalidationIntegration:
 
         # Build cache
         config1 = PipelineConfig.from_dict(config_dict)
-        pipeline1 = NERPipeline(config1)
+        pipeline1 = ELPipeline(config1)
         count1 = len(list(pipeline1.kb.all_entities()))
 
         # Delete cache contents
@@ -152,7 +152,7 @@ class TestKBCacheInvalidationIntegration:
 
         # Rebuild
         config2 = PipelineConfig.from_dict(config_dict)
-        pipeline2 = NERPipeline(config2)
+        pipeline2 = ELPipeline(config2)
         count2 = len(list(pipeline2.kb.all_entities()))
 
         assert count1 == count2

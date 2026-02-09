@@ -1,5 +1,5 @@
 """
-Memory estimation and system resource detection for the NER pipeline.
+Memory estimation and system resource detection for the EL pipeline.
 
 Provides utilities to:
 - Estimate VRAM/RAM requirements for each component
@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from ner_pipeline.lela.config import VLLM_GPU_MEMORY_UTILIZATION
+from el_pipeline.lela.config import VLLM_GPU_MEMORY_UTILIZATION
 
 logger = logging.getLogger(__name__)
 

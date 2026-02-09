@@ -1,4 +1,4 @@
-"""Shared fixtures for NER pipeline tests."""
+"""Shared fixtures for EL pipeline tests."""
 
 import json
 import os
@@ -8,7 +8,7 @@ from typing import Dict, Iterable, Iterator, List, Optional, Tuple
 
 import pytest
 
-from ner_pipeline.types import Candidate, Document, Entity, Mention, ResolvedMention
+from el_pipeline.types import Candidate, Document, Entity, Mention, ResolvedMention
 
 
 # ---------------------------------------------------------------------------

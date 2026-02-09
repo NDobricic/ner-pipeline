@@ -1,6 +1,6 @@
 # Web Application (Gradio UI) Documentation
 
-The NER Pipeline includes an interactive web interface built with Gradio for experimenting with different pipeline configurations. The web app uses spaCy's pipeline architecture under the hood.
+The EL Pipeline includes an interactive web interface built with Gradio for experimenting with different pipeline configurations. The web app uses spaCy's pipeline architecture under the hood.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ The NER Pipeline includes an interactive web interface built with Gradio for exp
 ## Installation
 
 ```bash
-cd ner-pipeline
+cd el-pipeline
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -121,13 +121,13 @@ A horizontal row of component configuration columns:
 Each NER option maps to a spaCy pipeline factory:
 
 #### Simple (Regex-based)
-- **spaCy Factory:** `ner_pipeline_simple`
+- **spaCy Factory:** `el_pipeline_simple`
 - **min_len**: Minimum mention length (1-10, default: 3)
 - Lightweight, no model downloads required
 - Uses regex pattern to find capitalized words
 
 #### spaCy
-- Uses spaCy's built-in NER + `ner_pipeline_ner_filter`
+- Uses spaCy's built-in NER + `el_pipeline_ner_filter`
 - **model**: spaCy model name
   - `en_core_web_sm` (default)
   - `en_core_web_md`
@@ -135,13 +135,13 @@ Each NER option maps to a spaCy pipeline factory:
 - Standard NER labels: PERSON, ORG, GPE, LOC, etc.
 
 #### GLiNER
-- **spaCy Factory:** `ner_pipeline_gliner`
+- **spaCy Factory:** `el_pipeline_gliner`
 - **model_name**: GLiNER model (default: `urchade/gliner_large`)
 - **labels**: Comma-separated entity labels to detect
 - Zero-shot NER with custom labels
 
 #### LELA GLiNER
-- **spaCy Factory:** `ner_pipeline_lela_gliner`
+- **spaCy Factory:** `el_pipeline_lela_gliner`
 - **model_name**: Default `numind/NuNER_Zero-span`
 - **labels**: LELA default labels (person, organization, location, event, work of art, product)
 - **threshold**: Detection threshold (default: 0.5)
@@ -149,29 +149,29 @@ Each NER option maps to a spaCy pipeline factory:
 ### Candidate Generation Options
 
 #### Fuzzy
-- **spaCy Factory:** `ner_pipeline_fuzzy_candidates`
+- **spaCy Factory:** `el_pipeline_fuzzy_candidates`
 - **top_k**: Number of candidates (1-20, default: 10)
 - Uses RapidFuzz string matching on entity titles
 
 #### BM25
-- **spaCy Factory:** `ner_pipeline_bm25_candidates`
+- **spaCy Factory:** `el_pipeline_bm25_candidates`
 - **top_k**: Number of candidates (1-20, default: 10)
 - Keyword-based retrieval on entity descriptions
 
 #### Dense
-- **spaCy Factory:** `ner_pipeline_fuzzy_candidates` (with sentence-transformers)
+- **spaCy Factory:** `el_pipeline_fuzzy_candidates` (with sentence-transformers)
 - **model_name**: Embedding model (default: `all-MiniLM-L6-v2`)
 - **top_k**: Number of candidates
 - Uses FAISS for similarity search
 
 #### LELA BM25
-- **spaCy Factory:** `ner_pipeline_lela_bm25_candidates`
+- **spaCy Factory:** `el_pipeline_lela_bm25_candidates`
 - **top_k**: Number of candidates (default: 64)
 - **use_context**: Include mention context in query
 - Uses bm25s with stemming for better matching
 
 #### LELA Dense
-- **spaCy Factory:** `ner_pipeline_lela_dense_candidates`
+- **spaCy Factory:** `el_pipeline_lela_dense_candidates`
 - **Embedding Model**: Selectable from dropdown:
   - MiniLM-L6 (~0.3GB VRAM)
   - BGE-Base (~0.5GB VRAM)
@@ -184,16 +184,16 @@ Each NER option maps to a spaCy pipeline factory:
 ### Reranking Options
 
 #### None
-- **spaCy Factory:** `ner_pipeline_noop_reranker`
+- **spaCy Factory:** `el_pipeline_noop_reranker`
 - No reranking, returns candidates as-is
 
 #### Cross Encoder
-- **spaCy Factory:** `ner_pipeline_cross_encoder_reranker`
+- **spaCy Factory:** `el_pipeline_cross_encoder_reranker`
 - **model_name**: Cross-encoder model (default: `cross-encoder/ms-marco-MiniLM-L-6-v2`)
 - **top_k**: Number of candidates to keep
 
 #### LELA Embedder
-- **spaCy Factory:** `ner_pipeline_lela_embedder_reranker`
+- **spaCy Factory:** `el_pipeline_lela_embedder_reranker`
 - **Embedding Model**: Selectable from dropdown (same choices as LELA Dense)
 - **top_k**: Number of candidates to keep
 - Reranks using cosine similarity with marked mention
@@ -205,21 +205,21 @@ Each NER option maps to a spaCy pipeline factory:
 - No disambiguation, returns candidates without selection
 
 #### First
-- **spaCy Factory:** `ner_pipeline_first_disambiguator`
+- **spaCy Factory:** `el_pipeline_first_disambiguator`
 - Selects the first candidate from the list
 
 #### Popularity
-- **spaCy Factory:** `ner_pipeline_popularity_disambiguator`
+- **spaCy Factory:** `el_pipeline_popularity_disambiguator`
 - Selects the candidate with the highest score
 
 #### LELA vLLM
-- **spaCy Factory:** `ner_pipeline_lela_vllm_disambiguator`
+- **spaCy Factory:** `el_pipeline_lela_vllm_disambiguator`
 - **LLM Model**: Same model choices as LELA vLLM
 - Sends all candidates at once (simpler, faster for small candidate sets)
 - Uses vLLM for fast batched inference
 
 #### LELA Transformers
-- **spaCy Factory:** `ner_pipeline_lela_transformers_disambiguator`
+- **spaCy Factory:** `el_pipeline_lela_transformers_disambiguator`
 - **LLM Model**: Same model choices as above
 - Alternative for older GPUs (P100/Pascal) where vLLM has issues
 - Uses HuggingFace transformers directly
@@ -399,7 +399,7 @@ app.py                              # Main Gradio application
 
 1. User configures pipeline options in the UI
 2. Configuration is translated to `PipelineConfig`
-3. `NERPipeline` builds a spaCy `Language` with selected components
+3. `ELPipeline` builds a spaCy `Language` with selected components
 4. Text is processed through `nlp(text)`
 5. Results are serialized and displayed
 
