@@ -1,6 +1,5 @@
 """Unit tests for LELACrossEncoderVLLMRerankerComponent."""
 
-import math
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -27,26 +26,10 @@ def sample_candidates() -> list:
     ]
 
 
-def _make_generate_output(yes_probability: float):
-    """Create a mock vLLM generate output with yes/no logprobs."""
-    no_probability = 1.0 - yes_probability
-    yes_logprob = math.log(max(yes_probability, 1e-10))
-    no_logprob = math.log(max(no_probability, 1e-10))
-
-    yes_token = MagicMock()
-    yes_token.decoded_token = "yes"
-    yes_token.logprob = yes_logprob
-
-    no_token = MagicMock()
-    no_token.decoded_token = "no"
-    no_token.logprob = no_logprob
-
-    generation = MagicMock()
-    generation.text = "yes" if yes_probability > 0.5 else "no"
-    generation.logprobs = [{0: yes_token, 1: no_token}]
-
+def _make_score_output(score: float):
+    """Create a mock vLLM score output."""
     output = MagicMock()
-    output.outputs = [generation]
+    output.outputs.score = score
     return output
 
 
@@ -60,12 +43,12 @@ class TestLELACrossEncoderVLLMRerankerComponent:
         self, mock_get_vllm_mod, mock_get_instance, mock_release, sample_candidates, nlp
     ):
         mock_model = MagicMock()
-        mock_model.generate.return_value = [
-            _make_generate_output(0.1),
-            _make_generate_output(0.5),
-            _make_generate_output(0.9),
-            _make_generate_output(0.3),
-            _make_generate_output(0.7),
+        mock_model.score.return_value = [
+            _make_score_output(0.1),
+            _make_score_output(0.5),
+            _make_score_output(0.9),
+            _make_score_output(0.3),
+            _make_score_output(0.7),
         ]
         mock_get_instance.return_value = (mock_model, False)
 
@@ -93,12 +76,12 @@ class TestLELACrossEncoderVLLMRerankerComponent:
         self, mock_get_vllm_mod, mock_get_instance, mock_release, sample_candidates, nlp
     ):
         mock_model = MagicMock()
-        mock_model.generate.return_value = [
-            _make_generate_output(0.1),  # E1
-            _make_generate_output(0.5),  # E2
-            _make_generate_output(0.9),  # E3 - highest
-            _make_generate_output(0.3),  # E4
-            _make_generate_output(0.7),  # E5
+        mock_model.score.return_value = [
+            _make_score_output(0.1),  # E1
+            _make_score_output(0.5),  # E2
+            _make_score_output(0.9),  # E3 - highest
+            _make_score_output(0.3),  # E4
+            _make_score_output(0.7),  # E5
         ]
         mock_get_instance.return_value = (mock_model, False)
 
@@ -126,7 +109,7 @@ class TestLELACrossEncoderVLLMRerankerComponent:
     def test_skips_reranking_when_candidates_below_top_k(
         self, mock_get_vllm_mod, mock_get_instance, mock_release, nlp
     ):
-        """Should not call .generate() if all entities have <= top_k candidates."""
+        """Should not call .score() if all entities have <= top_k candidates."""
         mock_model = MagicMock()
         mock_get_instance.return_value = (mock_model, False)
 
@@ -144,18 +127,18 @@ class TestLELACrossEncoderVLLMRerankerComponent:
         doc.ents[0]._.candidates = candidates
         doc = reranker(doc)
 
-        mock_model.generate.assert_not_called()
+        mock_model.score.assert_not_called()
         assert len(doc.ents[0]._.candidates) == 3
 
     @patch("el_pipeline.spacy_components.rerankers.release_vllm")
     @patch("el_pipeline.spacy_components.rerankers.get_vllm_instance")
     @patch("el_pipeline.spacy_components.rerankers._get_vllm")
-    def test_prompt_uses_cross_encoder_template(
+    def test_score_called_with_query_and_documents(
         self, mock_get_vllm_mod, mock_get_instance, mock_release, sample_candidates, nlp
     ):
-        """Prompt should use the Qwen3-Reranker template with marked mention and document."""
+        """score() should be called with a query string and list of document strings."""
         mock_model = MagicMock()
-        mock_model.generate.return_value = [_make_generate_output(0.5)] * 5
+        mock_model.score.return_value = [_make_score_output(0.5)] * 5
         mock_get_instance.return_value = (mock_model, False)
 
         mock_vllm_mod = MagicMock()
@@ -171,14 +154,17 @@ class TestLELACrossEncoderVLLMRerankerComponent:
         doc.ents[0]._.candidates = sample_candidates
         doc = reranker(doc)
 
-        call_args = mock_model.generate.call_args
-        prompts = call_args[0][0]
-        assert len(prompts) == 5
-        assert "[Obama]" in prompts[0]
-        assert "<Instruct>" in prompts[0]
-        assert "<Query>" in prompts[0]
-        assert "<Document>" in prompts[0]
-        assert "E1 (Description 1)" in prompts[0]
+        call_args = mock_model.score.call_args
+        query = call_args[0][0]
+        documents = call_args[0][1]
+        assert isinstance(query, str)
+        assert isinstance(documents, list)
+        assert len(documents) == 5
+        assert "[Obama]" in query
+        assert "<Instruct>" in query
+        assert "<Query>" in query
+        assert "<Document>" in documents[0]
+        assert "E1 (Description 1)" in documents[0]
 
     @patch("el_pipeline.spacy_components.rerankers.release_vllm")
     @patch("el_pipeline.spacy_components.rerankers.get_vllm_instance")
@@ -187,8 +173,8 @@ class TestLELACrossEncoderVLLMRerankerComponent:
         self, mock_get_vllm_mod, mock_get_instance, mock_release, sample_candidates, nlp
     ):
         mock_model = MagicMock()
-        mock_model.generate.return_value = [
-            _make_generate_output(float(i) / 5) for i in range(5)
+        mock_model.score.return_value = [
+            _make_score_output(float(i) / 5) for i in range(5)
         ]
         mock_get_instance.return_value = (mock_model, False)
 
@@ -216,7 +202,7 @@ class TestLELACrossEncoderVLLMRerankerComponent:
         self, mock_get_vllm_mod, mock_get_instance, mock_release, sample_candidates, nlp
     ):
         mock_model = MagicMock()
-        mock_model.generate.return_value = [_make_generate_output(0.5)] * 5
+        mock_model.score.return_value = [_make_score_output(0.5)] * 5
         mock_get_instance.return_value = (mock_model, False)
 
         mock_vllm_mod = MagicMock()
@@ -232,7 +218,7 @@ class TestLELACrossEncoderVLLMRerankerComponent:
         doc.ents[0]._.candidates = sample_candidates
         reranker(doc)
 
-        mock_release.assert_called_once_with(reranker.model_name)
+        mock_release.assert_called_once_with(reranker.model_name, task="score")
 
     def test_initialization_with_custom_params(self, nlp):
         from el_pipeline.spacy_components.rerankers import LELACrossEncoderVLLMRerankerComponent
@@ -248,12 +234,12 @@ class TestLELACrossEncoderVLLMRerankerComponent:
     @patch("el_pipeline.spacy_components.rerankers.release_vllm")
     @patch("el_pipeline.spacy_components.rerankers.get_vllm_instance")
     @patch("el_pipeline.spacy_components.rerankers._get_vllm")
-    def test_loads_vllm_without_task(
+    def test_loads_vllm_with_score_task(
         self, mock_get_vllm_mod, mock_get_instance, mock_release, sample_candidates, nlp
     ):
-        """Model should be loaded as default causal LM (no task parameter)."""
+        """Model should be loaded with task='score' and hf_overrides for seq-cls."""
         mock_model = MagicMock()
-        mock_model.generate.return_value = [_make_generate_output(0.5)] * 5
+        mock_model.score.return_value = [_make_score_output(0.5)] * 5
         mock_get_instance.return_value = (mock_model, False)
 
         mock_vllm_mod = MagicMock()
@@ -271,23 +257,10 @@ class TestLELACrossEncoderVLLMRerankerComponent:
 
         mock_get_instance.assert_called_once_with(
             model_name=reranker.model_name,
+            task="score",
+            hf_overrides={
+                "architectures": ["Qwen3ForSequenceClassification"],
+                "classifier_from_token": ["no", "yes"],
+                "is_original_qwen3_reranker": True,
+            },
         )
-
-    def test_extract_yes_probability_both_tokens(self):
-        """Should compute softmax(yes, no) when both tokens present."""
-        from el_pipeline.spacy_components.rerankers import LELACrossEncoderVLLMRerankerComponent
-
-        output = _make_generate_output(0.8)
-        prob = LELACrossEncoderVLLMRerankerComponent._extract_yes_probability(output)
-        assert abs(prob - 0.8) < 0.01
-
-    def test_extract_yes_probability_no_logprobs(self):
-        """Should fall back to text comparison when no logprobs."""
-        from el_pipeline.spacy_components.rerankers import LELACrossEncoderVLLMRerankerComponent
-
-        output = MagicMock()
-        output.outputs = [MagicMock(text="yes", logprobs=None)]
-        assert LELACrossEncoderVLLMRerankerComponent._extract_yes_probability(output) == 1.0
-
-        output.outputs = [MagicMock(text="no", logprobs=None)]
-        assert LELACrossEncoderVLLMRerankerComponent._extract_yes_probability(output) == 0.0

@@ -7,7 +7,7 @@ Provides factories and components for candidate reranking:
 - LlamaServerReranker: Reranking via llama.cpp server
 - LELAEmbedderRerankerComponent: Embedding-based cosine similarity (SentenceTransformer)
 - LELAEmbedderVLLMRerankerComponent: Embedding-based cosine similarity (vLLM)
-- LELACrossEncoderVLLMRerankerComponent: Cross-encoder via vLLM generation with logprobs
+- LELACrossEncoderVLLMRerankerComponent: Cross-encoder via vLLM score() API (seq-cls)
 - NoOpRerankerComponent: Pass-through (no reranking)
 """
 
@@ -671,12 +671,15 @@ def create_lela_cross_encoder_vllm_reranker_component(
 
 class LELACrossEncoderVLLMRerankerComponent:
     """
-    Cross-encoder reranker using vLLM generation with Qwen3-Reranker models.
+    Cross-encoder reranker using vLLM's score() API with seq-cls models.
 
-    The model generates "yes"/"no" for each query-document pair and the
-    probability of "yes" (from logprobs) is used as the relevance score.
+    Uses the Qwen3-Reranker-seq-cls model variant which has a classification
+    head, enabling direct use of vLLM's score() API for relevance scoring.
     Model is loaded on-demand and released after use.
     """
+
+    QUERY_TEMPLATE = "{prefix}<Instruct>: {instruction}\n<Query>: {query}\n"
+    DOCUMENT_TEMPLATE = "<Document>: {doc}{suffix}"
 
     def __init__(
         self,
@@ -695,45 +698,17 @@ class LELACrossEncoderVLLMRerankerComponent:
 
         logger.info(f"LELA cross-encoder vLLM reranker initialized: {model_name}")
 
-    def _format_prompt(self, text: str, start: int, end: int, candidate: Candidate) -> str:
-        """Format a complete cross-encoder prompt for one query-document pair."""
+    def _format_query(self, text: str, start: int, end: int) -> str:
+        """Format query with marked mention in text."""
         marked_text = f"{text[:start]}{SPAN_OPEN}{text[start:end]}{SPAN_CLOSE}{text[end:]}"
-        title = candidate.entity_id
-        doc_text = f"{title} ({candidate.description})" if candidate.description else title
-        return (
-            f"{CROSS_ENCODER_PREFIX}"
-            f"<Instruct>{RERANKER_TASK}\n"
-            f"<Query>{marked_text}\n"
-            f"<Document>{doc_text}"
-            f"{CROSS_ENCODER_SUFFIX}"
+        return self.QUERY_TEMPLATE.format(
+            prefix=CROSS_ENCODER_PREFIX, instruction=RERANKER_TASK, query=marked_text,
         )
 
-    @staticmethod
-    def _extract_yes_probability(output) -> float:
-        """Extract P(yes) from generation logprobs as the relevance score."""
-        import math
-        generation = output.outputs[0]
-        if not generation.logprobs:
-            return 1.0 if generation.text.strip().lower() == "yes" else 0.0
-
-        token_logprobs = generation.logprobs[0]
-        yes_logprob = None
-        no_logprob = None
-        for logprob_obj in token_logprobs.values():
-            token = logprob_obj.decoded_token.strip().lower()
-            if token == "yes":
-                yes_logprob = logprob_obj.logprob
-            elif token == "no":
-                no_logprob = logprob_obj.logprob
-
-        if yes_logprob is not None and no_logprob is not None:
-            yes_exp = math.exp(yes_logprob)
-            no_exp = math.exp(no_logprob)
-            return yes_exp / (yes_exp + no_exp)
-        elif yes_logprob is not None:
-            return math.exp(yes_logprob)
-        else:
-            return 0.0
+    def _format_document(self, candidate: Candidate) -> str:
+        """Format a candidate as a document string for scoring."""
+        doc_text = f"{candidate.entity_id} ({candidate.description or ''})"
+        return self.DOCUMENT_TEMPLATE.format(doc=doc_text, suffix=CROSS_ENCODER_SUFFIX)
 
     def _ensure_model_loaded(self, progress_callback=None):
         """Load model on-demand if not already loaded."""
@@ -745,6 +720,12 @@ class LELACrossEncoderVLLMRerankerComponent:
 
             self.model, was_cached = get_vllm_instance(
                 model_name=self.model_name,
+                task="score",
+                hf_overrides={
+                    "architectures": ["Qwen3ForSequenceClassification"],
+                    "classifier_from_token": ["no", "yes"],
+                    "is_original_qwen3_reranker": True,
+                },
             )
 
             if progress_callback:
@@ -767,13 +748,6 @@ class LELACrossEncoderVLLMRerankerComponent:
 
         self._ensure_model_loaded(self.progress_callback)
 
-        vllm = _get_vllm()
-        sampling_params = vllm.SamplingParams(
-            max_tokens=1,
-            temperature=0.0,
-            logprobs=20,
-        )
-
         processing_start = 0.1
         processing_range = 0.9
 
@@ -788,13 +762,11 @@ class LELACrossEncoderVLLMRerankerComponent:
                 if not candidates or len(candidates) <= self.top_k:
                     continue
 
-                prompts = [
-                    self._format_prompt(text, ent.start_char, ent.end_char, c)
-                    for c in candidates
-                ]
+                query = self._format_query(text, ent.start_char, ent.end_char)
+                documents = [self._format_document(c) for c in candidates]
 
-                outputs = self.model.generate(prompts, sampling_params=sampling_params)
-                scores = [self._extract_yes_probability(out) for out in outputs]
+                outputs = self.model.score(query, documents)
+                scores = [out.outputs.score for out in outputs]
 
                 scored_candidates = list(zip(candidates, scores))
                 scored_candidates.sort(key=lambda x: x[1], reverse=True)
@@ -817,7 +789,7 @@ class LELACrossEncoderVLLMRerankerComponent:
                     f"Cross-encoder (vLLM) reranked {len(candidates)} to {len(ent._.candidates)} for '{ent.text}'"
                 )
         finally:
-            release_vllm(self.model_name)
+            release_vllm(self.model_name, task="score")
             self.model = None  # Drop reference so pool eviction can free GPU memory
 
         self.progress_callback = None

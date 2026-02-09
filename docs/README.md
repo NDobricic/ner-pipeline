@@ -157,7 +157,7 @@ source .venv/bin/activate
 pip install --upgrade pip
 
 # Install PyTorch with CUDA 11.8 (required for P100/older GPUs)
-pip install torch==2.6.0+cu118 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install torch==2.7.1+cu118 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # Install remaining dependencies
 pip install -r requirements.txt
@@ -255,13 +255,13 @@ python app.py --port 7860
 - Python 3.10 (recommended; 3.13 is not supported due to vLLM incompatibility)
 - spaCy 3.8.11
 - PyTorch 2.6.0+cu118
-- vLLM 0.8.5 (for LELA vLLM disambiguator/reranker)
+- vLLM 0.10.1 (for LELA vLLM disambiguator/reranker)
 - See `requirements.txt` for full dependency list
 
 ### GPU Support
 
 - **CUDA 11.8**: Required for PyTorch GPU acceleration
-- **P100/Pascal GPUs**: Use `torch==2.6.0+cu118` and `vllm==0.8.5` (newer versions drop support for compute capability 6.0)
+- **P100/Pascal GPUs**: Use `torch==2.7.1+cu118` and `vllm==0.10.1` (newer versions drop support for compute capability 6.0)
 - **Newer GPUs (A100, etc.)**: Can use newer PyTorch/vLLM versions with CUDA 12.x
 
 ### Optional Dependencies

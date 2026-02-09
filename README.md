@@ -13,7 +13,7 @@ source .venv/bin/activate
 pip install --upgrade pip
 
 # Install PyTorch with CUDA 11.8 (required for P100/older GPUs)
-pip install torch==2.6.0+cu118 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install torch==2.7.1+cu118 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # Install remaining dependencies
 pip install -r requirements.txt

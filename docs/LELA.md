@@ -662,9 +662,9 @@ python -m el_pipeline.cli \
 ### CUDA Compatibility
 
 For **P100/Pascal GPUs** (compute capability 6.0):
-- Use `torch==2.6.0+cu118` (CUDA 11.8)
-- Use `vllm==0.8.5` (newer versions drop P100 support)
-- Install from PyTorch index: `pip install torch==2.6.0+cu118 --index-url https://download.pytorch.org/whl/cu118`
+- Use `torch==2.7.1+cu118` (CUDA 11.8)
+- Use `vllm==0.10.1` (latest version compatible with torch 2.7.1+cu118)
+- Install from PyTorch index: `pip install torch==2.7.1+cu118 --index-url https://download.pytorch.org/whl/cu118`
 
 For **newer GPUs** (A100, H100, etc.):
 - Can use latest PyTorch/vLLM with CUDA 12.x

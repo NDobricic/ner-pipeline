@@ -209,8 +209,7 @@ Each NER option maps to a spaCy pipeline factory:
 - **spaCy Factory:** `el_pipeline_lela_cross_encoder_vllm_reranker`
 - **model_name**: Cross-encoder model
 - **top_k**: Number of candidates to keep
-- Cross-encoder reranker using vLLM `.generate()` with logprobs
-- Uses Qwen3-Reranker prompt format with yes/no probabilities
+- Cross-encoder reranker using vLLM `.score()` API with the Qwen3-Reranker-seq-cls model variant
 
 ### Disambiguation Options
 

@@ -33,11 +33,11 @@ AVAILABLE_CROSS_ENCODER_MODELS = [
     ("tomaarsen/Qwen3-Reranker-0.6B-seq-cls", "Qwen3-Reranker-0.6B (~2GB)", 2.0),
 ]
 
-# vLLM reranker models (standard Qwen3-Reranker, used with .generate() API)
-DEFAULT_VLLM_RERANKER_MODEL = "Qwen/Qwen3-Reranker-4B"
+# vLLM reranker models (seq-cls variants, used with vLLM .score() API)
+DEFAULT_VLLM_RERANKER_MODEL = "tomaarsen/Qwen3-Reranker-4B-seq-cls"
 AVAILABLE_VLLM_RERANKER_MODELS = [
-    ("Qwen/Qwen3-Reranker-0.6B", "Qwen3-Reranker-0.6B (~2GB)", 2.0),
-    ("Qwen/Qwen3-Reranker-4B", "Qwen3-Reranker-4B (~10GB)", 10.0),
+    ("tomaarsen/Qwen3-Reranker-0.6B-seq-cls", "Qwen3-Reranker-0.6B (~2GB)", 2.0),
+    ("tomaarsen/Qwen3-Reranker-4B-seq-cls", "Qwen3-Reranker-4B (~9GB)", 9.0),
 ]
 
 # Qwen3-Reranker prompt templates (no colons after tags)

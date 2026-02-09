@@ -70,8 +70,8 @@ Running the complete LELA pipeline with vLLM disambiguation requires:
 
 | GPU Generation | CUDA Version | PyTorch Version | vLLM Version |
 |----------------|--------------|-----------------|--------------|
-| P100/Pascal (CC 6.0) | CUDA 11.8 | 2.6.0+cu118 | 0.8.5 |
-| V100/Volta (CC 7.0) | CUDA 11.8+ | 2.6.0+ | 0.8.5+ |
+| P100/Pascal (CC 6.0) | CUDA 11.8 | 2.7.1+cu118 | 0.10.1 |
+| V100/Volta (CC 7.0) | CUDA 11.8+ | 2.7.1+ | 0.10.1+ |
 | A100/Ampere (CC 8.0) | CUDA 12.x | Latest | Latest |
 | H100/Hopper (CC 9.0) | CUDA 12.x | Latest | Latest |
 
@@ -83,8 +83,8 @@ Running the complete LELA pipeline with vLLM disambiguation requires:
 
 | GPU | Architecture | Compute Capability | PyTorch | vLLM | Notes |
 |-----|--------------|-------------------|---------|------|-------|
-| P100 | Pascal | 6.0 | 2.6.0+cu118 | 0.8.5 | Use CUDA 11.8 only |
-| V100 | Volta | 7.0 | 2.6.0+ | 0.8.5+ | Recommended for LELA |
+| P100 | Pascal | 6.0 | 2.7.1+cu118 | 0.10.1 | Use CUDA 11.8 only |
+| V100 | Volta | 7.0 | 2.7.1+ | 0.10.1+ | Recommended for LELA |
 | A100 | Ampere | 8.0 | Latest | Latest | Optimal performance |
 | H100 | Hopper | 9.0 | Latest | Latest | Best performance |
 | RTX 3090 | Ampere | 8.6 | Latest | Latest | Consumer GPU option |
@@ -96,10 +96,10 @@ P100 GPUs (compute capability 6.0) require specific versions:
 
 ```bash
 # Install PyTorch with CUDA 11.8
-pip install torch==2.6.0+cu118 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install torch==2.7.1+cu118 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
-# Install vLLM 0.8.5 (last version with P100 support)
-pip install vllm==0.8.5
+# Install vLLM 0.10.1 (latest version compatible with torch 2.7.1+cu118 / P100)
+pip install vllm==0.10.1
 ```
 
 **Alternative for P100:** Use `lela_transformers` disambiguator instead of `lela_vllm`:
@@ -134,7 +134,6 @@ From `requirements.txt`:
 spacy==3.8.11
 gliner==0.2.24
 transformers==4.57.6
-torch==2.6.0+cu118
 sentence-transformers==5.2.0
 faiss-cpu==1.13.2
 rank-bm25==0.2.2
@@ -150,8 +149,8 @@ gradio==6.3.0
 bm25s==0.2.14
 PyStemmer==3.0.0
 
-# LELA vLLM (requires GPU)
-vllm==0.8.5
+# LELA vLLM (requires GPU; 0.10.1 is latest compatible with torch 2.7.1+cu118 / P100)
+vllm==0.10.1
 openai==2.15.0
 ```
 

@@ -29,7 +29,7 @@ This guide provides solutions for common issues encountered when installing and 
 
    For **CUDA 11.8** (P100/Pascal GPUs):
    ```bash
-   pip install torch==2.6.0+cu118 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+   pip install torch==2.7.1+cu118 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
    ```
 
    For **CUDA 12.x** (newer GPUs):
@@ -60,8 +60,8 @@ This guide provides solutions for common issues encountered when installing and 
 2. **CUDA/PyTorch mismatch:**
    ```bash
    # Ensure PyTorch is installed first with correct CUDA
-   pip install torch==2.6.0+cu118 --index-url https://download.pytorch.org/whl/cu118
-   pip install vllm==0.8.5
+   pip install torch==2.7.1+cu118 --index-url https://download.pytorch.org/whl/cu118
+   pip install vllm==0.10.1
    ```
 
 3. **Build dependencies missing:**
@@ -218,9 +218,9 @@ When using `ELPipeline`, initialization is automatic.
 
 Use specific versions that support P100:
 ```bash
-# CUDA 11.8 + PyTorch 2.6.0 + vLLM 0.8.5
-pip install torch==2.6.0+cu118 --index-url https://download.pytorch.org/whl/cu118
-pip install vllm==0.8.5
+# CUDA 11.8 + PyTorch 2.7.1 + vLLM 0.10.1
+pip install torch==2.7.1+cu118 --index-url https://download.pytorch.org/whl/cu118
+pip install vllm==0.10.1
 ```
 
 Alternatively, use the `lela_transformers` disambiguator which uses HuggingFace transformers directly:
@@ -314,7 +314,7 @@ if torch.cuda.is_available():
 2. Reinstall PyTorch with CUDA support:
    ```bash
    pip uninstall torch torchvision torchaudio
-   pip install torch==2.6.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+   pip install torch==2.7.1+cu118 --index-url https://download.pytorch.org/whl/cu118
    ```
 
 3. For components without GPU, they will run on CPU (this is expected for BM25, fuzzy matching, etc.)

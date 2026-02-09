@@ -16,7 +16,7 @@ dependencies = [
     "rapidfuzz==3.14.3",
     "sentence-transformers>=5.2.2",
     "spacy>=3.8.11",
-    "vllm>=0.15.0",
+    "vllm>=0.10.1",
 ]
 
 [tool.pytest.ini_options]

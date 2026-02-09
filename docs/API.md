@@ -325,7 +325,7 @@ Bi-encoder reranker using vLLM with task="embed". Manual L2 normalization of emb
 
 #### `el_pipeline_lela_cross_encoder_vllm_reranker`
 
-Cross-encoder reranker using vLLM `.generate()` with logprobs. Uses Qwen3-Reranker prompt format with yes/no probabilities.
+Cross-encoder reranker using vLLM `.score()` API with the Qwen3-Reranker-seq-cls model variant.
 
 **Config Options:**
 | Parameter | Type | Default | Description |

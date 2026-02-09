@@ -273,7 +273,7 @@ def estimate_component_memory(
 
     # Cross-encoder vLLM reranker
     if component_name == "lela_cross_encoder_vllm":
-        model = params.get("model_name", "Qwen/Qwen3-Reranker-4B")
+        model = params.get("model_name", "tomaarsen/Qwen3-Reranker-4B-seq-cls")
         return estimate_model_memory(model, "llm"), model
 
     # vLLM disambiguators
