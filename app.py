@@ -38,6 +38,13 @@ DESCRIPTION = """
 - LELA Paper: https://arxiv.org/abs/2601.05192
 """
 
+LOGO = """
+<div style="display: flex; justify-content: center; align-items: center; gap: 40px; margin-top: 40px;">
+    <img src="https://www.telecom-paris.fr/wp-content-EvDsK19/uploads/2024/01/logo_telecom_ipparis_rvb_fond_h-768x359.png" alt="spaCy Logo" style="height: 80px;">
+    <img src="https://www.ip-paris.fr/sites/default/files/image002.png" alt="spaCy Logo" style="height: 80px;">
+</div>
+"""
+
 
 def _is_vllm_usable() -> bool:
     """Check if vllm is installed and CUDA is available for it to run."""
@@ -1313,6 +1320,8 @@ if __name__ == "__main__":
                     value="custom",
                     visible=False,
                 )
+
+                gr.Markdown(LOGO)
 
             # ===== DOCUMENTATION TAB =====
             with gr.Tab("Help"):
