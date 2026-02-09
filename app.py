@@ -34,8 +34,8 @@ DESCRIPTION = """
 *Modular entity recognition and linking pipeline. Upload a knowledge base, enter text, configure the pipeline, and run.*"
 
 ## Links
-- [Repository](https://github.com/samyhaff/LELA)
-- [LELA Paper](https://arxiv.org/abs/2601.05192)
+- Repository: https://github.com/samyhaff/LELA
+- LELA Paper: https://arxiv.org/abs/2601.05192
 """
 
 
