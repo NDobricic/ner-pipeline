@@ -33,6 +33,10 @@ DESCRIPTION = """
 
 Modular NER → candidate generation → rerank → disambiguation pipeline built on spaCy.
 Swap components, configure parameters, and test with your own knowledge bases.
+
+## Links
+- [Repository](https://github.com/samyhaff/LELA)
+- [LELA Paper](https://arxiv.org/abs/2601.05192)
 """
 
 
