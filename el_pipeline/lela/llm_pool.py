@@ -29,10 +29,12 @@ logger = logging.getLogger(__name__)
 # Memory Management
 # ============================================================================
 
+
 def _get_free_vram_gb() -> float:
     """Get free GPU VRAM in GB."""
     try:
         import torch
+
         if torch.cuda.is_available():
             free_mem, _ = torch.cuda.mem_get_info(0)
             return free_mem / (1024**3)
@@ -44,9 +46,11 @@ def _get_free_vram_gb() -> float:
 def _clear_cuda_cache():
     """Clear CUDA cache and run garbage collection."""
     import gc
+
     gc.collect()
     try:
         import torch
+
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
@@ -69,6 +73,7 @@ def _get_sentence_transformers():
     if _sentence_transformers_module is None:
         try:
             import sentence_transformers
+
             _sentence_transformers_module = sentence_transformers
         except ImportError:
             raise ImportError(
@@ -81,30 +86,33 @@ def _get_sentence_transformers():
 def _evict_unused_sentence_transformers(required_vram_gb: float = 0):
     """
     Evict unused SentenceTransformer instances to free memory.
-    
+
     Args:
         required_vram_gb: Minimum VRAM needed (will keep evicting until enough is free)
     """
     global _sentence_transformer_instances, _sentence_transformer_in_use
-    
+
     # Find unused instances
-    unused_keys = [k for k in _sentence_transformer_instances.keys() 
-                   if k not in _sentence_transformer_in_use]
-    
+    unused_keys = [
+        k
+        for k in _sentence_transformer_instances.keys()
+        if k not in _sentence_transformer_in_use
+    ]
+
     if not unused_keys:
         return
-    
+
     for key in unused_keys:
         # Check if we have enough memory now
         if required_vram_gb > 0 and _get_free_vram_gb() >= required_vram_gb:
             break
-            
+
         logger.info(f"Evicting unused SentenceTransformer: {key}")
         try:
             del _sentence_transformer_instances[key]
         except Exception as e:
             logger.warning(f"Error evicting SentenceTransformer {key}: {e}")
-    
+
     _clear_cuda_cache()
 
 
@@ -136,14 +144,17 @@ def get_sentence_transformer_instance(
         # Check if we need to free memory before loading
         free_vram = _get_free_vram_gb()
         if free_vram < estimated_vram_gb:
-            logger.info(f"Free VRAM ({free_vram:.1f}GB) < needed ({estimated_vram_gb:.1f}GB), evicting unused models")
+            logger.info(
+                f"Free VRAM ({free_vram:.1f}GB) < needed ({estimated_vram_gb:.1f}GB), evicting unused models"
+            )
             _evict_unused_sentence_transformers(estimated_vram_gb)
-        
+
         sentence_transformers = _get_sentence_transformers()
 
         logger.info(f"Loading SentenceTransformer model: {model_name}")
 
         import torch
+
         model_kwargs = {"torch_dtype": torch.float16}
 
         model = sentence_transformers.SentenceTransformer(
@@ -166,9 +177,9 @@ def get_sentence_transformer_instance(
 def release_sentence_transformer(model_name: str, device: Optional[str] = None):
     """
     Mark a SentenceTransformer instance as no longer in use.
-    
+
     The instance stays cached but can be evicted if memory is needed later.
-    
+
     Args:
         model_name: HuggingFace model ID
         device: Device the model was loaded on
@@ -229,6 +240,7 @@ def _get_vllm():
     if _vllm_module is None:
         try:
             import vllm
+
             _vllm_module = vllm
         except ImportError:
             raise ImportError(
@@ -241,16 +253,16 @@ def _get_vllm():
 def _evict_unused_vllm_instances():
     """Evict all unused vLLM instances to free memory."""
     global _vllm_instances, _vllm_in_use
-    
+
     unused_keys = [k for k in _vllm_instances.keys() if k not in _vllm_in_use]
-    
+
     for key in unused_keys:
         logger.info(f"Evicting unused vLLM instance: {key}")
         try:
             del _vllm_instances[key]
         except Exception as e:
             logger.warning(f"Error evicting vLLM instance {key}: {e}")
-    
+
     if unused_keys:
         _clear_cuda_cache()
 
@@ -258,15 +270,15 @@ def _evict_unused_vllm_instances():
 def _evict_all_unused_models(required_vram_gb: float = 0):
     """
     Evict ALL unused models (both SentenceTransformer and vLLM) to free memory.
-    
+
     Called before loading large models like vLLM.
     """
     # First evict unused SentenceTransformers
     _evict_unused_sentence_transformers(required_vram_gb)
-    
+
     # Then evict unused vLLM instances
     _evict_unused_vllm_instances()
-    
+
     # Final cache clear
     _clear_cuda_cache()
 
@@ -276,7 +288,7 @@ def get_vllm_instance(
     tensor_parallel_size: int = 1,
     max_model_len: Optional[int] = None,
     estimated_vram_gb: float = 10.0,
-    task: Optional[str] = None,
+    convert: Optional[str] = None,
     **kwargs,
 ):
     """
@@ -290,7 +302,7 @@ def get_vllm_instance(
         tensor_parallel_size: Number of GPUs for tensor parallelism
         max_model_len: Maximum sequence length
         estimated_vram_gb: Estimated VRAM needed (for eviction decisions)
-        task: Optional vLLM task (e.g. "embed"). Included in cache key
+        convert: Optional vLLM convert (e.g. "embed"). Included in cache key
               and passed to vllm.LLM() constructor when set.
         **kwargs: Additional vLLM arguments
 
@@ -298,7 +310,11 @@ def get_vllm_instance(
         Tuple of (vLLM LLM instance, bool indicating if it was cached)
     """
     global _vllm_in_use
-    key = f"{model_name}:tp{tensor_parallel_size}:{task}" if task else f"{model_name}:tp{tensor_parallel_size}"
+    key = (
+        f"{model_name}:tp{tensor_parallel_size}:{convert}"
+        if convert
+        else f"{model_name}:tp{tensor_parallel_size}"
+    )
 
     was_cached = key in _vllm_instances
 
@@ -306,9 +322,11 @@ def get_vllm_instance(
         # vLLM needs a lot of memory - evict ALL unused models first
         free_vram = _get_free_vram_gb()
         if free_vram < estimated_vram_gb:
-            logger.info(f"Free VRAM ({free_vram:.1f}GB) < needed ({estimated_vram_gb:.1f}GB), evicting unused models")
+            logger.info(
+                f"Free VRAM ({free_vram:.1f}GB) < needed ({estimated_vram_gb:.1f}GB), evicting unused models"
+            )
             _evict_all_unused_models(estimated_vram_gb)
-        
+
         vllm = _get_vllm()
 
         llm_kwargs = {
@@ -321,28 +339,34 @@ def get_vllm_instance(
             "trust_remote_code": True,  # Required for Qwen models to load tokenizer/chat template
             **kwargs,
         }
-        if task:
-            llm_kwargs["task"] = task
+        if convert:
+            llm_kwargs["convert"] = convert
 
-        logger.info(f"Loading vLLM model: {model_name} (task={task})")
+        logger.info(f"Loading vLLM model: {model_name} (convert={convert})")
         _vllm_instances[key] = vllm.LLM(**llm_kwargs)
-        logger.info(f"vLLM model loaded: {model_name} (task={task})")
+        logger.info(f"vLLM model loaded: {model_name} (convert={convert})")
     else:
-        logger.info(f"Reusing cached vLLM model: {model_name} (task={task})")
+        logger.info(f"Reusing cached vLLM model: {model_name} (convert={convert})")
 
     # Mark as in use
     _vllm_in_use.add(key)
     return _vllm_instances[key], was_cached
 
 
-def release_vllm(model_name: str, tensor_parallel_size: int = 1, task: Optional[str] = None):
+def release_vllm(
+    model_name: str, tensor_parallel_size: int = 1, convert: Optional[str] = None
+):
     """
     Mark a vLLM instance as no longer in use.
 
     The instance stays cached but can be evicted if memory is needed later.
     """
     global _vllm_in_use
-    key = f"{model_name}:tp{tensor_parallel_size}:{task}" if task else f"{model_name}:tp{tensor_parallel_size}"
+    key = (
+        f"{model_name}:tp{tensor_parallel_size}:{convert}"
+        if convert
+        else f"{model_name}:tp{tensor_parallel_size}"
+    )
     _vllm_in_use.discard(key)
     logger.debug(f"Released vLLM instance: {key}")
 
@@ -386,6 +410,7 @@ def clear_vllm_instances(force: bool = False):
 # Convenience Functions
 # ============================================================================
 
+
 def release_all_models():
     """Mark all cached models as no longer in use (available for eviction)."""
     release_all_sentence_transformers()
@@ -393,22 +418,30 @@ def release_all_models():
     logger.info("All models marked as available for eviction")
 
 
-def is_sentence_transformer_cached(model_name: str, device: Optional[str] = None) -> bool:
+def is_sentence_transformer_cached(
+    model_name: str, device: Optional[str] = None
+) -> bool:
     """Check if a SentenceTransformer model is currently cached."""
     key = f"{model_name}:{device or 'auto'}"
     return key in _sentence_transformer_instances
 
 
-def is_vllm_cached(model_name: str, tensor_parallel_size: int = 1, task: Optional[str] = None) -> bool:
+def is_vllm_cached(
+    model_name: str, tensor_parallel_size: int = 1, convert: Optional[str] = None
+) -> bool:
     """Check if a vLLM model is currently cached."""
-    key = f"{model_name}:tp{tensor_parallel_size}:{task}" if task else f"{model_name}:tp{tensor_parallel_size}"
+    key = (
+        f"{model_name}:tp{tensor_parallel_size}:{convert}"
+        if convert
+        else f"{model_name}:tp{tensor_parallel_size}"
+    )
     return key in _vllm_instances
 
 
 def get_cached_models_info() -> dict:
     """
     Get information about currently cached models.
-    
+
     Returns:
         Dict with 'sentence_transformers' and 'vllm' keys, each containing
         a list of dicts with 'key' and 'in_use' fields.

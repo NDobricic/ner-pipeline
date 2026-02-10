@@ -50,6 +50,7 @@ def _get_vllm():
     if _vllm is None:
         try:
             import vllm
+
             _vllm = vllm
         except ImportError:
             raise ImportError(
@@ -560,7 +561,9 @@ class LELAEmbedderRerankerComponent:
 
     def _format_query(self, text: str, start: int, end: int) -> str:
         """Format query with marked mention in text."""
-        marked_text = f"{text[:start]}{SPAN_OPEN}{text[start:end]}{SPAN_CLOSE}{text[end:]}"
+        marked_text = (
+            f"{text[:start]}{SPAN_OPEN}{text[start:end]}{SPAN_CLOSE}{text[end:]}"
+        )
         return f"Instruct: {RERANKER_TASK}\nQuery: {marked_text}"
 
     def _format_candidate(self, candidate: Candidate) -> str:
@@ -576,17 +579,20 @@ class LELAEmbedderRerankerComponent:
         num_entities = len(entities)
 
         needs_reranking = any(
-            len(getattr(ent._, "candidates", [])) > self.top_k
-            for ent in entities
+            len(getattr(ent._, "candidates", [])) > self.top_k for ent in entities
         )
 
         if not needs_reranking:
             return doc
 
         if self.progress_callback:
-            self.progress_callback(0.0, f"Loading reranker model ({self.model_name.split('/')[-1]})...")
+            self.progress_callback(
+                0.0, f"Loading reranker model ({self.model_name.split('/')[-1]})..."
+            )
 
-        model, was_cached = get_sentence_transformer_instance(self.model_name, self.device)
+        model, was_cached = get_sentence_transformer_instance(
+            self.model_name, self.device
+        )
 
         if self.progress_callback:
             status = "Using cached model" if was_cached else "Model loaded"
@@ -600,7 +606,9 @@ class LELAEmbedderRerankerComponent:
                 if self.progress_callback and num_entities > 0:
                     progress = processing_start + (i / num_entities) * processing_range
                     ent_text = ent.text[:25] + "..." if len(ent.text) > 25 else ent.text
-                    self.progress_callback(progress, f"Reranking {i+1}/{num_entities}: {ent_text}")
+                    self.progress_callback(
+                        progress, f"Reranking {i+1}/{num_entities}: {ent_text}"
+                    )
 
                 candidates = getattr(ent._, "candidates", [])
                 if not candidates or len(candidates) <= self.top_k:
@@ -618,16 +626,18 @@ class LELAEmbedderRerankerComponent:
 
                 scored_candidates = list(zip(candidates, similarities))
                 scored_candidates.sort(key=lambda x: x[1], reverse=True)
-                top_candidates = scored_candidates[:self.top_k]
+                top_candidates = scored_candidates[: self.top_k]
 
                 reranked = []
                 reranked_scores = []
                 for candidate, score in top_candidates:
-                    reranked.append(Candidate(
-                        entity_id=candidate.entity_id,
-                        score=float(score),
-                        description=candidate.description,
-                    ))
+                    reranked.append(
+                        Candidate(
+                            entity_id=candidate.entity_id,
+                            score=float(score),
+                            description=candidate.description,
+                        )
+                    )
                     reranked_scores.append(float(score))
 
                 ent._.candidates = reranked
@@ -700,9 +710,13 @@ class LELACrossEncoderVLLMRerankerComponent:
 
     def _format_query(self, text: str, start: int, end: int) -> str:
         """Format query with marked mention in text."""
-        marked_text = f"{text[:start]}{SPAN_OPEN}{text[start:end]}{SPAN_CLOSE}{text[end:]}"
+        marked_text = (
+            f"{text[:start]}{SPAN_OPEN}{text[start:end]}{SPAN_CLOSE}{text[end:]}"
+        )
         return self.QUERY_TEMPLATE.format(
-            prefix=CROSS_ENCODER_PREFIX, instruction=RERANKER_TASK, query=marked_text,
+            prefix=CROSS_ENCODER_PREFIX,
+            instruction=RERANKER_TASK,
+            query=marked_text,
         )
 
     def _format_document(self, candidate: Candidate) -> str:
@@ -716,11 +730,12 @@ class LELACrossEncoderVLLMRerankerComponent:
             _get_vllm()
 
             if progress_callback:
-                progress_callback(0.0, f"Loading reranker model ({self.model_name.split('/')[-1]})...")
+                progress_callback(
+                    0.0, f"Loading reranker model ({self.model_name.split('/')[-1]})..."
+                )
 
             self.model, was_cached = get_vllm_instance(
                 model_name=self.model_name,
-                task="score",
                 hf_overrides={
                     "architectures": ["Qwen3ForSequenceClassification"],
                     "classifier_from_token": ["no", "yes"],
@@ -739,8 +754,7 @@ class LELACrossEncoderVLLMRerankerComponent:
         num_entities = len(entities)
 
         needs_reranking = any(
-            len(getattr(ent._, "candidates", [])) > self.top_k
-            for ent in entities
+            len(getattr(ent._, "candidates", [])) > self.top_k for ent in entities
         )
 
         if not needs_reranking:
@@ -769,7 +783,10 @@ class LELACrossEncoderVLLMRerankerComponent:
 
             if all_queries:
                 if self.progress_callback:
-                    self.progress_callback(0.2, f"Scoring {len(all_queries)} pairs across {len(work_items)} entities...")
+                    self.progress_callback(
+                        0.2,
+                        f"Scoring {len(all_queries)} pairs across {len(work_items)} entities...",
+                    )
 
                 # Single batched score call using vLLM's N -> N pattern
                 outputs = self.model.score(all_queries, all_documents)
@@ -779,21 +796,23 @@ class LELACrossEncoderVLLMRerankerComponent:
                 offset = 0
                 for ent_idx, candidates, num_pairs in work_items:
                     ent = entities[ent_idx]
-                    scores = all_scores[offset:offset + num_pairs]
+                    scores = all_scores[offset : offset + num_pairs]
                     offset += num_pairs
 
                     scored_candidates = list(zip(candidates, scores))
                     scored_candidates.sort(key=lambda x: x[1], reverse=True)
-                    top_candidates = scored_candidates[:self.top_k]
+                    top_candidates = scored_candidates[: self.top_k]
 
                     reranked = []
                     reranked_scores = []
                     for candidate, score in top_candidates:
-                        reranked.append(Candidate(
-                            entity_id=candidate.entity_id,
-                            score=float(score),
-                            description=candidate.description,
-                        ))
+                        reranked.append(
+                            Candidate(
+                                entity_id=candidate.entity_id,
+                                score=float(score),
+                                description=candidate.description,
+                            )
+                        )
                         reranked_scores.append(float(score))
 
                     ent._.candidates = reranked
@@ -803,7 +822,7 @@ class LELACrossEncoderVLLMRerankerComponent:
                         f"Cross-encoder (vLLM) reranked {len(candidates)} to {len(ent._.candidates)} for '{ent.text}'"
                     )
         finally:
-            release_vllm(self.model_name, task="score")
+            release_vllm(self.model_name)
             self.model = None  # Drop reference so pool eviction can free GPU memory
 
         self.progress_callback = None
@@ -864,7 +883,9 @@ class LELAEmbedderVLLMRerankerComponent:
 
     def _format_query(self, text: str, start: int, end: int) -> str:
         """Format query with marked mention in text."""
-        marked_text = f"{text[:start]}{SPAN_OPEN}{text[start:end]}{SPAN_CLOSE}{text[end:]}"
+        marked_text = (
+            f"{text[:start]}{SPAN_OPEN}{text[start:end]}{SPAN_CLOSE}{text[end:]}"
+        )
         return f"Instruct: {RERANKER_TASK}\nQuery: {marked_text}"
 
     def _format_candidate(self, candidate: Candidate) -> str:
@@ -879,11 +900,13 @@ class LELAEmbedderVLLMRerankerComponent:
             _get_vllm()
 
             if progress_callback:
-                progress_callback(0.0, f"Loading reranker model ({self.model_name.split('/')[-1]})...")
+                progress_callback(
+                    0.0, f"Loading reranker model ({self.model_name.split('/')[-1]})..."
+                )
 
             self.model, was_cached = get_vllm_instance(
                 model_name=self.model_name,
-                task="embed",
+                convert="embed",
             )
 
             if progress_callback:
@@ -897,8 +920,7 @@ class LELAEmbedderVLLMRerankerComponent:
         num_entities = len(entities)
 
         needs_reranking = any(
-            len(getattr(ent._, "candidates", [])) > self.top_k
-            for ent in entities
+            len(getattr(ent._, "candidates", [])) > self.top_k for ent in entities
         )
 
         if not needs_reranking:
@@ -914,7 +936,9 @@ class LELAEmbedderVLLMRerankerComponent:
                 if self.progress_callback and num_entities > 0:
                     progress = processing_start + (i / num_entities) * processing_range
                     ent_text = ent.text[:25] + "..." if len(ent.text) > 25 else ent.text
-                    self.progress_callback(progress, f"Reranking {i+1}/{num_entities}: {ent_text}")
+                    self.progress_callback(
+                        progress, f"Reranking {i+1}/{num_entities}: {ent_text}"
+                    )
 
                 candidates = getattr(ent._, "candidates", [])
                 if not candidates or len(candidates) <= self.top_k:
@@ -937,16 +961,18 @@ class LELAEmbedderVLLMRerankerComponent:
 
                 scored_candidates = list(zip(candidates, similarities))
                 scored_candidates.sort(key=lambda x: x[1], reverse=True)
-                top_candidates = scored_candidates[:self.top_k]
+                top_candidates = scored_candidates[: self.top_k]
 
                 reranked = []
                 reranked_scores = []
                 for candidate, score in top_candidates:
-                    reranked.append(Candidate(
-                        entity_id=candidate.entity_id,
-                        score=float(score),
-                        description=candidate.description,
-                    ))
+                    reranked.append(
+                        Candidate(
+                            entity_id=candidate.entity_id,
+                            score=float(score),
+                            description=candidate.description,
+                        )
+                    )
                     reranked_scores.append(float(score))
 
                 ent._.candidates = reranked
@@ -956,7 +982,7 @@ class LELAEmbedderVLLMRerankerComponent:
                     f"Embedder (vLLM) reranked {len(candidates)} to {len(ent._.candidates)} for '{ent.text}'"
                 )
         finally:
-            release_vllm(self.model_name, task="embed")
+            release_vllm(self.model_name, convert="embed")
             self.model = None  # Drop reference so pool eviction can free GPU memory
 
         self.progress_callback = None
