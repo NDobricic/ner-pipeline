@@ -101,12 +101,12 @@ The configuration names map to spaCy component factories:
 | `lela_dense` | `el_pipeline_lela_dense_candidates` | Dense retrieval |
 | **Rerankers** | | |
 | `none` | `el_pipeline_noop_reranker` | No reranking |
-| `cross_encoder` | `el_pipeline_cross_encoder_reranker` | Cross-encoder |
+| `cross_encoder` | `el_pipeline_lela_cross_encoder_reranker` | Cross-encoder |
 | `lela_embedder_transformers` | `el_pipeline_lela_embedder_transformers_reranker` | Bi-encoder (SentenceTransformers) |
 | `lela_embedder_vllm` | `el_pipeline_lela_embedder_vllm_reranker` | Bi-encoder (vLLM embed) |
 | `lela_cross_encoder_vllm` | `el_pipeline_lela_cross_encoder_vllm_reranker` | Cross-encoder (vLLM score) |
-| `vllm_api_client` | `el_pipeline_vllm_api_client_reranker` | vLLM API client reranker |
-| `llama_server` | `el_pipeline_llama_server_reranker` | Llama server reranker |
+| `lela_vllm_api_client` | `el_pipeline_lela_vllm_api_client_reranker` | vLLM API client reranker |
+| `lela_llama_server` | `el_pipeline_lela_llama_server_reranker` | Llama server reranker |
 | **Disambiguators** | | |
 | `first` | `el_pipeline_first_disambiguator` | Select first |
 | `lela_vllm` | `el_pipeline_lela_vllm_disambiguator` | vLLM disambiguation |

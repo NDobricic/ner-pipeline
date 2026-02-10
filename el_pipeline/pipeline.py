@@ -48,10 +48,10 @@ CANDIDATES_COMPONENT_MAP = {
 RERANKER_COMPONENT_MAP = {
     "lela_embedder_transformers": "el_pipeline_lela_embedder_transformers_reranker",
     "lela_embedder_vllm": "el_pipeline_lela_embedder_vllm_reranker",
-    "cross_encoder": "el_pipeline_cross_encoder_reranker",
+    "lela_cross_encoder": "el_pipeline_lela_cross_encoder_reranker",
     "lela_cross_encoder_vllm": "el_pipeline_lela_cross_encoder_vllm_reranker",
-    "vllm_api_client": "el_pipeline_vllm_api_client_reranker",
-    "llama_server": "el_pipeline_llama_server_reranker",
+    "lela_vllm_api_client": "el_pipeline_lela_vllm_api_client_reranker",
+    "lela_llama_server": "el_pipeline_lela_llama_server_reranker",
     "none": "el_pipeline_noop_reranker",
 }
 
@@ -197,6 +197,7 @@ class ELPipeline:
             if hasattr(cand_component, "initialize") and self.kb is not None:
                 init_progress_callback = None
                 if progress_callback:
+
                     def init_progress_callback(_progress: float, desc: str):
                         report(0.5, desc)
 
@@ -444,10 +445,10 @@ class ELPipeline:
             "el_pipeline_bm25_candidates": "Candidate generation (BM25)",
             "el_pipeline_lela_embedder_transformers_reranker": "Reranking (embedder)",
             "el_pipeline_lela_embedder_vllm_reranker": "Reranking (embedder vLLM)",
-            "el_pipeline_cross_encoder_reranker": "Reranking (cross-encoder)",
+            "el_pipeline_lela_cross_encoder_reranker": "Reranking (cross-encoder)",
             "el_pipeline_lela_cross_encoder_vllm_reranker": "Reranking (cross-encoder vLLM)",
-            "el_pipeline_vllm_api_client_reranker": "Reranking (vLLM API)",
-            "el_pipeline_llama_server_reranker": "Reranking (Llama Server)",
+            "el_pipeline_lela_vllm_api_client_reranker": "Reranking (vLLM API)",
+            "el_pipeline_lela_llama_server_reranker": "Reranking (Llama Server)",
             "el_pipeline_noop_reranker": "Reranking (pass-through)",
             "el_pipeline_lela_vllm_disambiguator": "Disambiguation (LLM)",
             "el_pipeline_lela_transformers_disambiguator": "Disambiguation (LLM)",
@@ -475,10 +476,10 @@ class ELPipeline:
             "el_pipeline_bm25_candidates",
             "el_pipeline_lela_embedder_transformers_reranker",
             "el_pipeline_lela_embedder_vllm_reranker",
-            "el_pipeline_cross_encoder_reranker",
+            "el_pipeline_lela_cross_encoder_reranker",
             "el_pipeline_lela_cross_encoder_vllm_reranker",
-            "el_pipeline_vllm_api_client_reranker",
-            "el_pipeline_llama_server_reranker",
+            "el_pipeline_lela_vllm_api_client_reranker",
+            "el_pipeline_lela_llama_server_reranker",
             "el_pipeline_lela_vllm_disambiguator",
             "el_pipeline_lela_transformers_disambiguator",
             "el_pipeline_lela_openai_api_disambiguator",

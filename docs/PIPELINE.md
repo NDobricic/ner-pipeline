@@ -110,9 +110,9 @@ doc = nlp("Albert Einstein visited Paris.")
 | `lela_embedder_transformers` | `el_pipeline_lela_embedder_transformers_reranker` |
 | `lela_embedder_vllm` | `el_pipeline_lela_embedder_vllm_reranker` |
 | `lela_cross_encoder_vllm` | `el_pipeline_lela_cross_encoder_vllm_reranker` |
-| `cross_encoder` | `el_pipeline_cross_encoder_reranker` |
-| `vllm_api_client` | `el_pipeline_vllm_api_client_reranker` |
-| `llama_server` | `el_pipeline_llama_server_reranker` |
+| `cross_encoder` | `el_pipeline_lela_cross_encoder_reranker` |
+| `lela_vllm_api_client` | `el_pipeline_lela_vllm_api_client_reranker` |
+| `lela_llama_server` | `el_pipeline_lela_llama_server_reranker` |
 | `none` | `el_pipeline_noop_reranker` |
 | `lela_vllm` | `el_pipeline_lela_vllm_disambiguator` |
 | `lela_transformers` | `el_pipeline_lela_transformers_disambiguator` |
@@ -364,7 +364,7 @@ Cross-encoder reranker using vLLM `.score()` API with the Qwen3-Reranker-seq-cls
 
 Cross-encoder reranking using sentence-transformers.
 
-**Factory:** `el_pipeline_cross_encoder_reranker`
+**Factory:** `el_pipeline_lela_cross_encoder_reranker`
 
 **Config:**
 | Parameter | Type | Default | Description |

@@ -66,7 +66,7 @@ def _get_vllm():
 
 
 @Language.factory(
-    "el_pipeline_cross_encoder_reranker",
+    "el_pipeline_lela_cross_encoder_reranker",
     default_config={
         "model_name": "Qwen/Qwen3-Reranker-4B-seq-cls",
         "top_k": 10,
@@ -200,14 +200,14 @@ class CrossEncoderRerankerComponent:
 
 
 @Language.factory(
-    "el_pipeline_vllm_api_client_reranker",
+    "el_pipeline_lela_vllm_api_client_reranker",
     default_config={
         "top_k": 10,
         "base_url": "http://localhost",
         "port": 8000,
     },
 )
-def create_vllm_api_client_reranker_component(
+def create_lela_vllm_api_client_reranker_component(
     nlp: Language,
     name: str,
     top_k: int,
@@ -362,7 +362,7 @@ class NoOpRerankerComponent:
 
 
 @Language.factory(
-    "el_pipeline_llama_server_reranker",
+    "el_pipeline_lela_llama_server_reranker",
     default_config={
         "model_name": "qwen3-reranker",
         "top_k": 10,
@@ -370,7 +370,7 @@ class NoOpRerankerComponent:
         "port": 8000,
     },
 )
-def create_llama_server_reranker_component(
+def create_lela_llama_server_reranker_component(
     nlp: Language,
     name: str,
     model_name: str,

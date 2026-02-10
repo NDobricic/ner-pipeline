@@ -186,9 +186,9 @@ Each NER option maps to a spaCy pipeline factory:
 - **spaCy Factory:** `el_pipeline_noop_reranker`
 - No reranking, returns candidates as-is
 
-#### Cross Encoder
-- **spaCy Factory:** `el_pipeline_cross_encoder_reranker`
-- **model_name**: Cross-encoder model (default: `cross-encoder/ms-marco-MiniLM-L-6-v2`)
+#### LELA Cross Encoder (sentence-transformers)
+- **spaCy Factory:** `el_pipeline_lela_cross_encoder_reranker`
+- **model_name**: Cross-encoder model
 - **top_k**: Number of candidates to keep
 
 #### LELA Embedder (Transformers)
