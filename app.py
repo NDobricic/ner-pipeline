@@ -213,7 +213,9 @@ def highlighted_to_html(
                         f"<em style=&quot;color:#555;&quot;>ID: {escape_js_string(entity_info['kb_id'])}</em>"
                     )
                 if entity_info.get("type"):
-                    popup_lines.append(f"<span style=&quot;color:#333;&quot;>Type: {escape_js_string(entity_info['type'])}</span>")
+                    popup_lines.append(
+                        f"<span style=&quot;color:#333;&quot;>Type: {escape_js_string(entity_info['type'])}</span>"
+                    )
                 if entity_info.get("mention") and entity_info.get(
                     "mention"
                 ) != entity_info.get("kb_title"):
@@ -302,9 +304,13 @@ def highlighted_to_html(
                         f"<em style=&quot;color:#555;&quot;>ID: {escape_js_string(entity_info['kb_id'])}</em>"
                     )
                 if entity_info.get("type"):
-                    popup_lines.append(f"<span style=&quot;color:#333;&quot;>Type: {escape_js_string(entity_info['type'])}</span>")
+                    popup_lines.append(
+                        f"<span style=&quot;color:#333;&quot;>Type: {escape_js_string(entity_info['type'])}</span>"
+                    )
                 # Show occurrence count for legend hover
-                popup_lines.append(f"<span style=&quot;color:#333;&quot;>Mentions: {count}</span>")
+                popup_lines.append(
+                    f"<span style=&quot;color:#333;&quot;>Mentions: {count}</span>"
+                )
                 if entity_info.get("kb_description"):
                     desc = entity_info["kb_description"]
                     if len(desc) > 150:
@@ -1028,14 +1034,14 @@ def clear_outputs_for_new_run():
     # Return: preview_html (cleared + shown), stats, json, run_btn, cancel_btn,
     #         text_input (hidden), edit_btn (label→"Edit"), view_mode (→"preview")
     return (
-        gr.update(value="", visible=True),   # preview_html: clear + show (result mode)
+        gr.update(value="", visible=True),  # preview_html: clear + show (result mode)
         "*Processing...*",
         None,
-        gr.update(visible=False),            # run_btn hidden
-        gr.update(visible=True),             # cancel_btn shown
-        gr.update(visible=False),            # text_input hidden (result mode)
-        gr.update(value="✏️ Edit"),            # edit_btn label
-        "preview",                           # view_mode
+        gr.update(visible=False),  # run_btn hidden
+        gr.update(visible=True),  # cancel_btn shown
+        gr.update(visible=False),  # text_input hidden (result mode)
+        gr.update(value="✏️ Edit"),  # edit_btn label
+        "preview",  # view_mode
     )
 
 
@@ -1242,27 +1248,48 @@ if __name__ == "__main__":
                     with gr.Column(scale=2):
                         # Header row with label, Edit button, and Upload button
                         with gr.Row():
-                            gr.HTML("<span style='font-weight:600;font-size:1.1em;line-height:2.4;'>Input text</span>")
-                            edit_btn = gr.Button("👁 Preview", size="sm", variant="secondary", scale=0, min_width=40, elem_id="edit-preview-btn")
+                            gr.HTML(
+                                "<span style='font-weight:600;font-size:1.1em;line-height:2.4;'>Input text</span>"
+                            )
+                            edit_btn = gr.Button(
+                                "👁 Preview",
+                                size="sm",
+                                variant="secondary",
+                                scale=0,
+                                min_width=40,
+                                elem_id="edit-preview-btn",
+                            )
                             upload_btn = gr.UploadButton(
-                                "📄 Upload", size="sm", variant="secondary", scale=0, min_width=100,
+                                "📄 Upload",
+                                size="sm",
+                                variant="secondary",
+                                scale=0,
+                                min_width=100,
                                 file_types=[".txt", ".pdf", ".docx", ".html"],
                                 elem_id="upload-file-btn",
                             )
                         # Edit mode: Textbox (visible by default)
                         text_input = gr.Textbox(
                             placeholder="Enter or paste text, or drop a file...",
-                            lines=12, show_label=False, elem_id="main-text-input",
+                            lines=12,
+                            show_label=False,
+                            elem_id="main-text-input",
                             value="Albert Einstein was born in Germany. Marie Curie was a pioneering scientist.",
                         )
                         # Result mode: HTML output (hidden by default)
-                        preview_html = gr.HTML(visible=False, elem_id="main-result-output", elem_classes=["output-section"])
+                        preview_html = gr.HTML(
+                            visible=False,
+                            elem_id="main-result-output",
+                            elem_classes=["output-section"],
+                        )
 
                         # Stats + JSON as collapsible section below
                         with gr.Accordion("Stats / JSON", open=False):
                             with gr.Tabs():
                                 with gr.Tab("Stats"):
-                                    stats_output = gr.Markdown("*Run the pipeline to see statistics.*")
+                                    stats_output = gr.Markdown(
+                                        "*Run the pipeline to see statistics.*"
+                                    )
                                 with gr.Tab("JSON"):
                                     json_output = gr.JSON(label="Pipeline Output")
 
@@ -1579,18 +1606,18 @@ Test files are available in `data/test/`:
                 else:
                     html = "<div style='color:#6B7280;padding:1em;'>Run the pipeline to see results here.</div>"
                 return (
-                    gr.update(visible=False),                    # text_input
-                    gr.update(value=html, visible=True),         # preview_html
-                    gr.update(value="✏️ Edit"),                    # edit_btn label
-                    "preview",                                   # view_mode
+                    gr.update(visible=False),  # text_input
+                    gr.update(value=html, visible=True),  # preview_html
+                    gr.update(value="✏️ Edit"),  # edit_btn label
+                    "preview",  # view_mode
                 )
             else:
                 # Switch to edit mode
                 return (
-                    gr.update(visible=True),                     # text_input
-                    gr.update(visible=False),                    # preview_html
-                    gr.update(value="👁 Preview"),                # edit_btn label
-                    "edit",                                      # view_mode
+                    gr.update(visible=True),  # text_input
+                    gr.update(visible=False),  # preview_html
+                    gr.update(value="👁 Preview"),  # edit_btn label
+                    "edit",  # view_mode
                 )
 
         edit_btn.click(
@@ -1604,7 +1631,13 @@ Test files are available in `data/test/`:
             if not file:
                 return gr.update(), gr.update(), gr.update()
             ext = Path(file.name).suffix.lower()
-            loader_map = {".txt": "text", ".pdf": "pdf", ".docx": "docx", ".html": "html", ".htm": "html"}
+            loader_map = {
+                ".txt": "text",
+                ".pdf": "pdf",
+                ".docx": "docx",
+                ".html": "html",
+                ".htm": "html",
+            }
             new_loader = loader_map.get(ext, "text")
 
             # For text files, read content into the textbox

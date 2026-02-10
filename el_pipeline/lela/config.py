@@ -16,6 +16,7 @@ AVAILABLE_LLM_MODELS = [
     ("Qwen/Qwen3-1.7B", "Qwen3-1.7B (~4GB VRAM)", 4.0),
     ("Qwen/Qwen3-4B", "Qwen3-4B (~9GB VRAM)", 9.0),
     ("Qwen/Qwen3-8B", "Qwen3-8B (~18GB VRAM)", 18.0),
+    ("Qwen/Qwen3-14B", "Qwen3-14B (~32GB VRAM)", 32.0),
 ]
 
 # Available embedding models (model_id, display_name, vram_gb)
