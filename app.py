@@ -31,8 +31,6 @@ from el_pipeline.lela.config import (
 )
 
 DESCRIPTION = """
-# EL Pipeline 🔗
-
 *Modular entity recognition and linking pipeline. Upload a knowledge base, enter text, configure the pipeline, and run.*"
 
 ## Links
@@ -1233,7 +1231,7 @@ if __name__ == "__main__":
     </script>
     """
 
-    with gr.Blocks(title="EL Pipeline", fill_height=True, head=custom_head) as demo:
+    with gr.Blocks(title="EL Pipeline 🔗", fill_height=True, head=custom_head) as demo:
         gr.Markdown("# EL Pipeline", elem_classes=["main-header"])
         gr.Markdown(
             DESCRIPTION,
