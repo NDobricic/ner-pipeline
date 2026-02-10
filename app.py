@@ -206,19 +206,19 @@ def highlighted_to_html(
             if entity_info:
                 if entity_info.get("kb_title"):
                     popup_lines.append(
-                        f"<strong>{escape_js_string(entity_info['kb_title'])}</strong>"
+                        f"<strong style=&quot;color:#333;&quot;>{escape_js_string(entity_info['kb_title'])}</strong>"
                     )
                 if entity_info.get("kb_id"):
                     popup_lines.append(
-                        f"<em>ID: {escape_js_string(entity_info['kb_id'])}</em>"
+                        f"<em style=&quot;color:#555;&quot;>ID: {escape_js_string(entity_info['kb_id'])}</em>"
                     )
                 if entity_info.get("type"):
-                    popup_lines.append(f"Type: {escape_js_string(entity_info['type'])}")
+                    popup_lines.append(f"<span style=&quot;color:#333;&quot;>Type: {escape_js_string(entity_info['type'])}</span>")
                 if entity_info.get("mention") and entity_info.get(
                     "mention"
                 ) != entity_info.get("kb_title"):
                     popup_lines.append(
-                        f"Mention: &quot;{escape_js_string(entity_info['mention'])}&quot;"
+                        f"<span style=&quot;color:#333;&quot;>Mention: &quot;{escape_js_string(entity_info['mention'])}&quot;</span>"
                     )
                 if entity_info.get("kb_description"):
                     desc = entity_info["kb_description"]
@@ -295,16 +295,16 @@ def highlighted_to_html(
             if entity_info:
                 if entity_info.get("kb_title"):
                     popup_lines.append(
-                        f"<strong>{escape_js_string(entity_info['kb_title'])}</strong>"
+                        f"<strong style=&quot;color:#333;&quot;>{escape_js_string(entity_info['kb_title'])}</strong>"
                     )
                 if entity_info.get("kb_id"):
                     popup_lines.append(
-                        f"<em>ID: {escape_js_string(entity_info['kb_id'])}</em>"
+                        f"<em style=&quot;color:#555;&quot;>ID: {escape_js_string(entity_info['kb_id'])}</em>"
                     )
                 if entity_info.get("type"):
-                    popup_lines.append(f"Type: {escape_js_string(entity_info['type'])}")
+                    popup_lines.append(f"<span style=&quot;color:#333;&quot;>Type: {escape_js_string(entity_info['type'])}</span>")
                 # Show occurrence count for legend hover
-                popup_lines.append(f"Mentions: {count}")
+                popup_lines.append(f"<span style=&quot;color:#333;&quot;>Mentions: {count}</span>")
                 if entity_info.get("kb_description"):
                     desc = entity_info["kb_description"]
                     if len(desc) > 150:
@@ -360,6 +360,7 @@ def highlighted_to_html(
         f"display: none; "
         f"position: absolute; "
         f"background: white; "
+        f"color: #333; "
         f"border: 1px solid #ccc; "
         f"border-radius: 6px; "
         f"padding: 0.5em 0.75em; "
@@ -593,7 +594,7 @@ def run_pipeline(
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    no_tab_switch = gr.update()
+    no_vis_change = gr.update()
 
     if not kb_file:
         from el_pipeline.knowledge_bases.yago_downloader import ensure_yago_kb
@@ -612,18 +613,18 @@ def run_pipeline(
             *format_error_output(
                 "Missing Input", "Please provide either text input or upload a file."
             ),
-            no_tab_switch,
+            no_vis_change,
         )
         return
 
     # Check for cancellation
     if _cancel_event.is_set():
         logger.info("Pipeline cancelled before configuration")
-        yield "", "*Pipeline cancelled.*", {}, no_tab_switch
+        yield "", "*Pipeline cancelled.*", {}, no_vis_change
         return
 
     progress(0.1, desc="Building pipeline configuration...")
-    yield "", "*Building configuration...*", {}, no_tab_switch
+    yield "", "*Building configuration...*", {}, no_vis_change
 
     # Build NER params based on type
     ner_params = {}
@@ -704,11 +705,11 @@ def run_pipeline(
     # Check for cancellation
     if _cancel_event.is_set():
         logger.info("Pipeline cancelled before initialization")
-        yield "", "*Pipeline cancelled.*", {}, no_tab_switch
+        yield "", "*Pipeline cancelled.*", {}, no_vis_change
         return
 
     progress(0.15, desc="Initializing pipeline...")
-    yield "", "*Initializing pipeline...*", {}, no_tab_switch
+    yield "", "*Initializing pipeline...*", {}, no_vis_change
 
     try:
         config = PipelineConfig.from_dict(config_dict)
@@ -733,24 +734,24 @@ def run_pipeline(
         )
     except InterruptedError:
         logger.info("Pipeline cancelled during initialization")
-        yield "", "*Pipeline cancelled.*", {}, no_tab_switch
+        yield "", "*Pipeline cancelled.*", {}, no_vis_change
         return
     except Exception as e:
         logger.exception("Pipeline initialization failed")
         yield (
             *format_error_output("Pipeline Initialization Failed", str(e)),
-            no_tab_switch,
+            no_vis_change,
         )
         return
 
     # Check for cancellation
     if _cancel_event.is_set():
         logger.info("Pipeline cancelled after initialization")
-        yield "", "*Pipeline cancelled.*", {}, no_tab_switch
+        yield "", "*Pipeline cancelled.*", {}, no_vis_change
         return
 
     progress(0.4, desc="Loading document...")
-    yield "", "*Loading document...*", {}, no_tab_switch
+    yield "", "*Loading document...*", {}, no_vis_change
 
     try:
         if file_input:
@@ -779,7 +780,7 @@ def run_pipeline(
                     "No Documents Loaded",
                     "The input file was empty or could not be parsed.",
                 ),
-                no_tab_switch,
+                no_vis_change,
             )
             return
 
@@ -788,11 +789,11 @@ def run_pipeline(
         # Check for cancellation
         if _cancel_event.is_set():
             logger.info("Pipeline cancelled before processing")
-            yield "", "*Pipeline cancelled.*", {}, no_tab_switch
+            yield "", "*Pipeline cancelled.*", {}, no_vis_change
             return
 
         progress(0.45, desc="Processing document...")
-        yield "", "*Processing document...*", {}, no_tab_switch
+        yield "", "*Processing document...*", {}, no_vis_change
 
         def _run_processing(report):
             def progress_callback(local_progress: float, description: str):
@@ -816,10 +817,10 @@ def run_pipeline(
 
     except InterruptedError:
         logger.info("Pipeline cancelled during processing")
-        yield "", "*Pipeline cancelled.*", {}, no_tab_switch
+        yield "", "*Pipeline cancelled.*", {}, no_vis_change
         return
     except Exception as e:
-        yield (*format_error_output("Pipeline Execution Failed", str(e)), no_tab_switch)
+        yield (*format_error_output("Pipeline Execution Failed", str(e)), no_vis_change)
         return
 
     logger.info("Pipeline processing complete, formatting output...")
@@ -860,8 +861,8 @@ def run_pipeline(
         f"=== run_pipeline RETURNING (run #{_run_counter}, {len(result.get('entities', []))} entities) ==="
     )
     sys.stderr.flush()
-    # Final yield with complete results + switch to Preview tab
-    yield html_output, stats, result, gr.Tabs(selected=1)
+    # Final yield with complete results — stay in result mode (text_input hidden)
+    yield html_output, stats, result, gr.update(visible=False)
 
 
 def update_ner_params(ner_choice: str):
@@ -1024,16 +1025,17 @@ def clear_outputs_for_new_run():
     import sys
 
     sys.stderr.flush()
-    # Return empty HTML string instead of empty list for the HTML component
-    # Also return button visibility updates: hide Run, show Cancel
-    # Switch to Preview tab (selected=1) so user sees progress
+    # Return: preview_html (cleared + shown), stats, json, run_btn, cancel_btn,
+    #         text_input (hidden), edit_btn (label→"Edit"), view_mode (→"preview")
     return (
-        "",
+        gr.update(value="", visible=True),   # preview_html: clear + show (result mode)
         "*Processing...*",
         None,
-        gr.update(visible=False),
-        gr.update(visible=True),
-        gr.Tabs(selected=1),
+        gr.update(visible=False),            # run_btn hidden
+        gr.update(visible=True),             # cancel_btn shown
+        gr.update(visible=False),            # text_input hidden (result mode)
+        gr.update(value="✏️ Edit"),            # edit_btn label
+        "preview",                           # view_mode
     )
 
 
@@ -1099,27 +1101,46 @@ if __name__ == "__main__":
     }
     .output-section {
         min-height: 300px;
+        max-height: 500px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color-primary);
+        border-radius: var(--radius-lg);
+        padding: 1em;
     }
     .run-button {
         margin-top: 1rem;
         margin-bottom: 1rem;
     }
+    #edit-preview-btn {
+        width: 100px !important;
+        max-width: 100px !important;
+        flex: none !important;
+    }
+    #upload-file-btn {
+        width: 120px !important;
+        max-width: 120px !important;
+        flex: none !important;
+    }
     """
 
-    # JavaScript to cancel pipeline when tab is closed (injected via head parameter)
+    # JavaScript to cancel pipeline when tab is closed + drag-and-drop support
     custom_head = """
     <script>
     (function() {
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', setupPageCloseHandler);
+            document.addEventListener('DOMContentLoaded', init);
         } else {
+            init();
+        }
+
+        function init() {
             setupPageCloseHandler();
+            setupTextAreaDrop();
         }
 
         function setupPageCloseHandler() {
             console.log("EL Pipeline: Page close handler initialized");
 
-            // Find the cancel button if visible (indicates pipeline is running)
             function findCancelButton() {
                 const buttons = document.querySelectorAll('button');
                 for (const btn of buttons) {
@@ -1134,7 +1155,6 @@ if __name__ == "__main__":
                 return null;
             }
 
-            // Cancel pipeline when page is actually closing/navigating away
             window.addEventListener('pagehide', function() {
                 const cancelBtn = findCancelButton();
                 if (cancelBtn) {
@@ -1143,7 +1163,6 @@ if __name__ == "__main__":
                 }
             }, { capture: true });
 
-            // Backup: also try on beforeunload (fires earlier, more reliable for sending requests)
             window.addEventListener('beforeunload', function() {
                 const cancelBtn = findCancelButton();
                 if (cancelBtn) {
@@ -1151,6 +1170,58 @@ if __name__ == "__main__":
                     console.log("EL Pipeline: Triggered cancellation on beforeunload");
                 }
             }, { capture: true });
+        }
+
+        function setupTextAreaDrop() {
+            // Use event delegation on document so listeners survive Gradio DOM rebuilds
+            document.addEventListener('dragover', function(e) {
+                var el = e.target.closest('#main-text-input');
+                if (!el) return;
+                e.preventDefault();
+                e.stopPropagation();
+                el.style.outline = '2px dashed #2563EB';
+                el.style.outlineOffset = '-2px';
+            });
+            document.addEventListener('dragleave', function(e) {
+                var el = e.target.closest('#main-text-input');
+                if (!el) return;
+                e.preventDefault();
+                el.style.outline = '';
+                el.style.outlineOffset = '';
+            });
+            document.addEventListener('drop', function(e) {
+                var el = e.target.closest('#main-text-input');
+                if (!el) return;
+                e.preventDefault();
+                e.stopPropagation();
+                el.style.outline = '';
+                el.style.outlineOffset = '';
+                var file = e.dataTransfer.files[0];
+                if (!file) return;
+
+                if (file.name.endsWith('.txt')) {
+                    var reader = new FileReader();
+                    reader.onload = function() {
+                        var ta = el.querySelector('textarea');
+                        if (ta) {
+                            var nativeSet = Object.getOwnPropertyDescriptor(
+                                window.HTMLTextAreaElement.prototype, "value").set;
+                            nativeSet.call(ta, reader.result);
+                            ta.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                    };
+                    reader.readAsText(file);
+                } else {
+                    var uploadInput = document.querySelector('#upload-file-btn input[type="file"]');
+                    if (uploadInput) {
+                        var dt = new DataTransfer();
+                        dt.items.add(file);
+                        uploadInput.files = dt.files;
+                        uploadInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+            });
+            console.log("EL Pipeline: Drag-and-drop initialized on text area");
         }
     })();
     </script>
@@ -1169,50 +1240,56 @@ if __name__ == "__main__":
                 # --- INPUT SECTION ---
                 with gr.Row():
                     with gr.Column(scale=2):
-                        input_tabs = gr.Tabs(selected=0)
-                        with input_tabs:
-                            with gr.Tab("Edit", id=0):
-                                text_input = gr.Textbox(
-                                    label="Text Input",
-                                    placeholder="Enter text to process, or upload a document...",
-                                    lines=4,
-                                    value="Albert Einstein was born in Germany. Marie Curie was a pioneering scientist.",
-                                )
-                            with gr.Tab("Preview", id=1):
-                                preview_html = gr.HTML(
-                                    elem_classes=["output-section"],
-                                )
-                            with gr.Tab("Stats", id=2):
-                                stats_output = gr.Markdown(
-                                    value="*Run the pipeline to see statistics.*",
-                                )
-                            with gr.Tab("JSON", id=3):
-                                json_output = gr.JSON(label="Pipeline Output")
-                    with gr.Column(scale=1):
-                        file_input = gr.File(
-                            label="Upload Document",
-                            file_types=[".txt", ".pdf", ".docx", ".html"],
+                        # Header row with label, Edit button, and Upload button
+                        with gr.Row():
+                            gr.HTML("<span style='font-weight:600;font-size:1.1em;line-height:2.4;'>Input text</span>")
+                            edit_btn = gr.Button("👁 Preview", size="sm", variant="secondary", scale=0, min_width=40, elem_id="edit-preview-btn")
+                            upload_btn = gr.UploadButton(
+                                "📄 Upload", size="sm", variant="secondary", scale=0, min_width=100,
+                                file_types=[".txt", ".pdf", ".docx", ".html"],
+                                elem_id="upload-file-btn",
+                            )
+                        # Edit mode: Textbox (visible by default)
+                        text_input = gr.Textbox(
+                            placeholder="Enter or paste text, or drop a file...",
+                            lines=12, show_label=False, elem_id="main-text-input",
+                            value="Albert Einstein was born in Germany. Marie Curie was a pioneering scientist.",
                         )
+                        # Result mode: HTML output (hidden by default)
+                        preview_html = gr.HTML(visible=False, elem_id="main-result-output", elem_classes=["output-section"])
+
+                        # Stats + JSON as collapsible section below
+                        with gr.Accordion("Stats / JSON", open=False):
+                            with gr.Tabs():
+                                with gr.Tab("Stats"):
+                                    stats_output = gr.Markdown("*Run the pipeline to see statistics.*")
+                                with gr.Tab("JSON"):
+                                    json_output = gr.JSON(label="Pipeline Output")
+
+                    with gr.Column(scale=1, min_width=200):
                         kb_file = gr.File(
                             label="Knowledge Base (JSONL) — optional, defaults to YAGO 4.5",
                             file_types=[".jsonl"],
                             value=None,
                         )
+                        run_btn = gr.Button(
+                            "Run Pipeline",
+                            variant="primary",
+                            size="lg",
+                            elem_classes=["run-button"],
+                        )
+                        cancel_btn = gr.Button(
+                            "Cancel",
+                            variant="stop",
+                            size="lg",
+                            visible=False,
+                            elem_classes=["run-button"],
+                        )
 
-                # --- RUN/CANCEL BUTTON ---
-                run_btn = gr.Button(
-                    "Run Pipeline",
-                    variant="primary",
-                    size="lg",
-                    elem_classes=["run-button"],
-                )
-                cancel_btn = gr.Button(
-                    "Cancel",
-                    variant="stop",
-                    size="lg",
-                    visible=False,
-                    elem_classes=["run-button"],
-                )
+                # Hidden file component for internal file tracking (used by pipeline)
+                file_input = gr.File(visible=False)
+                # State: "edit" or "preview" — tracks which mode the text area is in
+                view_mode = gr.State("edit")
 
                 # --- CONFIGURATION SECTION (Horizontal Layout) ---
                 gr.Markdown("### Configuration")
@@ -1492,10 +1569,58 @@ Test files are available in `data/test/`:
                 """)
 
         # --- EVENT HANDLERS ---
-        file_input.change(
-            fn=update_loader_from_file,
-            inputs=[file_input],
-            outputs=[loader_type],
+
+        # Edit/Preview toggle button
+        def toggle_edit_preview(current_mode, current_preview):
+            if current_mode == "edit":
+                # Switch to preview mode
+                if current_preview:
+                    html = current_preview
+                else:
+                    html = "<div style='color:#6B7280;padding:1em;'>Run the pipeline to see results here.</div>"
+                return (
+                    gr.update(visible=False),                    # text_input
+                    gr.update(value=html, visible=True),         # preview_html
+                    gr.update(value="✏️ Edit"),                    # edit_btn label
+                    "preview",                                   # view_mode
+                )
+            else:
+                # Switch to edit mode
+                return (
+                    gr.update(visible=True),                     # text_input
+                    gr.update(visible=False),                    # preview_html
+                    gr.update(value="👁 Preview"),                # edit_btn label
+                    "edit",                                      # view_mode
+                )
+
+        edit_btn.click(
+            fn=toggle_edit_preview,
+            inputs=[view_mode, preview_html],
+            outputs=[text_input, preview_html, edit_btn, view_mode],
+        )
+
+        # Upload button → load file, populate textbox or store file ref
+        def handle_file_upload(file):
+            if not file:
+                return gr.update(), gr.update(), gr.update()
+            ext = Path(file.name).suffix.lower()
+            loader_map = {".txt": "text", ".pdf": "pdf", ".docx": "docx", ".html": "html", ".htm": "html"}
+            new_loader = loader_map.get(ext, "text")
+
+            # For text files, read content into the textbox
+            if ext == ".txt":
+                try:
+                    content = Path(file.name).read_text(encoding="utf-8")
+                    return content, gr.update(value=new_loader), file
+                except Exception:
+                    pass
+            # For non-text files, just store the file reference
+            return gr.update(), gr.update(value=new_loader), file
+
+        upload_btn.upload(
+            fn=handle_file_upload,
+            inputs=[upload_btn],
+            outputs=[text_input, loader_type, file_input],
         )
 
         ner_type.change(
@@ -1554,7 +1679,7 @@ Test files are available in `data/test/`:
             outputs=[memory_estimate_display],
         )
 
-        # Chain: clear outputs → run pipeline → apply filter → restore buttons
+        # Chain: clear outputs → run pipeline → restore buttons
         run_event = (
             run_btn.click(
                 fn=clear_outputs_for_new_run,
@@ -1565,7 +1690,9 @@ Test files are available in `data/test/`:
                     json_output,
                     run_btn,
                     cancel_btn,
-                    input_tabs,
+                    text_input,
+                    edit_btn,
+                    view_mode,
                 ],
             )
             .then(
@@ -1601,7 +1728,7 @@ Test files are available in `data/test/`:
                     disambig_api_key,
                     kb_type,
                 ],
-                outputs=[preview_html, stats_output, json_output, input_tabs],
+                outputs=[preview_html, stats_output, json_output, text_input],
             )
             .then(
                 fn=restore_buttons_after_run,
