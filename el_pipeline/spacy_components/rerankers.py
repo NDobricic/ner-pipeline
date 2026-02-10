@@ -66,7 +66,7 @@ def _get_vllm():
 
 
 @Language.factory(
-    "el_pipeline_cross_encoder_reranker",
+    "el_pipeline_lela_cross_encoder_reranker",
     default_config={
         "model_name": "Qwen/Qwen3-Reranker-4B-seq-cls",
         "top_k": 10,

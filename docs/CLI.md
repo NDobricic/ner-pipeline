@@ -101,7 +101,7 @@ The configuration names map to spaCy component factories:
 | `lela_dense` | `el_pipeline_lela_dense_candidates` | Dense retrieval |
 | **Rerankers** | | |
 | `none` | `el_pipeline_noop_reranker` | No reranking |
-| `cross_encoder` | `el_pipeline_cross_encoder_reranker` | Cross-encoder |
+| `cross_encoder` | `el_pipeline_lela_cross_encoder_reranker` | Cross-encoder |
 | `lela_embedder_transformers` | `el_pipeline_lela_embedder_transformers_reranker` | Bi-encoder (SentenceTransformers) |
 | `lela_embedder_vllm` | `el_pipeline_lela_embedder_vllm_reranker` | Bi-encoder (vLLM embed) |
 | `lela_cross_encoder_vllm` | `el_pipeline_lela_cross_encoder_vllm_reranker` | Cross-encoder (vLLM score) |
