@@ -736,6 +736,7 @@ class LELACrossEncoderVLLMRerankerComponent:
 
             self.model, was_cached = get_vllm_instance(
                 model_name=self.model_name,
+                task="score",
                 hf_overrides={
                     "architectures": ["Qwen3ForSequenceClassification"],
                     "classifier_from_token": ["no", "yes"],

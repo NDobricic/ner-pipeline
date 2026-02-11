@@ -305,12 +305,11 @@ disamb.initialize(kb)
 
 ### LELA Transformers Disambiguation: `el_pipeline_lela_transformers_disambiguator`
 
-LLM-based disambiguation using HuggingFace Transformers - alternative for older GPUs.
+LLM-based disambiguation using HuggingFace Transformers directly.
 
 **Default Model:** `Qwen/Qwen3-4B`
 
 **When to Use:**
-- Running on older GPUs (P100/Pascal) where vLLM has compatibility issues
 - vLLM installation fails or has problems
 - You need direct HuggingFace transformers integration
 
@@ -338,7 +337,7 @@ disamb.initialize(kb)
 }
 ```
 
-**Note:** This component loads the model directly with HuggingFace transformers, which may be slower than vLLM but has better compatibility with older hardware.
+**Note:** This component loads the model directly with HuggingFace transformers, which may be slower than vLLM but avoids vLLM-specific dependencies.
 
 ### Knowledge Base
 
@@ -657,17 +656,11 @@ python -m el_pipeline.cli \
 | lela_embedder_vllm | Yes (Required) | vLLM-based embedding |
 | lela_cross_encoder_vllm | Yes (Required) | vLLM-based cross-encoder |
 | lela_vllm | Yes (Required) | vLLM-based LLM inference |
-| lela_transformers | Yes | HuggingFace transformers (better P100 support) |
+| lela_transformers | Yes | HuggingFace transformers (alternative to vLLM) |
 
 ### CUDA Compatibility
 
-For **P100/Pascal GPUs** (compute capability 6.0):
-- Use `torch==2.7.1+cu118` (CUDA 11.8)
-- Use `vllm==0.10.1` (latest version compatible with torch 2.7.1+cu118)
-- Install from PyTorch index: `pip install torch==2.7.1+cu118 --index-url https://download.pytorch.org/whl/cu118`
-
-For **newer GPUs** (A100, H100, etc.):
-- Can use latest PyTorch/vLLM with CUDA 12.x
+Requires **CUDA 12.x** with latest PyTorch and vLLM. See [REQUIREMENTS.md](REQUIREMENTS.md) for GPU compatibility matrix.
 
 ### Model Sizes
 

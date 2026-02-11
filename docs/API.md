@@ -378,7 +378,7 @@ component.initialize(kb)
 
 #### `el_pipeline_lela_transformers_disambiguator`
 
-Transformers-based LLM disambiguation (alternative to vLLM for P100/Pascal GPUs).
+Transformers-based LLM disambiguation (alternative to vLLM).
 
 **Config Options:**
 | Parameter | Type | Default | Description |
@@ -397,7 +397,6 @@ component.initialize(kb)
 ```
 
 **When to use:** Use this instead of `lela_vllm` when:
-- Running on older GPUs (P100/Pascal) where vLLM has issues
 - vLLM installation fails or has compatibility problems
 - You need direct HuggingFace transformers integration
 

@@ -219,7 +219,7 @@ class TestLELACrossEncoderVLLMRerankerComponent:
         doc.ents[0]._.candidates = sample_candidates
         reranker(doc)
 
-        mock_release.assert_called_once_with(reranker.model_name, task="score")
+        mock_release.assert_called_once_with(reranker.model_name)
 
     def test_initialization_with_custom_params(self, nlp):
         from el_pipeline.spacy_components.rerankers import LELACrossEncoderVLLMRerankerComponent

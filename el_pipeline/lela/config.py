@@ -5,7 +5,7 @@ NER_LABELS = ["person", "organization", "location"]
 
 # Model IDs
 DEFAULT_GLINER_MODEL = "numind/NuNER_Zero-span"
-# Qwen3-4B for entity disambiguation (use lela_transformers on P100 GPUs)
+# Qwen3-4B for entity disambiguation
 DEFAULT_LLM_MODEL = "Qwen/Qwen3-4B"
 DEFAULT_EMBEDDER_MODEL = "Qwen/Qwen3-Embedding-4B"
 DEFAULT_RERANKER_MODEL = "tomaarsen/Qwen3-Reranker-4B-seq-cls"

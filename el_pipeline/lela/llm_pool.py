@@ -333,7 +333,7 @@ def get_vllm_instance(
             "model": model_name,
             "tensor_parallel_size": tensor_parallel_size,
             "enforce_eager": True,  # Disable CUDA graphs to avoid multiprocessing issues
-            "dtype": "half",  # float16 for P100 (compute capability 6.0)
+            "dtype": "half",  # float16 for efficient inference
             "max_model_len": max_model_len or 4096,  # Qwen3-4B supports up to 32K
             "gpu_memory_utilization": VLLM_GPU_MEMORY_UTILIZATION,
             "trust_remote_code": True,  # Required for Qwen models to load tokenizer/chat template

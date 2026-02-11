@@ -4,18 +4,13 @@ Standalone, swappable NER → candidate generation → rerank → disambiguation
 
 ## Install
 
-**Requirements:** Python 3.10-3.12 (Python 3.13 is NOT supported due to vLLM), CUDA 11.8 for GPU support
+**Requirements:** Python 3.10-3.12 (Python 3.13 is NOT supported due to vLLM), CUDA 12.x for GPU support
 
 ```bash
 cd el-pipeline
 python3.10 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-
-# Install PyTorch with CUDA 11.8 (required for P100/older GPUs)
-pip install torch==2.7.1+cu118 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-
-# Install remaining dependencies
 pip install -r requirements.txt
 ```
 
@@ -34,7 +29,6 @@ If you encounter issues, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) 
 - PyTorch CUDA mismatch
 - vLLM installation failures
 - GPU memory issues
-- P100/Pascal GPU compatibility
 
 ### CLI
 1) Prepare a JSONL knowledge base with fields: `id`, `title`, `description` (plus optional metadata).

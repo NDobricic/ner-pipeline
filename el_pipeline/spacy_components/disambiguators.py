@@ -711,7 +711,7 @@ class LELAOpenAIAPIDisambiguatorComponent:
 
 
 # ============================================================================
-# LELA Transformers Disambiguator Component (for older GPUs)
+# LELA Transformers Disambiguator Component
 # ============================================================================
 
 
@@ -752,8 +752,7 @@ class LELATransformersDisambiguatorComponent:
     """
     Transformers-based entity disambiguator component for spaCy.
 
-    Alternative to vLLM for older GPUs (like P100) where vLLM has issues.
-    Uses HuggingFace transformers directly for inference.
+    Alternative to vLLM-based disambiguator. Uses HuggingFace transformers directly for inference.
     """
 
     def __init__(

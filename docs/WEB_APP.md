@@ -229,7 +229,7 @@ Each NER option maps to a spaCy pipeline factory:
 #### LELA Transformers
 - **spaCy Factory:** `el_pipeline_lela_transformers_disambiguator`
 - **LLM Model**: Same model choices as above
-- Alternative for older GPUs (P100/Pascal) where vLLM has issues
+- Alternative to vLLM-based disambiguator
 - Uses HuggingFace transformers directly
 
 ## Using the Interface
