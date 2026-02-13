@@ -30,9 +30,22 @@ from el_pipeline.lela.config import (
 )
 from el_pipeline.lela.llm_pool import clear_all_models
 
-DESCRIPTION = """
-- Repository: https://github.com/samyhaff/LELA
-- LELA Paper: https://arxiv.org/abs/2601.05192
+TITLE_HTML = """
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:4px;">
+  <h1 style="margin:0;font-size:1.8em;">LELA: An End-to-End LLM-Based Entity Linking Framework with Zero-Shot Domain Adaptation</h1>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <a href="https://github.com/samyhaff/LELA" target="_blank"
+       style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;background:#f3f4f6;color:#1f2937;text-decoration:none;font-size:0.85em;border:1px solid #d1d5db;">
+      <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+    <a href="https://arxiv.org/abs/2601.05192" target="_blank"
+       style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;background:#f3f4f6;color:#1f2937;text-decoration:none;font-size:0.85em;border:1px solid #d1d5db;">
+      <svg height="16" width="12" viewBox="0 0 17.732 24.269" xmlns="http://www.w3.org/2000/svg"><path d="M573.549,280.916l2.266,2.738,6.674-7.84c.353-.47.52-.717.353-1.117a1.218,1.218,0,0,0-1.061-.748h0a.953.953,0,0,0-.712.262Z" transform="translate(-566.984 -271.548)" fill="#bdb9b4"/><path d="M579.525,282.225l-10.606-10.174a1.413,1.413,0,0,0-.834-.5,1.09,1.09,0,0,0-1.027.66c-.167.4-.047.681.319,1.206l8.44,10.242h0l-6.282,7.716a1.336,1.336,0,0,0-.323,1.3,1.114,1.114,0,0,0,1.04.69A.992.992,0,0,0,571,293l8.519-7.92A1.924,1.924,0,0,0,579.525,282.225Z" transform="translate(-566.984 -271.548)" fill="#b31b1b"/><path d="M584.32,293.912l-8.525-10.275,0,0L573.53,280.9l-1.389,1.254a2.063,2.063,0,0,0,0,2.965l10.812,10.419a.925.925,0,0,0,.742.282,1.039,1.039,0,0,0,.953-.667A1.261,1.261,0,0,0,584.32,293.912Z" transform="translate(-566.984 -271.548)" fill="#bdb9b4"/></svg>
+      Paper
+    </a>
+  </div>
+</div>
 """
 
 LOGO = """
@@ -806,7 +819,7 @@ def run_pipeline(
                     "No Documents Loaded",
                     "The input file was empty or could not be parsed.",
                 ),
-                no_vis_change, no_btn_change,
+                no_vis_change, no_btn_change, no_mode_change,
             )
             return
 
@@ -1095,7 +1108,7 @@ def clear_outputs_for_new_run():
         gr.update(visible=False),  # run_btn hidden
         gr.update(visible=True),  # cancel_btn shown
         gr.update(visible=False),  # text_input hidden
-        gr.update(value="✏️ Edit", visible=False),  # edit_btn hidden until pipeline finishes
+        gr.update(value="✎ Edit", visible=False),  # edit_btn hidden until pipeline finishes
         "preview",  # view_mode → preview
         gr.update(interactive=False),  # upload_btn disabled
         gr.update(interactive=False),  # unload_btn disabled
@@ -1161,15 +1174,8 @@ if __name__ == "__main__":
 
     # Custom CSS for cleaner design
     custom_css = """
-    .main-header {
-        margin-bottom: 0.25rem;
-    }
-    .subtitle {
-        margin-top: 0;
-        margin-bottom: 0.5rem;
-    }
-    .config-row {
-        align-items: flex-start !important;
+    #title-bar .html-container {
+        padding-left: 0 !important;
     }
     .output-section {
         min-height: 300px;
@@ -1187,90 +1193,104 @@ if __name__ == "__main__":
         padding: 0 !important;
         margin: 0 !important;
     }
-    .run-button {
-        margin-top: 0.25rem;
-        margin-bottom: 0.25rem;
-    }
-    #edit-preview-btn {
-        width: 100px !important;
-        max-width: 100px !important;
-        flex: 0 0 auto !important;
-    }
-    #upload-file-btn {
-        width: 120px !important;
-        max-width: 120px !important;
-        flex: 0 0 auto !important;
-        background: var(--button-primary-background-fill) !important;
-        color: var(--button-primary-text-color) !important;
-        border-color: var(--button-primary-border-color) !important;
-    }
-    .input-header-row > * {
-        flex: 0 0 auto !important;
-    }
-    .gradio-container {
-        font-size: 18px !important;
-    }
-    .gradio-container button {
-        font-size: 18px !important;
-    }
-    .gradio-container .markdown h1 {
-        font-size: 1.6em !important;
-    }
-    .gradio-container label {
-        font-size: 16px !important;
-    }
-    .config-header h3 {
-        font-size: 1.5em !important;
-    }
-    .pipeline-col-header p {
-        font-size: 1.2em !important;
-    }
     .input-header-row {
         align-items: center !important;
+        margin-bottom: 0 !important;
         gap: 0.5rem !important;
         flex-wrap: nowrap !important;
         justify-content: flex-start !important;
     }
-    .input-header-row > div {
+    .input-header-row > * {
         flex: 0 0 auto !important;
-        min-width: 0 !important;
+        width: auto !important;
+        max-width: fit-content !important;
+    }
+    .input-title {
+        flex: 0 0 auto !important;
         width: auto !important;
     }
-    .input-header-label {
-        flex: 0 0 auto !important;
+    .input-title h3 {
+        margin: 0 !important;
+    }
+    .action-row {
+        align-items: flex-start !important;
+        gap: 0.5rem !important;
+        flex-wrap: nowrap !important;
+        margin-top: 0.5rem !important;
+        margin-bottom: 0.25rem !important;
+    }
+    #stats-accordion {
+        flex: 1 1 auto !important;
         min-width: 0 !important;
     }
-    #kb-file-upload, #kb-file-upload label, #kb-file-upload span {
-        font-size: 14px !important;
+    #run-btn {
+        max-width: 400px !important;
     }
-    #kb-file-upload .wrap {
-        min-height: 270px !important;
+    #cancel-btn {
+        max-width: 400px !important;
+    }
+    #edit-preview-btn {
+        max-width: 100px !important;
+    }
+    #upload-file-btn {
+        max-width: 120px !important;
+    }
+    .config-row {
+        align-items: flex-start !important;
+    }
+    .pipeline-col-header p {
+        font-weight: 600 !important;
+        font-size: 1.1em !important;
+        margin-bottom: 0.3em !important;
+    }
+    .kb-row {
+        align-items: center !important;
+        gap: 0.75rem !important;
+        margin-top: 1.5rem !important;
+        margin-bottom: 0.25rem !important;
+    }
+    .kb-filename {
+        font-size: 0.85em !important;
+        opacity: 0.8;
+    }
+    .kb-filename p { margin: 0 !important; }
+    .gpu-info {
+        font-size: 0.85em !important;
+        opacity: 0.7;
+    }
+    .gpu-info p { margin: 0 !important; }
+    #config-accordion {
+        margin-top: 0.25rem !important;
+        position: relative !important;
+    }
+    #gpu-info-display {
+        width: auto !important;
+        max-width: fit-content !important;
+        padding: 0 !important;
+        margin-top: -29.5px !important;
+        margin-left: 110px !important;
+        margin-bottom: 0 !important;
+        pointer-events: none !important;
+        height: 0 !important;
+        overflow: visible !important;
+    }
+    #gpu-info-display > * {
+        padding: 0 !important;
     }
     #unload-btn {
         font-size: 13px !important;
-        width: 130px !important;
-        max-width: 130px !important;
-        min-width: 130px !important;
-        flex: 0 0 auto !important;
-        background: #f8d7da !important;
-        color: #721c24 !important;
-        border-color: #f5c6cb !important;
+        max-width: 160px !important;
+        background: #fef2f2 !important;
+        border-color: #fca5a5 !important;
+        color: #b91c1c !important;
     }
-    .input-section-row {
-        align-items: flex-start !important;
+    #unload-btn:hover {
+        background: #fee2e2 !important;
+        border-color: #f87171 !important;
     }
-    .kb-column {
-        padding-top: 5.8em !important;
-    }
-    .config-title-row {
-        align-items: center !important;
-        gap: 0.5rem !important;
-        flex-wrap: nowrap !important;
-    }
-    .config-title-row > div {
-        flex: 0 0 auto !important;
-        min-width: 0 !important;
-        width: auto !important;
+    .footer-logos {
+        margin-top: 1.5rem !important;
+        margin-bottom: 0 !important;
     }
     """
 
@@ -1378,425 +1398,350 @@ if __name__ == "__main__":
     </script>
     """
 
-    with gr.Blocks(title="LELA 🔗", fill_height=True, head=custom_head, css=custom_css) as demo:
-        gr.Markdown("# LELA: An end-to-end LLM-based Entity Linking Framework with Zero-Shot Domain Adaptation", elem_classes=["main-header"])
-        gr.Markdown(
-            DESCRIPTION,
-            elem_classes=["subtitle"],
+    with gr.Blocks(title="LELA", fill_height=True, head=custom_head, css=custom_css) as demo:
+        gr.HTML(TITLE_HTML, elem_id="title-bar")
+
+        # --- INPUT SECTION ---
+        with gr.Row(elem_classes=["input-header-row"]):
+            gr.Markdown("### Input Text", elem_classes=["input-title"])
+            upload_btn = gr.UploadButton(
+                "⇪ Upload File",
+                size="sm",
+                variant="secondary",
+                scale=0,
+                min_width=100,
+                file_types=[".txt", ".pdf", ".docx", ".html"],
+                elem_id="upload-file-btn",
+            )
+            edit_btn = gr.Button(
+                "◉ Preview",
+                size="sm",
+                variant="secondary",
+                scale=0,
+                min_width=90,
+                elem_id="edit-preview-btn",
+                visible=False,
+            )
+        text_input = gr.Textbox(
+            show_label=False,
+            placeholder="Enter or paste text, or drag & drop a file...",
+            lines=10,
+            elem_id="main-text-input",
+            value="Albert Einstein was born in Germany. Marie Curie was a pioneering scientist.",
+        )
+        # Result mode: HTML output (hidden by default)
+        preview_html = gr.HTML(
+            visible=False,
+            elem_id="main-result-output",
+            elem_classes=["output-section"],
         )
 
-        with gr.Tabs():
-            # ===== MAIN PIPELINE TAB =====
-            with gr.Tab("Pipeline"):
-                # --- INPUT SECTION ---
-                with gr.Row(elem_classes=["input-section-row"]):
-                    with gr.Column(scale=2):
-                        # Header row with label, Edit button, and Upload button
-                        with gr.Row(elem_classes=["input-header-row"]):
-                            gr.HTML(
-                                "<span style='font-weight:600;font-size:1.4em;line-height:2.4;'>Input text</span>",
-                                elem_classes=["input-header-label"],
-                            )
-                            edit_btn = gr.Button(
-                                "👁 Preview",
-                                size="sm",
-                                variant="secondary",
-                                scale=0,
-                                min_width=40,
-                                elem_id="edit-preview-btn",
-                                visible=False,
-                            )
-                            upload_btn = gr.UploadButton(
-                                "📄 Upload",
-                                size="sm",
-                                variant="secondary",
-                                scale=0,
-                                min_width=100,
-                                file_types=[".txt", ".pdf", ".docx", ".html"],
-                                elem_id="upload-file-btn",
-                            )
-                        # Edit mode: Textbox (visible by default)
-                        text_input = gr.Textbox(
-                            placeholder="Enter or paste text, or drop a file...",
-                            lines=12,
-                            show_label=False,
-                            elem_id="main-text-input",
-                            value="Albert Einstein was born in Germany. Marie Curie was a pioneering scientist.",
+        # --- ACTION ROW: Run/Cancel + Stats/JSON ---
+        with gr.Row(elem_classes=["action-row"]):
+            run_btn = gr.Button(
+                "Run Pipeline",
+                variant="primary",
+                scale=0,
+                min_width=400,
+                elem_id="run-btn",
+            )
+            cancel_btn = gr.Button(
+                "Cancel",
+                variant="stop",
+                visible=False,
+                scale=0,
+                min_width=400,
+                elem_id="cancel-btn",
+            )
+            with gr.Accordion("Stats / JSON", open=False, elem_id="stats-accordion"):
+                with gr.Tabs():
+                    with gr.Tab("Stats"):
+                        stats_output = gr.Markdown(
+                            "*Run the pipeline to see statistics.*"
                         )
-                        # Result mode: HTML output (hidden by default)
-                        preview_html = gr.HTML(
-                            visible=False,
-                            elem_id="main-result-output",
-                            elem_classes=["output-section"],
-                        )
+                    with gr.Tab("JSON"):
+                        json_output = gr.JSON(label="Pipeline Output")
 
-                        # Stats + JSON as collapsible section below
-                        with gr.Accordion("Stats / JSON", open=False):
-                            with gr.Tabs():
-                                with gr.Tab("Stats"):
-                                    stats_output = gr.Markdown(
-                                        "*Run the pipeline to see statistics.*"
-                                    )
-                                with gr.Tab("JSON"):
-                                    json_output = gr.JSON(label="Pipeline Output")
+        # Hidden file component for internal file tracking (used by pipeline)
+        file_input = gr.File(visible=False)
+        # State: "edit" or "preview" — tracks which mode the text area is in
+        view_mode = gr.State("edit")
 
-                    with gr.Column(scale=0, min_width=200, elem_classes=["kb-column"]):
-                        kb_file = gr.File(
-                            label="Knowledge Base (JSONL) — optional, defaults to YAGO 4.5",
-                            file_types=[".jsonl"],
-                            value=None,
-                            elem_id="kb-file-upload",
-                        )
-                        run_btn = gr.Button(
-                            "Run Pipeline",
-                            variant="primary",
-                            size="lg",
-                            elem_classes=["run-button"],
-                        )
-                        cancel_btn = gr.Button(
-                            "Cancel",
-                            variant="stop",
-                            size="lg",
-                            visible=False,
-                            elem_classes=["run-button"],
-                        )
+        # --- CONFIGURATION SECTION (collapsible) ---
+        with gr.Accordion("Configuration", open=True, elem_id="config-accordion"):
+            memory_estimate_display = gr.Markdown(
+                value="*Detecting GPU...*",
+                elem_classes=["gpu-info"],
+                elem_id="gpu-info-display",
+            )
+            # Knowledge base upload + Unload button
+            with gr.Row(elem_classes=["kb-row"]):
+                kb_upload_btn = gr.UploadButton(
+                    "▤ Upload Knowledge Base",
+                    file_types=[".jsonl"],
+                    size="sm",
+                    variant="secondary",
+                    scale=0,
+                    min_width=180,
+                    elem_id="kb-upload-btn",
+                )
+                kb_filename = gr.Markdown(
+                    value="*Using default: YAGO 4.5*",
+                    elem_classes=["kb-filename"],
+                )
+                unload_btn = gr.Button(
+                    "Unload All Models",
+                    variant="secondary",
+                    size="sm",
+                    scale=0,
+                    min_width=140,
+                    elem_id="unload-btn",
+                )
+            kb_file = gr.File(visible=False)
 
-                # Hidden file component for internal file tracking (used by pipeline)
-                file_input = gr.File(visible=False)
-                # State: "edit" or "preview" — tracks which mode the text area is in
-                view_mode = gr.State("edit")
+            with gr.Row(equal_height=False, elem_classes=["config-row"]):
+                # NER Column
+                with gr.Column(scale=1, min_width=180):
+                    gr.Markdown("**NER**", elem_classes=["pipeline-col-header"])
+                    ner_type = gr.Dropdown(
+                        choices=components["ner"],
+                        value="simple",
+                        label="Model",
+                        container=False,
 
-                # --- CONFIGURATION SECTION (Horizontal Layout) ---
-                with gr.Row(elem_classes=["config-title-row"]):
-                    gr.Markdown("### Configuration", elem_classes=["config-header"])
-                    unload_btn = gr.Button(
-                        "Unload All Models",
-                        variant="secondary",
-                        size="sm",
-                        scale=0,
-                        min_width=120,
-                        elem_id="unload-btn",
+                    )
+                    with gr.Group(visible=False) as spacy_params:
+                        spacy_model = gr.Textbox(
+                            label="SpaCy Model",
+                            value="en_core_web_sm",
+                            scale=1,
+                        )
+                    with gr.Group(visible=False) as gliner_params:
+                        gliner_model = gr.Textbox(
+                            label="GLiNER Model",
+                            value=DEFAULT_GLINER_MODEL,
+                        )
+                        gliner_labels = gr.Textbox(
+                            label="Labels (comma-sep)",
+                            value="person, organization, location",
+                        )
+                        gliner_threshold = gr.Slider(
+                            minimum=0.1,
+                            maximum=1.0,
+                            value=0.5,
+                            step=0.05,
+                            label="Threshold",
+                        )
+                    with gr.Group(visible=True) as simple_params:
+                        simple_min_len = gr.Slider(
+                            minimum=1,
+                            maximum=10,
+                            value=3,
+                            step=1,
+                            label="Min Length",
+                        )
+                    ner_vram_info = gr.Markdown(
+                        visible=False,
                     )
 
-                # GPU memory info
-                memory_estimate_display = gr.Markdown(
-                    value="*Detecting GPU...*",
-                    elem_id="memory-estimate",
-                )
+                # Candidates Column
+                with gr.Column(scale=1, min_width=180):
+                    gr.Markdown("**Candidates**", elem_classes=["pipeline-col-header"])
+                    cand_type = gr.Dropdown(
+                        choices=components["candidates"],
+                        value="fuzzy",
+                        label="Generator",
+                        container=False,
 
-                with gr.Row(equal_height=False, elem_classes=["config-row"]):
-                    # NER Column
-                    with gr.Column(scale=1, min_width=200):
-                        gr.Markdown("**NER**", elem_classes=["pipeline-col-header"])
-                        ner_type = gr.Dropdown(
-                            choices=components["ner"],
-                            value="simple",
-                            label="Model",
-                            container=False,
+                    )
+                    # Embedding model selection for dense candidates
+                    embedding_model_choices = [
+                        (m[1], m[0]) for m in EMBEDDING_MODEL_CHOICES
+                    ]
+                    cand_embedding_model = gr.Dropdown(
+                        choices=embedding_model_choices,
+                        value="Qwen/Qwen3-Embedding-4B",
+                        label="Embedding Model",
+                        visible=False,
+                    )
+                    with gr.Group(
+                        visible=False
+                    ) as lela_openai_api_dense_cand_params:
+                        cand_api_base_url = gr.Textbox(
+                            label="Cand. OpenAI API Base URL",
+                            value="http://localhost:8000/v1",
                         )
-                        with gr.Group(visible=False) as spacy_params:
-                            spacy_model = gr.Textbox(
-                                label="SpaCy Model",
-                                value="en_core_web_sm",
-                                scale=1,
-                            )
-                        with gr.Group(visible=False) as gliner_params:
-                            gliner_model = gr.Textbox(
-                                label="GLiNER Model",
-                                value=DEFAULT_GLINER_MODEL,
-                            )
-                            gliner_labels = gr.Textbox(
-                                label="Labels (comma-sep)",
-                                value="person, organization, location",
-                            )
-                            gliner_threshold = gr.Slider(
-                                minimum=0.1,
-                                maximum=1.0,
-                                value=0.5,
-                                step=0.05,
-                                label="Threshold",
-                            )
-                        with gr.Group(visible=True) as simple_params:
-                            simple_min_len = gr.Slider(
-                                minimum=1,
-                                maximum=10,
-                                value=3,
-                                step=1,
-                                label="Min Length",
-                            )
-                        ner_vram_info = gr.Markdown(
-                            visible=False,
+                        cand_api_key = gr.Textbox(
+                            label="Cand. OpenAI API Key",
+                            value="",
+                            type="password",
+                        )
+                    cand_top_k = gr.Slider(
+                        minimum=1,
+                        maximum=100,
+                        value=64,
+                        step=1,
+                        label="Top K",
+                    )
+                    cand_use_context = gr.Checkbox(
+                        label="Use Context",
+                        value=False,
+                        visible=False,
+                    )
+                    cand_vram_info = gr.Markdown(
+                        visible=False,
+                    )
+
+                # Reranking Column
+                with gr.Column(scale=1, min_width=180):
+                    gr.Markdown("**Reranking**", elem_classes=["pipeline-col-header"])
+                    reranker_type = gr.Dropdown(
+                        choices=components["rerankers"],
+                        value="none",
+                        label="Reranker",
+                        container=False,
+
+                    )
+                    # Cross-encoder model selection
+                    cross_encoder_model_choices = [
+                        (m[1], m[0]) for m in CROSS_ENCODER_MODEL_CHOICES
+                    ]
+                    reranker_cross_encoder_model = gr.Dropdown(
+                        choices=cross_encoder_model_choices,
+                        value="tomaarsen/Qwen3-Reranker-4B-seq-cls",
+                        label="Cross-Encoder Model",
+                        visible=False,
+                    )
+                    # Embedding model selection for embedder reranker
+                    reranker_embedding_model = gr.Dropdown(
+                        choices=embedding_model_choices,
+                        value="Qwen/Qwen3-Embedding-4B",
+                        label="Embedding Model",
+                        visible=False,
+                    )
+                    with gr.Group(visible=False) as lela_vllm_api_client_params:
+                        reranker_api_url = gr.Textbox(
+                            label="Reranker API URL",
+                            value="http://localhost",
+                        )
+                        reranker_api_port = gr.Number(
+                            label="Reranker API Port",
+                            value=8000,
+                        )
+                    reranker_top_k = gr.Slider(
+                        minimum=1,
+                        maximum=20,
+                        value=10,
+                        step=1,
+                        label="Top K",
+                    )
+                    reranker_gpu_mem_gb = gr.Slider(
+                        minimum=0.5,
+                        maximum=gpu_total_gb,
+                        value=min(10.0, gpu_total_gb),
+                        step=0.5,
+                        label="GPU Memory (GB)",
+                        visible=False,
+                    )
+                    reranker_max_model_len = gr.Slider(
+                        minimum=MIN_VLLM_CONTEXT_LEN,
+                        maximum=MAX_VLLM_CONTEXT_LEN,
+                        value=min(DEFAULT_WEB_VLLM_CONTEXT_LEN, MAX_VLLM_CONTEXT_LEN),
+                        step=VLLM_CONTEXT_LEN_STEP,
+                        label="Context Length (max_model_len)",
+                        visible=False,
+                    )
+                    reranker_vram_info = gr.Markdown(
+                        visible=False,
+                    )
+
+                # Disambiguation Column
+                with gr.Column(scale=1, min_width=180):
+                    gr.Markdown("**Disambiguation**", elem_classes=["pipeline-col-header"])
+                    disambig_type = gr.Dropdown(
+                        choices=components["disambiguators"],
+                        value="first",
+                        label="Method",
+                        container=False,
+
+                    )
+                    # LLM model selection for vLLM-based disambiguators
+                    llm_model_choices = [(m[1], m[0]) for m in LLM_MODEL_CHOICES]
+                    llm_model = gr.Dropdown(
+                        choices=llm_model_choices,
+                        value="Qwen/Qwen3-4B",
+                        label="LLM Model",
+                        visible=False,
+                    )
+                    with gr.Group(visible=False) as lela_common_params:
+                        lela_thinking = gr.Checkbox(
+                            label="Reasoning",
+                            value=True,
+                        )
+                        lela_none_candidate = gr.Checkbox(
+                            label="'None' Candidate",
+                            value=True,
+                        )
+                    disambig_gpu_mem_gb = gr.Slider(
+                        minimum=0.5,
+                        maximum=gpu_total_gb,
+                        value=min(10.0, gpu_total_gb),
+                        step=0.5,
+                        label="GPU Memory (GB)",
+                        visible=False,
+                    )
+                    disambig_max_model_len = gr.Slider(
+                        minimum=MIN_VLLM_CONTEXT_LEN,
+                        maximum=MAX_VLLM_CONTEXT_LEN,
+                        value=min(DEFAULT_WEB_VLLM_CONTEXT_LEN, MAX_VLLM_CONTEXT_LEN),
+                        step=VLLM_CONTEXT_LEN_STEP,
+                        label="Context Length (max_model_len)",
+                        visible=False,
+                    )
+                    disambig_vram_info = gr.Markdown(
+                        visible=False,
+                    )
+                    with gr.Group(visible=False) as lela_openai_api_params:
+                        disambig_api_base_url = gr.Textbox(
+                            label="OpenAI API Base URL",
+                            value="http://localhost:8000/v1",
+                        )
+                        disambig_api_key = gr.Textbox(
+                            label="OpenAI API Key",
+                            value="",
+                            type="password",
                         )
 
-                    # Candidates Column
-                    with gr.Column(scale=1, min_width=200):
-                        gr.Markdown("**Candidates**", elem_classes=["pipeline-col-header"])
-                        cand_type = gr.Dropdown(
-                            choices=components["candidates"],
-                            value="fuzzy",
-                            label="Generator",
-                            container=False,
-                        )
-                        # Embedding model selection for dense candidates
-                        embedding_model_choices = [
-                            (m[1], m[0]) for m in EMBEDDING_MODEL_CHOICES
-                        ]
-                        cand_embedding_model = gr.Dropdown(
-                            choices=embedding_model_choices,
-                            value="Qwen/Qwen3-Embedding-4B",
-                            label="Embedding Model",
-                            visible=False,
-                        )
-                        with gr.Group(
-                            visible=False
-                        ) as lela_openai_api_dense_cand_params:
-                            cand_api_base_url = gr.Textbox(
-                                label="Cand. OpenAI API Base URL",
-                                value="http://localhost:8000/v1",
-                            )
-                            cand_api_key = gr.Textbox(
-                                label="Cand. OpenAI API Key",
-                                value="",
-                                type="password",
-                            )
-                        cand_top_k = gr.Slider(
-                            minimum=1,
-                            maximum=100,
-                            value=64,
-                            step=1,
-                            label="Top K",
-                        )
-                        cand_use_context = gr.Checkbox(
-                            label="Use Context",
-                            value=False,
-                            visible=False,
-                        )
-                        cand_vram_info = gr.Markdown(
-                            visible=False,
-                        )
 
-                    # Reranking Column
-                    with gr.Column(scale=1, min_width=200):
-                        gr.Markdown("**Reranking**", elem_classes=["pipeline-col-header"])
-                        reranker_type = gr.Dropdown(
-                            choices=components["rerankers"],
-                            value="none",
-                            label="Reranker",
-                            container=False,
-                        )
-                        # Cross-encoder model selection
-                        cross_encoder_model_choices = [
-                            (m[1], m[0]) for m in CROSS_ENCODER_MODEL_CHOICES
-                        ]
-                        reranker_cross_encoder_model = gr.Dropdown(
-                            choices=cross_encoder_model_choices,
-                            value="tomaarsen/Qwen3-Reranker-4B-seq-cls",
-                            label="Cross-Encoder Model",
-                            visible=False,
-                        )
-                        # Embedding model selection for embedder reranker
-                        reranker_embedding_model = gr.Dropdown(
-                            choices=embedding_model_choices,
-                            value="Qwen/Qwen3-Embedding-4B",
-                            label="Embedding Model",
-                            visible=False,
-                        )
-                        with gr.Group(visible=False) as lela_vllm_api_client_params:
-                            reranker_api_url = gr.Textbox(
-                                label="Reranker API URL",
-                                value="http://localhost",
-                            )
-                            reranker_api_port = gr.Number(
-                                label="Reranker API Port",
-                                value=8000,
-                            )
-                        reranker_top_k = gr.Slider(
-                            minimum=1,
-                            maximum=20,
-                            value=10,
-                            step=1,
-                            label="Top K",
-                        )
-                        reranker_gpu_mem_gb = gr.Slider(
-                            minimum=0.5,
-                            maximum=gpu_total_gb,
-                            value=min(10.0, gpu_total_gb),
-                            step=0.5,
-                            label="GPU Memory (GB)",
-                            visible=False,
-                        )
-                        reranker_max_model_len = gr.Slider(
-                            minimum=MIN_VLLM_CONTEXT_LEN,
-                            maximum=MAX_VLLM_CONTEXT_LEN,
-                            value=min(DEFAULT_WEB_VLLM_CONTEXT_LEN, MAX_VLLM_CONTEXT_LEN),
-                            step=VLLM_CONTEXT_LEN_STEP,
-                            label="Context Length (max_model_len)",
-                            visible=False,
-                        )
-                        reranker_vram_info = gr.Markdown(
-                            visible=False,
-                        )
+        # Hidden loader and KB type (auto-detected)
+        loader_type = gr.Dropdown(
+            choices=components["loaders"],
+            value="text",
+            visible=False,
+        )
+        kb_type = gr.Dropdown(
+            choices=components["knowledge_bases"],
+            value="custom",
+            visible=False,
+        )
 
-                    # Disambiguation Column
-                    with gr.Column(scale=1, min_width=200):
-                        gr.Markdown("**Disambiguation**", elem_classes=["pipeline-col-header"])
-                        disambig_type = gr.Dropdown(
-                            choices=components["disambiguators"],
-                            value="first",
-                            label="Method",
-                            container=False,
-                        )
-                        # LLM model selection for vLLM-based disambiguators
-                        llm_model_choices = [(m[1], m[0]) for m in LLM_MODEL_CHOICES]
-                        llm_model = gr.Dropdown(
-                            choices=llm_model_choices,
-                            value="Qwen/Qwen3-4B",
-                            label="LLM Model",
-                            visible=False,
-                        )
-                        with gr.Group(visible=False) as lela_common_params:
-                            lela_thinking = gr.Checkbox(
-                                label="Reasoning",
-                                value=True,
-                            )
-                            lela_none_candidate = gr.Checkbox(
-                                label="'None' Candidate",
-                                value=True,
-                            )
-                        disambig_gpu_mem_gb = gr.Slider(
-                            minimum=0.5,
-                            maximum=gpu_total_gb,
-                            value=min(10.0, gpu_total_gb),
-                            step=0.5,
-                            label="GPU Memory (GB)",
-                            visible=False,
-                        )
-                        disambig_max_model_len = gr.Slider(
-                            minimum=MIN_VLLM_CONTEXT_LEN,
-                            maximum=MAX_VLLM_CONTEXT_LEN,
-                            value=min(DEFAULT_WEB_VLLM_CONTEXT_LEN, MAX_VLLM_CONTEXT_LEN),
-                            step=VLLM_CONTEXT_LEN_STEP,
-                            label="Context Length (max_model_len)",
-                            visible=False,
-                        )
-                        disambig_vram_info = gr.Markdown(
-                            visible=False,
-                        )
-                        with gr.Group(visible=False) as lela_openai_api_params:
-                            disambig_api_base_url = gr.Textbox(
-                                label="OpenAI API Base URL",
-                                value="http://localhost:8000/v1",
-                            )
-                            disambig_api_key = gr.Textbox(
-                                label="OpenAI API Key",
-                                value="",
-                                type="password",
-                            )
-                # Hidden loader and KB type (auto-detected)
-                loader_type = gr.Dropdown(
-                    choices=components["loaders"],
-                    value="text",
-                    visible=False,
-                )
-                kb_type = gr.Dropdown(
-                    choices=components["knowledge_bases"],
-                    value="custom",
-                    visible=False,
-                )
+        gr.Markdown(LOGO, elem_classes=["footer-logos"])
 
-                gr.Markdown(LOGO)
-
-            # ===== DOCUMENTATION TAB =====
-            with gr.Tab("Help"):
-                gr.Markdown("""
-## Quick Start
-
-1. **Upload Knowledge Base**: JSONL file with entities (`title`, `description`, optional `id`)
-2. **Enter Text or Upload File**: Input text directly or upload a document
-3. **Configure Pipeline**: Select components and adjust parameters
-4. **Run**: Click "Run Pipeline" to process
-
----
-
-## Example Files
-
-Test files are available in `data/test/`:
-- `sample_kb.jsonl` - Sample knowledge base with 10 entities
-- `sample_doc.txt` - Sample document for testing
-
----
-
-## Pipeline Components
-
-### NER Models
-| Name | Description |
-|------|-------------|
-| **simple** | Regex-based extraction of capitalized phrases |
-| **spacy** | SpaCy NER models (requires download) |
-| **gliner** | GLiNER zero-shot NER with custom labels |
-
-### Candidate Generators
-| Name | Description |
-|------|-------------|
-| **fuzzy** | Fuzzy string matching |
-| **bm25** | BM25 text retrieval |
-| **lela_dense** | Dense embedding retrieval |
-
-### Rerankers
-| Name | Description |
-|------|-------------|
-| **none** | No reranking |
-| **lela_cross_encoder** | Cross-encoder reranking |
-| **lela_embedder** | Embedding-based reranking |
-
-### Disambiguators
-| Name | Description |
-|------|-------------|
-| **none** | No disambiguation |
-| **first** | Select first candidate |
-| **popularity** | Select by popularity |
-| **lela_vllm** | vLLM-based disambiguation |
-| **lela_openai_api** | OpenAI-compatible API disambiguation |
-
----
-
-## spaCy Component Mapping
-
-| Config Name | spaCy Factory |
-|-------------|---------------|
-| simple | el_pipeline_simple |
-| lela_embedder | el_pipeline_lela_embedder_reranker |
-| lela_vllm | el_pipeline_lela_vllm_disambiguator |
-| lela_openai_api | el_pipeline_lela_openai_api_disambiguator |
-
----
-
-## Entity Type Legend (SpaCy)
-
-| Label | Meaning | Example |
-|-------|---------|---------|
-| **PERSON** | People, including fictional | *Albert Einstein*, *Marie Curie* |
-| **ORG** | Organizations, companies, agencies | *Google*, *United Nations*, *NASA* |
-| **GPE** | Geopolitical entities | *France*, *New York*, *California* |
-| **LOC** | Non-GPE locations | *Mount Everest*, *Pacific Ocean* |
-| **FAC** | Facilities | *Empire State Building*, *JFK Airport* |
-| **PRODUCT** | Objects, vehicles, foods | *iPhone*, *Boeing 747* |
-| **EVENT** | Named events | *World War II*, *Hurricane Katrina* |
-| **WORK_OF_ART** | Creative works | *The Great Gatsby*, *Mona Lisa* |
-| **LAW** | Legal documents | *Roe v. Wade*, *GDPR* |
-| **LANGUAGE** | Languages | *English*, *Mandarin* |
-| **DATE** | Dates/periods | *January 2020*, *next week* |
-| **TIME** | Times | *3:00 PM*, *morning* |
-| **PERCENT** | Percentages | *50%*, *ten percent* |
-| **MONEY** | Monetary values | *$100*, *€50 million* |
-| **QUANTITY** | Measurements | *10 kg*, *five miles* |
-| **ORDINAL** | Ordinal numbers | *first*, *3rd* |
-| **CARDINAL** | Cardinal numbers | *one*, *100*, *millions* |
-| **NORP** | Nationalities/groups | *American*, *Buddhist* |
-| **ENT** | Generic entity | Any capitalized phrase |
-                """)
 
         # --- EVENT HANDLERS ---
+
+        # KB upload button → populate hidden file + show filename
+        def on_kb_upload(file):
+            if file is None:
+                return None, "*Using default: YAGO 4.5*"
+            name = Path(file.name).name if hasattr(file, 'name') else str(file)
+            return file, f"**{name}**"
+
+        kb_upload_btn.upload(
+            fn=on_kb_upload,
+            inputs=[kb_upload_btn],
+            outputs=[kb_file, kb_filename],
+        )
 
         # Edit/Preview toggle button
         def toggle_edit_preview(current_mode, current_preview):
@@ -1809,7 +1754,7 @@ Test files are available in `data/test/`:
                 return (
                     gr.update(visible=False),  # text_input
                     gr.update(value=html, visible=True),  # preview_html
-                    gr.update(value="✏️ Edit"),  # edit_btn label
+                    gr.update(value="✎ Edit"),  # edit_btn label
                     "preview",  # view_mode
                 )
             else:
@@ -1817,7 +1762,7 @@ Test files are available in `data/test/`:
                 return (
                     gr.update(visible=True),  # text_input
                     gr.update(visible=False),  # preview_html
-                    gr.update(value="👁 Preview", visible=False),  # edit_btn label + hide
+                    gr.update(value="◉ Preview", visible=False),  # edit_btn label + hide
                     "edit",  # view_mode
                 )
 
