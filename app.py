@@ -31,9 +31,6 @@ from el_pipeline.lela.config import (
 from el_pipeline.lela.llm_pool import clear_all_models
 
 DESCRIPTION = """
-*Modular entity recognition and linking pipeline. Upload a knowledge base, enter text, configure the pipeline, and run.*"
-
-## Links
 - Repository: https://github.com/samyhaff/LELA
 - LELA Paper: https://arxiv.org/abs/2601.05192
 """
@@ -490,7 +487,7 @@ def format_error_output(error_title: str, error_message: str) -> Tuple[str, str,
     stats = f"**Error**\n\n{full_error}"
     result = {"error": error_title, "details": error_message}
 
-    return html_output, stats, result
+    return gr.update(value=html_output), stats, result
 
 
 def _run_with_heartbeat(fn, progress_fn, initial_progress, initial_desc):
@@ -609,6 +606,8 @@ def run_pipeline(
         torch.cuda.empty_cache()
 
     no_vis_change = gr.update()
+    no_btn_change = gr.update()
+    no_mode_change = gr.update()
 
     if not kb_file:
         from el_pipeline.knowledge_bases.yago_downloader import ensure_yago_kb
@@ -627,18 +626,18 @@ def run_pipeline(
             *format_error_output(
                 "Missing Input", "Please provide either text input or upload a file."
             ),
-            no_vis_change,
+            no_vis_change, no_btn_change, no_mode_change,
         )
         return
 
     # Check for cancellation
     if _cancel_event.is_set():
         logger.info("Pipeline cancelled before configuration")
-        yield "", "*Pipeline cancelled.*", {}, no_vis_change
+        yield gr.update(value=""), "*Pipeline cancelled.*", {}, no_vis_change, no_btn_change, no_mode_change
         return
 
     progress(0.1, desc="Building pipeline configuration...")
-    yield "", "*Building configuration...*", {}, no_vis_change
+    yield gr.update(value=""), "*Building configuration...*", {}, no_vis_change, no_btn_change, no_mode_change
 
     # Build NER params based on type
     ner_params = {}
@@ -732,11 +731,11 @@ def run_pipeline(
     # Check for cancellation
     if _cancel_event.is_set():
         logger.info("Pipeline cancelled before initialization")
-        yield "", "*Pipeline cancelled.*", {}, no_vis_change
+        yield gr.update(value=""), "*Pipeline cancelled.*", {}, no_vis_change, no_btn_change, no_mode_change
         return
 
     progress(0.15, desc="Initializing pipeline...")
-    yield "", "*Initializing pipeline...*", {}, no_vis_change
+    yield gr.update(value=""), "*Initializing pipeline...*", {}, no_vis_change, no_btn_change, no_mode_change
 
     try:
         config = PipelineConfig.from_dict(config_dict)
@@ -761,24 +760,24 @@ def run_pipeline(
         )
     except InterruptedError:
         logger.info("Pipeline cancelled during initialization")
-        yield "", "*Pipeline cancelled.*", {}, no_vis_change
+        yield gr.update(value=""), "*Pipeline cancelled.*", {}, no_vis_change, no_btn_change, no_mode_change
         return
     except Exception as e:
         logger.exception("Pipeline initialization failed")
         yield (
             *format_error_output("Pipeline Initialization Failed", str(e)),
-            no_vis_change,
+            no_vis_change, no_btn_change, no_mode_change,
         )
         return
 
     # Check for cancellation
     if _cancel_event.is_set():
         logger.info("Pipeline cancelled after initialization")
-        yield "", "*Pipeline cancelled.*", {}, no_vis_change
+        yield gr.update(value=""), "*Pipeline cancelled.*", {}, no_vis_change, no_btn_change, no_mode_change
         return
 
     progress(0.4, desc="Loading document...")
-    yield "", "*Loading document...*", {}, no_vis_change
+    yield gr.update(value=""), "*Loading document...*", {}, no_vis_change, no_btn_change, no_mode_change
 
     try:
         if file_input:
@@ -807,7 +806,7 @@ def run_pipeline(
                     "No Documents Loaded",
                     "The input file was empty or could not be parsed.",
                 ),
-                no_vis_change,
+                no_vis_change, no_btn_change,
             )
             return
 
@@ -816,11 +815,11 @@ def run_pipeline(
         # Check for cancellation
         if _cancel_event.is_set():
             logger.info("Pipeline cancelled before processing")
-            yield "", "*Pipeline cancelled.*", {}, no_vis_change
+            yield gr.update(value=""), "*Pipeline cancelled.*", {}, no_vis_change, no_btn_change, no_mode_change
             return
 
         progress(0.45, desc="Processing document...")
-        yield "", "*Processing document...*", {}, no_vis_change
+        yield gr.update(value=""), "*Processing document...*", {}, no_vis_change, no_btn_change, no_mode_change
 
         def _run_processing(report):
             def progress_callback(local_progress: float, description: str):
@@ -844,10 +843,10 @@ def run_pipeline(
 
     except InterruptedError:
         logger.info("Pipeline cancelled during processing")
-        yield "", "*Pipeline cancelled.*", {}, no_vis_change
+        yield gr.update(value=""), "*Pipeline cancelled.*", {}, no_vis_change, no_btn_change, no_mode_change
         return
     except Exception as e:
-        yield (*format_error_output("Pipeline Execution Failed", str(e)), no_vis_change)
+        yield (*format_error_output("Pipeline Execution Failed", str(e)), no_vis_change, no_btn_change, no_mode_change)
         return
 
     logger.info("Pipeline processing complete, formatting output...")
@@ -888,8 +887,8 @@ def run_pipeline(
         f"=== run_pipeline RETURNING (run #{_run_counter}, {len(result.get('entities', []))} entities) ==="
     )
     sys.stderr.flush()
-    # Final yield with complete results — stay in result mode (text_input hidden)
-    yield html_output, stats, result, gr.update(visible=False)
+    # Final yield: show preview with results, hide text_input, show edit_btn, switch to preview mode
+    yield gr.update(value=html_output, visible=True), stats, result, gr.update(visible=False), gr.update(visible=True), "preview"
 
 
 def update_ner_params(ner_choice: str):
@@ -1087,25 +1086,31 @@ def clear_outputs_for_new_run():
     import sys
 
     sys.stderr.flush()
-    # Return: preview_html (cleared + shown), stats, json, run_btn, cancel_btn,
-    #         text_input (hidden), edit_btn (label→"Edit"), view_mode (→"preview")
+    # Return: preview_html, stats, json, run_btn, cancel_btn,
+    #         text_input, edit_btn, view_mode, upload_btn, unload_btn, kb_file
     return (
-        gr.update(value="", visible=True),  # preview_html: clear + show (result mode)
+        gr.update(value="", visible=True),  # preview_html: clear + show (progress bar appears here)
         "*Processing...*",
         None,
         gr.update(visible=False),  # run_btn hidden
         gr.update(visible=True),  # cancel_btn shown
-        gr.update(visible=False),  # text_input hidden (result mode)
-        gr.update(value="✏️ Edit"),  # edit_btn label
-        "preview",  # view_mode
+        gr.update(visible=False),  # text_input hidden
+        gr.update(value="✏️ Edit", visible=False),  # edit_btn hidden until pipeline finishes
+        "preview",  # view_mode → preview
+        gr.update(interactive=False),  # upload_btn disabled
+        gr.update(interactive=False),  # unload_btn disabled
+        gr.update(interactive=False),  # kb_file disabled
     )
 
 
 def restore_buttons_after_run():
-    """Restore button visibility after pipeline completes or is cancelled."""
-    # Show Run button, hide Cancel button (reset text and make interactive again)
-    return gr.update(visible=True), gr.update(
-        visible=False, value="Cancel", interactive=True
+    """Restore button visibility and re-enable controls after pipeline completes or is cancelled."""
+    return (
+        gr.update(visible=True),  # run_btn shown
+        gr.update(visible=False, value="Cancel", interactive=True),  # cancel_btn hidden
+        gr.update(interactive=True),  # upload_btn re-enabled
+        gr.update(interactive=True),  # unload_btn re-enabled
+        gr.update(interactive=True),  # kb_file re-enabled
     )
 
 
@@ -1174,19 +1179,98 @@ if __name__ == "__main__":
         border-radius: var(--radius-lg);
         padding: 1em;
     }
+    #main-result-output {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    #main-result-output > div {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
     .run-button {
-        margin-top: 1rem;
-        margin-bottom: 1rem;
+        margin-top: 0.25rem;
+        margin-bottom: 0.25rem;
     }
     #edit-preview-btn {
         width: 100px !important;
         max-width: 100px !important;
-        flex: none !important;
+        flex: 0 0 auto !important;
     }
     #upload-file-btn {
         width: 120px !important;
         max-width: 120px !important;
-        flex: none !important;
+        flex: 0 0 auto !important;
+        background: var(--button-primary-background-fill) !important;
+        color: var(--button-primary-text-color) !important;
+        border-color: var(--button-primary-border-color) !important;
+    }
+    .input-header-row > * {
+        flex: 0 0 auto !important;
+    }
+    .gradio-container {
+        font-size: 18px !important;
+    }
+    .gradio-container button {
+        font-size: 18px !important;
+    }
+    .gradio-container .markdown h1 {
+        font-size: 1.6em !important;
+    }
+    .gradio-container label {
+        font-size: 16px !important;
+    }
+    .config-header h3 {
+        font-size: 1.5em !important;
+    }
+    .pipeline-col-header p {
+        font-size: 1.2em !important;
+    }
+    .input-header-row {
+        align-items: center !important;
+        gap: 0.5rem !important;
+        flex-wrap: nowrap !important;
+        justify-content: flex-start !important;
+    }
+    .input-header-row > div {
+        flex: 0 0 auto !important;
+        min-width: 0 !important;
+        width: auto !important;
+    }
+    .input-header-label {
+        flex: 0 0 auto !important;
+        min-width: 0 !important;
+    }
+    #kb-file-upload, #kb-file-upload label, #kb-file-upload span {
+        font-size: 14px !important;
+    }
+    #kb-file-upload .wrap {
+        min-height: 270px !important;
+    }
+    #unload-btn {
+        font-size: 13px !important;
+        width: 130px !important;
+        max-width: 130px !important;
+        min-width: 130px !important;
+        flex: 0 0 auto !important;
+        background: #f8d7da !important;
+        color: #721c24 !important;
+        border-color: #f5c6cb !important;
+    }
+    .input-section-row {
+        align-items: flex-start !important;
+    }
+    .kb-column {
+        padding-top: 5.8em !important;
+    }
+    .config-title-row {
+        align-items: center !important;
+        gap: 0.5rem !important;
+        flex-wrap: nowrap !important;
+    }
+    .config-title-row > div {
+        flex: 0 0 auto !important;
+        min-width: 0 !important;
+        width: auto !important;
     }
     """
 
@@ -1294,8 +1378,8 @@ if __name__ == "__main__":
     </script>
     """
 
-    with gr.Blocks(title="EL Pipeline 🔗", fill_height=True, head=custom_head) as demo:
-        gr.Markdown("# EL Pipeline 🔗", elem_classes=["main-header"])
+    with gr.Blocks(title="LELA 🔗", fill_height=True, head=custom_head, css=custom_css) as demo:
+        gr.Markdown("# LELA: An end-to-end LLM-based Entity Linking Framework with Zero-Shot Domain Adaptation", elem_classes=["main-header"])
         gr.Markdown(
             DESCRIPTION,
             elem_classes=["subtitle"],
@@ -1305,12 +1389,13 @@ if __name__ == "__main__":
             # ===== MAIN PIPELINE TAB =====
             with gr.Tab("Pipeline"):
                 # --- INPUT SECTION ---
-                with gr.Row():
+                with gr.Row(elem_classes=["input-section-row"]):
                     with gr.Column(scale=2):
                         # Header row with label, Edit button, and Upload button
-                        with gr.Row():
+                        with gr.Row(elem_classes=["input-header-row"]):
                             gr.HTML(
-                                "<span style='font-weight:600;font-size:1.1em;line-height:2.4;'>Input text</span>"
+                                "<span style='font-weight:600;font-size:1.4em;line-height:2.4;'>Input text</span>",
+                                elem_classes=["input-header-label"],
                             )
                             edit_btn = gr.Button(
                                 "👁 Preview",
@@ -1319,6 +1404,7 @@ if __name__ == "__main__":
                                 scale=0,
                                 min_width=40,
                                 elem_id="edit-preview-btn",
+                                visible=False,
                             )
                             upload_btn = gr.UploadButton(
                                 "📄 Upload",
@@ -1354,11 +1440,12 @@ if __name__ == "__main__":
                                 with gr.Tab("JSON"):
                                     json_output = gr.JSON(label="Pipeline Output")
 
-                    with gr.Column(scale=1, min_width=200):
+                    with gr.Column(scale=0, min_width=200, elem_classes=["kb-column"]):
                         kb_file = gr.File(
                             label="Knowledge Base (JSONL) — optional, defaults to YAGO 4.5",
                             file_types=[".jsonl"],
                             value=None,
+                            elem_id="kb-file-upload",
                         )
                         run_btn = gr.Button(
                             "Run Pipeline",
@@ -1380,26 +1467,27 @@ if __name__ == "__main__":
                 view_mode = gr.State("edit")
 
                 # --- CONFIGURATION SECTION (Horizontal Layout) ---
-                gr.Markdown("### Configuration")
-
-                # GPU memory info + unload button
-                with gr.Row():
-                    memory_estimate_display = gr.Markdown(
-                        value="*Detecting GPU...*",
-                        elem_id="memory-estimate",
-                    )
+                with gr.Row(elem_classes=["config-title-row"]):
+                    gr.Markdown("### Configuration", elem_classes=["config-header"])
                     unload_btn = gr.Button(
                         "Unload All Models",
                         variant="secondary",
                         size="sm",
                         scale=0,
-                        min_width=140,
+                        min_width=120,
+                        elem_id="unload-btn",
                     )
+
+                # GPU memory info
+                memory_estimate_display = gr.Markdown(
+                    value="*Detecting GPU...*",
+                    elem_id="memory-estimate",
+                )
 
                 with gr.Row(equal_height=False, elem_classes=["config-row"]):
                     # NER Column
                     with gr.Column(scale=1, min_width=200):
-                        gr.Markdown("**NER**")
+                        gr.Markdown("**NER**", elem_classes=["pipeline-col-header"])
                         ner_type = gr.Dropdown(
                             choices=components["ner"],
                             value="simple",
@@ -1442,7 +1530,7 @@ if __name__ == "__main__":
 
                     # Candidates Column
                     with gr.Column(scale=1, min_width=200):
-                        gr.Markdown("**Candidates**")
+                        gr.Markdown("**Candidates**", elem_classes=["pipeline-col-header"])
                         cand_type = gr.Dropdown(
                             choices=components["candidates"],
                             value="fuzzy",
@@ -1489,7 +1577,7 @@ if __name__ == "__main__":
 
                     # Reranking Column
                     with gr.Column(scale=1, min_width=200):
-                        gr.Markdown("**Reranking**")
+                        gr.Markdown("**Reranking**", elem_classes=["pipeline-col-header"])
                         reranker_type = gr.Dropdown(
                             choices=components["rerankers"],
                             value="none",
@@ -1551,7 +1639,7 @@ if __name__ == "__main__":
 
                     # Disambiguation Column
                     with gr.Column(scale=1, min_width=200):
-                        gr.Markdown("**Disambiguation**")
+                        gr.Markdown("**Disambiguation**", elem_classes=["pipeline-col-header"])
                         disambig_type = gr.Dropdown(
                             choices=components["disambiguators"],
                             value="first",
@@ -1725,11 +1813,11 @@ Test files are available in `data/test/`:
                     "preview",  # view_mode
                 )
             else:
-                # Switch to edit mode
+                # Switch to edit mode — hide the toggle button
                 return (
                     gr.update(visible=True),  # text_input
                     gr.update(visible=False),  # preview_html
-                    gr.update(value="👁 Preview"),  # edit_btn label
+                    gr.update(value="👁 Preview", visible=False),  # edit_btn label + hide
                     "edit",  # view_mode
                 )
 
@@ -1859,6 +1947,9 @@ Test files are available in `data/test/`:
                     text_input,
                     edit_btn,
                     view_mode,
+                    upload_btn,
+                    unload_btn,
+                    kb_file,
                 ],
             )
             .then(
@@ -1898,12 +1989,12 @@ Test files are available in `data/test/`:
                     disambig_api_key,
                     kb_type,
                 ],
-                outputs=[preview_html, stats_output, json_output, text_input],
+                outputs=[preview_html, stats_output, json_output, text_input, edit_btn, view_mode],
             )
             .then(
                 fn=restore_buttons_after_run,
                 inputs=None,
-                outputs=[run_btn, cancel_btn],
+                outputs=[run_btn, cancel_btn, upload_btn, unload_btn, kb_file],
             )
             .then(
                 fn=compute_memory_estimate,
