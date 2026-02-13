@@ -202,6 +202,7 @@ Each NER option maps to a spaCy pipeline factory:
 - **spaCy Factory:** `el_pipeline_lela_embedder_vllm_reranker`
 - **Embedding Model**: Selectable from dropdown
 - **top_k**: Number of candidates to keep
+- **Context Length (`max_model_len`)**: Slider (512-32768, default 4096)
 - Bi-encoder reranker using vLLM with task="embed"
 - Manual L2 normalization of embeddings
 
@@ -209,6 +210,7 @@ Each NER option maps to a spaCy pipeline factory:
 - **spaCy Factory:** `el_pipeline_lela_cross_encoder_vllm_reranker`
 - **model_name**: Cross-encoder model
 - **top_k**: Number of candidates to keep
+- **Context Length (`max_model_len`)**: Slider (512-32768, default 4096)
 - Cross-encoder reranker using vLLM `.score()` API with the Qwen3-Reranker-seq-cls model variant
 
 ### Disambiguation Options
@@ -223,6 +225,7 @@ Each NER option maps to a spaCy pipeline factory:
 #### LELA vLLM
 - **spaCy Factory:** `el_pipeline_lela_vllm_disambiguator`
 - **LLM Model**: Same model choices as LELA vLLM
+- **Context Length (`max_model_len`)**: Slider (512-32768, default 4096)
 - Sends all candidates at once (simpler, faster for small candidate sets)
 - Uses vLLM for fast batched inference
 
@@ -249,6 +252,7 @@ Each NER option maps to a spaCy pipeline factory:
    - Choose candidate generator and embedding model (if using dense)
    - Optionally configure reranker and disambiguator
    - For LLM disambiguation, select model size based on available VRAM
+   - For local vLLM components, reduce **Context Length** to lower VRAM usage
    - Watch the memory estimate display to ensure configuration fits
 
 4. **Run Pipeline**

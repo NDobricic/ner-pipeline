@@ -179,6 +179,7 @@ The configuration names map to spaCy component factories:
     "params": {
       "model_name": "Qwen/Qwen3-8B",
       "tensor_parallel_size": 1,
+      "max_model_len": 4096,
       "add_none_candidate": true,
       "add_descriptions": true
     }
@@ -186,6 +187,29 @@ The configuration names map to spaCy component factories:
   "knowledge_base": {
     "name": "custom",
     "params": {"path": "entities.jsonl"}
+  }
+}
+```
+
+#### vLLM Context-Length Tuning
+
+```json
+{
+  "reranker": {
+    "name": "lela_cross_encoder_vllm",
+    "params": {
+      "model_name": "tomaarsen/Qwen3-Reranker-4B-seq-cls",
+      "top_k": 10,
+      "max_model_len": 4096
+    }
+  },
+  "disambiguator": {
+    "name": "lela_vllm",
+    "params": {
+      "model_name": "Qwen/Qwen3-8B",
+      "tensor_parallel_size": 1,
+      "max_model_len": 4096
+    }
   }
 }
 ```

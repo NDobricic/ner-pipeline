@@ -199,6 +199,7 @@ class TestLELAEmbedderVLLMRerankerComponent:
         mock_get_instance.assert_called_once_with(
             model_name=reranker.model_name,
             convert="embed",
+            max_model_len=None,
             gpu_memory_utilization=None,
             estimated_vram_gb=10.0,
         )
@@ -212,7 +213,37 @@ class TestLELAEmbedderVLLMRerankerComponent:
         )
         assert reranker.model_name == "custom-embed-model"
         assert reranker.top_k == 7
+        assert reranker.max_model_len is None
         assert reranker.model is None
+
+    @patch("el_pipeline.spacy_components.rerankers.release_vllm")
+    @patch("el_pipeline.spacy_components.rerankers.get_vllm_instance")
+    @patch("el_pipeline.spacy_components.rerankers._get_vllm")
+    def test_passes_custom_max_model_len(
+        self, mock_get_vllm_mod, mock_get_instance, mock_release, sample_candidates, nlp
+    ):
+        mock_model = MagicMock()
+        mock_model.encode.return_value = [
+            _make_encode_output([0.5, 0.5, 0.0]),
+        ] * 6
+        mock_get_instance.return_value = (mock_model, False)
+        mock_get_vllm_mod.return_value = MagicMock()
+
+        from el_pipeline.spacy_components.rerankers import LELAEmbedderVLLMRerankerComponent
+
+        ensure_candidates_extension()
+        reranker = LELAEmbedderVLLMRerankerComponent(
+            nlp=nlp,
+            top_k=3,
+            max_model_len=4096,
+        )
+
+        doc = nlp("Obama was the president.")
+        doc.ents = [Span(doc, 0, 1, label="ENTITY")]
+        doc.ents[0]._.candidates = sample_candidates
+        reranker(doc)
+
+        assert mock_get_instance.call_args.kwargs["max_model_len"] == 4096
 
     @patch("el_pipeline.spacy_components.rerankers.release_vllm")
     @patch("el_pipeline.spacy_components.rerankers.get_vllm_instance")

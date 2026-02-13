@@ -347,6 +347,7 @@ Bi-encoder reranker using vLLM with task="embed". Manual L2 normalization of emb
 |-----------|------|---------|-------------|
 | `model_name` | str | LELA default | Embedding model |
 | `top_k` | int | 10 | Candidates to keep |
+| `max_model_len` | int | None | vLLM context length cap |
 
 ### LELACrossEncoderVLLMRerankerComponent
 
@@ -359,6 +360,7 @@ Cross-encoder reranker using vLLM `.score()` API with the Qwen3-Reranker-seq-cls
 |-----------|------|---------|-------------|
 | `model_name` | str | LELA default | Cross-encoder model |
 | `top_k` | int | 10 | Candidates to keep |
+| `max_model_len` | int | None | vLLM context length cap |
 
 ### CrossEncoderRerankerComponent
 

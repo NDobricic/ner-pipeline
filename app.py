@@ -25,6 +25,7 @@ from el_pipeline.lela.config import (
     DEFAULT_VLLM_RERANKER_MODEL,
     DEFAULT_GLINER_MODEL,
     DEFAULT_GLINER_VRAM_GB,
+    DEFAULT_MAX_MODEL_LEN,
     get_model_vram_gb,
 )
 from el_pipeline.lela.llm_pool import clear_all_models
@@ -127,6 +128,10 @@ UNLINKED_COLOR = "#9E9E9E"  # Gray for entities not linked to KB
 
 
 ERROR_COLOR = "#DC2626"  # Tailwind red-600
+MIN_VLLM_CONTEXT_LEN = 512
+MAX_VLLM_CONTEXT_LEN = 32768
+VLLM_CONTEXT_LEN_STEP = 256
+DEFAULT_WEB_VLLM_CONTEXT_LEN = min(4096, DEFAULT_MAX_MODEL_LEN)
 
 
 def get_label_color(label: str) -> str:
@@ -570,11 +575,13 @@ def run_pipeline(
     reranker_api_port: int,
     reranker_top_k: int,
     reranker_gpu_mem_gb: float,
+    reranker_max_model_len: int,
     disambig_type: str,
     llm_model: str,
     lela_thinking: bool,
     lela_none_candidate: bool,
     disambig_gpu_mem_gb: float,
+    disambig_max_model_len: int,
     disambig_api_base_url: str,
     disambig_api_key: str,
     kb_type: str,
@@ -674,6 +681,7 @@ def run_pipeline(
         reranker_params["port"] = reranker_api_port
     if reranker_type in ("lela_embedder_vllm", "lela_cross_encoder_vllm"):
         reranker_params["gpu_memory_gb"] = reranker_gpu_mem_gb
+        reranker_params["max_model_len"] = int(reranker_max_model_len)
     if reranker_type == "lela_embedder_transformers":
         reranker_params["estimated_vram_gb"] = get_model_vram_gb(reranker_embedding_model)
 
@@ -685,6 +693,7 @@ def run_pipeline(
         disambig_params["add_none_candidate"] = lela_none_candidate
     if disambig_type == "lela_vllm":
         disambig_params["gpu_memory_gb"] = disambig_gpu_mem_gb
+        disambig_params["max_model_len"] = int(disambig_max_model_len)
     if disambig_type == "lela_transformers":
         disambig_params["estimated_vram_gb"] = get_model_vram_gb(llm_model)
     if disambig_type == "lela_openai_api":
@@ -942,6 +951,10 @@ def update_reranker_params(reranker_choice: str):
         "lela_embedder_vllm",
         "lela_cross_encoder_vllm",
     )
+    show_context_len_slider = reranker_choice in (
+        "lela_embedder_vllm",
+        "lela_cross_encoder_vllm",
+    )
     # VRAM info for transformers backends
     show_vram_info = reranker_choice in (
         "lela_cross_encoder",
@@ -967,6 +980,7 @@ def update_reranker_params(reranker_choice: str):
         gr.update(visible=show_embedding_model),
         gr.update(visible=show_lela_vllm_api_client),
         gr.update(visible=show_gpu_mem_slider),
+        gr.update(visible=show_context_len_slider),
         gr.update(visible=show_vram_info, value=vram_text),
     )
 
@@ -975,6 +989,7 @@ def update_disambig_params(disambig_choice: str):
     """Show/hide disambiguator-specific parameters based on selection."""
     show_llm = disambig_choice in ("lela_vllm", "lela_transformers")
     show_gpu_mem_slider = disambig_choice == "lela_vllm"
+    show_context_len_slider = disambig_choice == "lela_vllm"
     show_vram_info = disambig_choice == "lela_transformers"
     show_openai_api = disambig_choice == "lela_openai_api"
     vram_text = _format_vram_info("Qwen/Qwen3-4B") if show_vram_info else ""
@@ -982,6 +997,7 @@ def update_disambig_params(disambig_choice: str):
         gr.update(visible=show_llm),
         gr.update(visible=show_llm),
         gr.update(visible=show_gpu_mem_slider),
+        gr.update(visible=show_context_len_slider),
         gr.update(visible=show_openai_api),
         gr.update(visible=show_vram_info, value=vram_text),
     )
@@ -1521,6 +1537,14 @@ if __name__ == "__main__":
                             label="GPU Memory (GB)",
                             visible=False,
                         )
+                        reranker_max_model_len = gr.Slider(
+                            minimum=MIN_VLLM_CONTEXT_LEN,
+                            maximum=MAX_VLLM_CONTEXT_LEN,
+                            value=min(DEFAULT_WEB_VLLM_CONTEXT_LEN, MAX_VLLM_CONTEXT_LEN),
+                            step=VLLM_CONTEXT_LEN_STEP,
+                            label="Context Length (max_model_len)",
+                            visible=False,
+                        )
                         reranker_vram_info = gr.Markdown(
                             visible=False,
                         )
@@ -1557,6 +1581,14 @@ if __name__ == "__main__":
                             value=min(10.0, gpu_total_gb),
                             step=0.5,
                             label="GPU Memory (GB)",
+                            visible=False,
+                        )
+                        disambig_max_model_len = gr.Slider(
+                            minimum=MIN_VLLM_CONTEXT_LEN,
+                            maximum=MAX_VLLM_CONTEXT_LEN,
+                            value=min(DEFAULT_WEB_VLLM_CONTEXT_LEN, MAX_VLLM_CONTEXT_LEN),
+                            step=VLLM_CONTEXT_LEN_STEP,
+                            label="Context Length (max_model_len)",
                             visible=False,
                         )
                         disambig_vram_info = gr.Markdown(
@@ -1762,6 +1794,7 @@ Test files are available in `data/test/`:
                 reranker_embedding_model,
                 lela_vllm_api_client_params,
                 reranker_gpu_mem_gb,
+                reranker_max_model_len,
                 reranker_vram_info,
             ],
         )
@@ -1769,7 +1802,7 @@ Test files are available in `data/test/`:
         disambig_type.change(
             fn=update_disambig_params,
             inputs=[disambig_type],
-            outputs=[llm_model, lela_common_params, disambig_gpu_mem_gb, lela_openai_api_params, disambig_vram_info],
+            outputs=[llm_model, lela_common_params, disambig_gpu_mem_gb, disambig_max_model_len, lela_openai_api_params, disambig_vram_info],
         )
 
         # Update VRAM info when model selection changes
@@ -1854,11 +1887,13 @@ Test files are available in `data/test/`:
                     reranker_api_port,
                     reranker_top_k,
                     reranker_gpu_mem_gb,
+                    reranker_max_model_len,
                     disambig_type,
                     llm_model,
                     lela_thinking,
                     lela_none_candidate,
                     disambig_gpu_mem_gb,
+                    disambig_max_model_len,
                     disambig_api_base_url,
                     disambig_api_key,
                     kb_type,

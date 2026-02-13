@@ -693,6 +693,7 @@ class LELAEmbedderRerankerComponent:
         "model_name": DEFAULT_VLLM_RERANKER_MODEL,
         "top_k": RERANKER_TOP_K,
         "gpu_memory_gb": None,
+        "max_model_len": None,
     },
 )
 def create_lela_cross_encoder_vllm_reranker_component(
@@ -701,6 +702,7 @@ def create_lela_cross_encoder_vllm_reranker_component(
     model_name: str,
     top_k: int,
     gpu_memory_gb: Optional[float],
+    max_model_len: Optional[int],
 ):
     """Factory for LELA cross-encoder vLLM reranker component."""
     return LELACrossEncoderVLLMRerankerComponent(
@@ -708,6 +710,7 @@ def create_lela_cross_encoder_vllm_reranker_component(
         model_name=model_name,
         top_k=top_k,
         gpu_memory_gb=gpu_memory_gb,
+        max_model_len=max_model_len,
     )
 
 
@@ -729,11 +732,13 @@ class LELACrossEncoderVLLMRerankerComponent:
         model_name: str = DEFAULT_VLLM_RERANKER_MODEL,
         top_k: int = RERANKER_TOP_K,
         gpu_memory_gb: Optional[float] = None,
+        max_model_len: Optional[int] = None,
     ):
         self.nlp = nlp
         self.model_name = model_name
         self.top_k = top_k
         self.gpu_memory_gb = gpu_memory_gb
+        self.max_model_len = max_model_len
         self.gpu_memory_utilization = gb_to_vllm_fraction(gpu_memory_gb) if gpu_memory_gb is not None else None
 
         ensure_candidates_extension()
@@ -771,6 +776,7 @@ class LELACrossEncoderVLLMRerankerComponent:
 
             self.model, was_cached = get_vllm_instance(
                 model_name=self.model_name,
+                max_model_len=self.max_model_len,
                 gpu_memory_utilization=self.gpu_memory_utilization,
                 estimated_vram_gb=self.gpu_memory_gb or 10.0,
                 hf_overrides={
@@ -877,6 +883,7 @@ class LELACrossEncoderVLLMRerankerComponent:
         "model_name": DEFAULT_EMBEDDER_MODEL,
         "top_k": RERANKER_TOP_K,
         "gpu_memory_gb": None,
+        "max_model_len": None,
     },
 )
 def create_lela_embedder_vllm_reranker_component(
@@ -885,6 +892,7 @@ def create_lela_embedder_vllm_reranker_component(
     model_name: str,
     top_k: int,
     gpu_memory_gb: Optional[float],
+    max_model_len: Optional[int],
 ):
     """Factory for LELA embedder vLLM reranker component."""
     return LELAEmbedderVLLMRerankerComponent(
@@ -892,6 +900,7 @@ def create_lela_embedder_vllm_reranker_component(
         model_name=model_name,
         top_k=top_k,
         gpu_memory_gb=gpu_memory_gb,
+        max_model_len=max_model_len,
     )
 
 
@@ -910,11 +919,13 @@ class LELAEmbedderVLLMRerankerComponent:
         model_name: str = DEFAULT_EMBEDDER_MODEL,
         top_k: int = RERANKER_TOP_K,
         gpu_memory_gb: Optional[float] = None,
+        max_model_len: Optional[int] = None,
     ):
         self.nlp = nlp
         self.model_name = model_name
         self.top_k = top_k
         self.gpu_memory_gb = gpu_memory_gb
+        self.max_model_len = max_model_len
         self.gpu_memory_utilization = gb_to_vllm_fraction(gpu_memory_gb) if gpu_memory_gb is not None else None
 
         ensure_candidates_extension()
@@ -950,6 +961,7 @@ class LELAEmbedderVLLMRerankerComponent:
             self.model, was_cached = get_vllm_instance(
                 model_name=self.model_name,
                 convert="embed",
+                max_model_len=self.max_model_len,
                 gpu_memory_utilization=self.gpu_memory_utilization,
                 estimated_vram_gb=self.gpu_memory_gb or 10.0,
             )
