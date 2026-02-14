@@ -1278,19 +1278,13 @@ if __name__ == "__main__":
         margin-top: 0.25rem !important;
         position: relative !important;
     }
-    #gpu-info-display {
-        width: auto !important;
-        max-width: fit-content !important;
-        padding: 0 !important;
-        margin-top: -29.5px !important;
-        margin-left: 110px !important;
-        margin-bottom: 0 !important;
-        pointer-events: none !important;
-        height: 0 !important;
-        overflow: visible !important;
-    }
-    #gpu-info-display > * {
-        padding: 0 !important;
+    #export-btn {
+        position: absolute !important;
+        margin-top: -32px !important;
+        left: 100px !important;
+        z-index: 10 !important;
+        max-width: 80px !important;
+        font-size: 13px !important;
     }
     #unload-btn {
         font-size: 13px !important;
@@ -1484,11 +1478,15 @@ if __name__ == "__main__":
 
         # --- CONFIGURATION SECTION (collapsible) ---
         with gr.Accordion("Configuration", open=True, elem_id="config-accordion"):
-            memory_estimate_display = gr.Markdown(
-                value="*Detecting GPU...*",
-                elem_classes=["gpu-info"],
-                elem_id="gpu-info-display",
+            export_btn = gr.Button(
+                "⎘ Export",
+                size="sm",
+                variant="secondary",
+                scale=0,
+                min_width=80,
+                elem_id="export-btn",
             )
+            export_holder = gr.Textbox(visible=False)
             # Knowledge base upload + Unload button
             with gr.Row(elem_classes=["kb-row"]):
                 kb_upload_btn = gr.UploadButton(
@@ -1731,6 +1729,11 @@ if __name__ == "__main__":
                             type="password",
                         )
 
+            memory_estimate_display = gr.Markdown(
+                value="*Detecting GPU...*",
+                elem_classes=["gpu-info"],
+                elem_id="gpu-info-display",
+            )
 
         # Hidden loader and KB type (auto-detected)
         loader_type = gr.Dropdown(
@@ -1748,6 +1751,151 @@ if __name__ == "__main__":
 
 
         # --- EVENT HANDLERS ---
+
+        # Export config as JSON file
+        def handle_export(
+            loader_t, ner_t, spacy_m, gliner_m, gliner_l, gliner_th, lbl_from_kb,
+            simple_ml, cand_t, cand_emb_m, cand_tk, cand_ctx, cand_api_url,
+            cand_api_k, reranker_t, reranker_emb_m, reranker_ce_m, reranker_url,
+            reranker_port, reranker_tk, reranker_gpu, reranker_ctx_len,
+            disambig_t, llm_m, thinking, none_cand, disambig_gpu, disambig_ctx_len,
+            disambig_url, disambig_key, kb_t, kb_f,
+        ):
+            import json as _json
+
+            # NER params
+            ner_params = {}
+            if ner_t == "spacy":
+                ner_params["model"] = spacy_m
+            elif ner_t == "gliner":
+                ner_params["model_name"] = gliner_m
+                ner_params["threshold"] = gliner_th
+                if gliner_l:
+                    ner_params["labels"] = [l.strip() for l in gliner_l.split(",")]
+                if lbl_from_kb:
+                    ner_params["labels_from_kb"] = True
+            elif ner_t == "simple":
+                ner_params["min_len"] = simple_ml
+
+            # Candidate params
+            cand_params = {"top_k": cand_tk}
+            if cand_t == "lela_dense":
+                cand_params["use_context"] = cand_ctx
+                cand_params["model_name"] = cand_emb_m
+            elif cand_t == "lela_openai_api_dense":
+                cand_params["use_context"] = cand_ctx
+                cand_params["model_name"] = cand_emb_m
+                cand_params["base_url"] = cand_api_url
+                cand_params["api_key"] = cand_api_k
+
+            # Reranker params
+            reranker_params = {"top_k": reranker_tk}
+            if reranker_t in ("lela_embedder_transformers", "lela_embedder_vllm"):
+                reranker_params["model_name"] = reranker_emb_m
+            if reranker_t in ("lela_cross_encoder", "lela_cross_encoder_vllm"):
+                reranker_params["model_name"] = reranker_ce_m
+            if reranker_t in ("lela_vllm_api_client", "lela_llama_server"):
+                reranker_params["base_url"] = reranker_url
+                reranker_params["port"] = reranker_port
+            if reranker_t in ("lela_embedder_vllm", "lela_cross_encoder_vllm"):
+                reranker_params["gpu_memory_gb"] = reranker_gpu
+                reranker_params["max_model_len"] = int(reranker_ctx_len)
+
+            # Disambiguator params
+            disambig_params = {}
+            if disambig_t in ("lela_vllm", "lela_transformers"):
+                disambig_params["model_name"] = llm_m
+                disambig_params["disable_thinking"] = not thinking
+                disambig_params["add_none_candidate"] = none_cand
+            if disambig_t == "lela_vllm":
+                disambig_params["gpu_memory_gb"] = disambig_gpu
+                disambig_params["max_model_len"] = int(disambig_ctx_len)
+            if disambig_t == "lela_openai_api":
+                disambig_params["base_url"] = disambig_url
+                disambig_params["api_key"] = disambig_key or None
+
+            # Assemble config
+            if cand_t == "none":
+                cand_config = {"name": "none", "params": {}}
+                reranker_config = {"name": "none", "params": {}}
+                disambig_config = None
+            else:
+                cand_config = {"name": cand_t, "params": cand_params}
+                reranker_config = (
+                    {"name": reranker_t, "params": reranker_params}
+                    if reranker_t != "none"
+                    else {"name": "none", "params": {}}
+                )
+                disambig_config = (
+                    {"name": disambig_t, "params": disambig_params}
+                    if disambig_t != "none"
+                    else None
+                )
+
+            kb_params = {}
+            if kb_f and hasattr(kb_f, "name"):
+                kb_params["path"] = Path(kb_f.name).name
+
+            config_dict = {
+                "loader": {"name": loader_t, "params": {}},
+                "ner": {"name": ner_t, "params": ner_params},
+                "candidate_generator": cand_config,
+                "reranker": reranker_config,
+                "disambiguator": disambig_config,
+                "knowledge_base": {"name": kb_t, "params": kb_params},
+                "batch_size": 1,
+            }
+
+            return _json.dumps(config_dict, indent=2)
+
+        export_btn.click(
+            fn=handle_export,
+            inputs=[
+                loader_type, ner_type, spacy_model, gliner_model, gliner_labels,
+                gliner_threshold, labels_from_kb, simple_min_len,
+                cand_type, cand_embedding_model, cand_top_k, cand_use_context,
+                cand_api_base_url, cand_api_key,
+                reranker_type, reranker_embedding_model, reranker_cross_encoder_model,
+                reranker_api_url, reranker_api_port, reranker_top_k,
+                reranker_gpu_mem_gb, reranker_max_model_len,
+                disambig_type, llm_model, lela_thinking, lela_none_candidate,
+                disambig_gpu_mem_gb, disambig_max_model_len,
+                disambig_api_base_url, disambig_api_key,
+                kb_type, kb_file,
+            ],
+            outputs=[export_holder],
+        ).then(
+            fn=None,
+            inputs=[export_holder],
+            js="""async (json_str) => {
+                const blob = new Blob([json_str], {type: 'application/json'});
+                if (window.showSaveFilePicker) {
+                    try {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: 'lela_config.json',
+                            types: [{
+                                description: 'JSON Config',
+                                accept: {'application/json': ['.json']},
+                            }],
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        return;
+                    } catch (e) {
+                        if (e.name === 'AbortError') return;
+                    }
+                }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'lela_config.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }""",
+        )
 
         # KB upload button → populate hidden file + show filename
         def on_kb_upload(file):
