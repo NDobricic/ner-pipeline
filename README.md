@@ -60,11 +60,9 @@ This uses the `simple` regex NER, fuzzy candidates, first-candidate disambiguati
 
 ## Python API
 ```python
-from lela.config import PipelineConfig
-from lela.pipeline import ELPipeline
-import json
+from lela import PipelineConfig, ELPipeline
 
-config = PipelineConfig.from_dict(json.load(open("config.json")))
+config = PipelineConfig.from_json("config.json")
 pipeline = ELPipeline(config)
 results = pipeline.run(["docs/file1.txt"])
 ```

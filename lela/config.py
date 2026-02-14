@@ -1,5 +1,7 @@
+import json
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Dict, Optional, Union
 
 
 @dataclass
@@ -22,6 +24,12 @@ class PipelineConfig:
     knowledge_base: Optional[ComponentConfig] = None
     cache_dir: str = ".ner_cache"
     batch_size: int = 1
+
+    @staticmethod
+    def from_json(path: Union[str, Path]) -> "PipelineConfig":
+        """Create a PipelineConfig from a JSON file path."""
+        with open(path) as f:
+            return PipelineConfig.from_dict(json.load(f))
 
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> "PipelineConfig":

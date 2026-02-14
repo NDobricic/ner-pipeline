@@ -141,6 +141,18 @@ from lela.config import PipelineConfig
 
 #### Class Methods
 
+##### `from_json(path: str | Path) -> PipelineConfig`
+
+Create a configuration from a JSON file.
+
+**Parameters:**
+- `path`: Path to a JSON configuration file
+
+**Example:**
+```python
+config = PipelineConfig.from_json("config.json")
+```
+
 ##### `from_dict(config_dict: Dict) -> PipelineConfig`
 
 Create a configuration from a dictionary.
@@ -759,14 +771,11 @@ answer: 1
 ### Basic Pipeline Usage
 
 ```python
-from lela.config import PipelineConfig
-from lela.pipeline import ELPipeline
+from lela import PipelineConfig, ELPipeline
 from lela.types import Document
-import json
 
-# Load configuration
-with open("config.json") as f:
-    config = PipelineConfig.from_dict(json.load(f))
+# Load configuration from JSON file
+config = PipelineConfig.from_json("config.json")
 
 # Create pipeline (builds spaCy nlp internally)
 pipeline = ELPipeline(config)

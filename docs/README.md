@@ -175,15 +175,10 @@ python -m lela.cli \
 
 **Using the Python API:**
 ```python
-from lela.config import PipelineConfig
-from lela.pipeline import ELPipeline
-import json
+from lela import PipelineConfig, ELPipeline
 
-# Load configuration
-with open("config.json") as f:
-    config = PipelineConfig.from_dict(json.load(f))
-
-# Create and run pipeline
+# Load configuration and run pipeline
+config = PipelineConfig.from_json("config.json")
 pipeline = ELPipeline(config)
 results = pipeline.run(["document.txt"], output_path="results.jsonl")
 ```
