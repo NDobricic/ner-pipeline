@@ -171,8 +171,11 @@ def highlighted_to_html(
         # Escape backslashes first, then other special chars
         s = s.replace("\\", "\\\\")
         s = s.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+        # Escape single quotes for JS BEFORE html.escape.
+        # html.escape converts \' to \&#x27;, and the browser's HTML parser
+        # decodes &#x27; back to ', yielding \' in the JS string — a valid escape.
+        s = s.replace("'", "\\'")
         s = html.escape(s)
-        s = s.replace("'", "\\'").replace('"', "&quot;")
         return s
 
     # Generate unique container ID for this render
