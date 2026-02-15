@@ -121,13 +121,13 @@ A horizontal row of component configuration columns:
 Each NER option maps to a spaCy pipeline factory:
 
 #### Simple (Regex-based)
-- **spaCy Factory:** `lela_simple`
+- **spaCy Factory:** `simple_ner`
 - **min_len**: Minimum mention length (1-10, default: 3)
 - Lightweight, no model downloads required
 - Uses regex pattern to find capitalized words
 
 #### spaCy
-- Uses spaCy's built-in NER + `lela_ner_filter`
+- Uses spaCy's built-in NER + `ner_filter`
 - **model**: spaCy model name
   - `en_core_web_sm` (default)
   - `en_core_web_md`
@@ -135,13 +135,13 @@ Each NER option maps to a spaCy pipeline factory:
 - Standard NER labels: PERSON, ORG, GPE, LOC, etc.
 
 #### GLiNER
-- **spaCy Factory:** `lela_gliner`
+- **spaCy Factory:** `gliner_ner`
 - **model_name**: GLiNER model (default: `urchade/gliner_large`)
 - **labels**: Comma-separated entity labels to detect
 - Zero-shot NER with custom labels
 
 #### LELA GLiNER
-- **spaCy Factory:** `lela_lela_gliner`
+- **spaCy Factory:** `chunked_gliner_ner`
 - **model_name**: Default `numind/NuNER_Zero-span`
 - **labels**: LELA default labels (person, organization, location)
 - **threshold**: Detection threshold (default: 0.5)
@@ -149,28 +149,28 @@ Each NER option maps to a spaCy pipeline factory:
 ### Candidate Generation Options
 
 #### Fuzzy
-- **spaCy Factory:** `lela_fuzzy_candidates`
+- **spaCy Factory:** `fuzzy_candidates`
 - **top_k**: Number of candidates (1-20, default: 10)
 - Uses RapidFuzz string matching on entity titles
 
 #### BM25
-- **spaCy Factory:** `lela_bm25_candidates`
+- **spaCy Factory:** `bm25_candidates`
 - **top_k**: Number of candidates (1-20, default: 10)
 - Keyword-based retrieval on entity descriptions
 
 #### Dense
-- **spaCy Factory:** `lela_lela_dense_candidates`
+- **spaCy Factory:** `dense_candidates`
 - **model_name**: Embedding model (default: `all-MiniLM-L6-v2`)
 - **top_k**: Number of candidates
 - Uses FAISS for similarity search
 
 #### LELA BM25
-- **spaCy Factory:** `lela_bm25_candidates`
+- **spaCy Factory:** `bm25_candidates`
 - **top_k**: Number of candidates (default: 20)
 - Uses rank-bm25 for keyword-based retrieval
 
 #### LELA Dense
-- **spaCy Factory:** `lela_lela_dense_candidates`
+- **spaCy Factory:** `dense_candidates`
 - **Embedding Model**: Selectable from dropdown:
   - MiniLM-L6 (~0.3GB VRAM)
   - BGE-Base (~0.5GB VRAM)
@@ -183,23 +183,23 @@ Each NER option maps to a spaCy pipeline factory:
 ### Reranking Options
 
 #### None
-- **spaCy Factory:** `lela_noop_reranker`
+- **spaCy Factory:** `noop_reranker`
 - No reranking, returns candidates as-is
 
 #### LELA Cross Encoder (sentence-transformers)
-- **spaCy Factory:** `lela_lela_cross_encoder_reranker`
+- **spaCy Factory:** `cross_encoder_reranker`
 - **model_name**: Cross-encoder model
 - **top_k**: Number of candidates to keep
 
 #### LELA Embedder (Transformers)
-- **spaCy Factory:** `lela_lela_embedder_transformers_reranker`
+- **spaCy Factory:** `embedder_transformers_reranker`
 - **Embedding Model**: Selectable from dropdown
 - **top_k**: Number of candidates to keep
 - Bi-encoder reranker using SentenceTransformers
 - Uses cosine similarity between query and candidate embeddings
 
 #### LELA Embedder (vLLM)
-- **spaCy Factory:** `lela_lela_embedder_vllm_reranker`
+- **spaCy Factory:** `embedder_vllm_reranker`
 - **Embedding Model**: Selectable from dropdown
 - **top_k**: Number of candidates to keep
 - **Context Length (`max_model_len`)**: Slider (512-32768, default 4096)
@@ -207,7 +207,7 @@ Each NER option maps to a spaCy pipeline factory:
 - Manual L2 normalization of embeddings
 
 #### LELA Cross-Encoder (vLLM)
-- **spaCy Factory:** `lela_lela_cross_encoder_vllm_reranker`
+- **spaCy Factory:** `cross_encoder_vllm_reranker`
 - **model_name**: Cross-encoder model
 - **top_k**: Number of candidates to keep
 - **Context Length (`max_model_len`)**: Slider (512-32768, default 4096)
@@ -219,18 +219,18 @@ Each NER option maps to a spaCy pipeline factory:
 - No disambiguation, returns candidates without selection
 
 #### First
-- **spaCy Factory:** `lela_first_disambiguator`
+- **spaCy Factory:** `first_disambiguator`
 - Selects the first candidate from the list
 
 #### LELA vLLM
-- **spaCy Factory:** `lela_lela_vllm_disambiguator`
+- **spaCy Factory:** `vllm_disambiguator`
 - **LLM Model**: Same model choices as LELA vLLM
 - **Context Length (`max_model_len`)**: Slider (512-32768, default 4096)
 - Sends all candidates at once (simpler, faster for small candidate sets)
 - Uses vLLM for fast batched inference
 
 #### LELA Transformers
-- **spaCy Factory:** `lela_lela_transformers_disambiguator`
+- **spaCy Factory:** `transformers_disambiguator`
 - **LLM Model**: Same model choices as above
 - Alternative to vLLM-based disambiguator
 - Uses HuggingFace transformers directly
@@ -439,19 +439,19 @@ Better accuracy for production use with larger KBs:
 
 For custom entity types and domain adaptation:
 
-- **NER**: gliner or lela_gliner
-- **Candidates**: lela_dense or bm25
-- **Reranker**: none or lela_embedder
-- **Disambiguator**: first or lela_vllm
+- **NER**: gliner or gliner_ner
+- **Candidates**: dense or bm25
+- **Reranker**: none or embedder_transformers
+- **Disambiguator**: first or vllm
 
 ### Full LELA Pipeline
 
 Maximum accuracy with LLM disambiguation:
 
-- **NER**: lela_gliner (threshold: 0.5)
-- **Candidates**: lela_dense (top_k: 64)
-- **Reranker**: lela_embedder_transformers (top_k: 10, Qwen3-Embed-4B)
-- **Disambiguator**: lela_vllm (Qwen3-4B)
+- **NER**: gliner_ner (threshold: 0.5)
+- **Candidates**: dense (top_k: 64)
+- **Reranker**: embedder_transformers (top_k: 10, Qwen3-Embed-4B)
+- **Disambiguator**: vllm (Qwen3-4B)
 
 **VRAM Requirements:**
 - Qwen3-0.6B LLM: ~4GB total

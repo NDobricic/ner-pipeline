@@ -60,31 +60,31 @@ The pipeline uses spaCy's component system where each stage is a registered fact
 ├───────────────────────────────────────────────────────────────┤
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │  NER Component (doc.ents populated)                     │  │
-│  │  Factories: lela_lela_gliner, _simple, _gliner, │  │
+│  │  Factories: chunked_gliner_ner, _simple, _gliner, │  │
 │  │             or spaCy's built-in NER + _ner_filter       │  │
 │  └─────────────────────────────────────────────────────────┘  │
 │                              │                                │
 │                              ▼                                │
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │  Candidate Generator (ent._.candidates populated)       │  │
-│  │  Factories: lela_lela_dense_candidates,          │  │
+│  │  Factories: dense_candidates,          │  │
 │  │             _fuzzy_candidates, _bm25_candidates         │  │
 │  └─────────────────────────────────────────────────────────┘  │
 │                              │                                │
 │                              ▼                                │
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │  Reranker (ent._.candidates reordered)                  │  │
-│  │  Factories: lela_lela_embedder_transformers_reranker, │  │
-│  │             _lela_embedder_vllm_reranker,                │  │
-│  │             _lela_cross_encoder_vllm_reranker,           │  │
+│  │  Factories: embedder_transformers_reranker, │  │
+│  │             _embedder_vllm_reranker,                │  │
+│  │             _cross_encoder_vllm_reranker,           │  │
 │  │             _cross_encoder_reranker, _noop_reranker     │  │
 │  └─────────────────────────────────────────────────────────┘  │
 │                              │                                │
 │                              ▼                                │
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │  Disambiguator (ent._.resolved_entity set)              │  │
-│  │  Factories: lela_lela_vllm_disambiguator,       │  │
-│  │             _lela_transformers_disambiguator,            │  │
+│  │  Factories: vllm_disambiguator,       │  │
+│  │             _transformers_disambiguator,            │  │
 │  │             _first_disambiguator                        │  │
 │  └─────────────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────────────┘
@@ -189,9 +189,9 @@ from lela import spacy_components  # Register factories
 
 # Build custom pipeline
 nlp = spacy.blank("en")
-nlp.add_pipe("lela_simple", config={"min_len": 3})
-nlp.add_pipe("lela_fuzzy_candidates", config={"top_k": 10})
-nlp.add_pipe("lela_first_disambiguator")
+nlp.add_pipe("simple_ner", config={"min_len": 3})
+nlp.add_pipe("fuzzy_candidates", config={"top_k": 10})
+nlp.add_pipe("first_disambiguator")
 
 # Initialize components with KB
 from lela.knowledge_bases.jsonl import JSONLKnowledgeBase

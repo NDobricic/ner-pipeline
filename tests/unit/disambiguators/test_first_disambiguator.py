@@ -29,9 +29,9 @@ class TestFirstDisambiguatorComponent:
     @pytest.fixture
     def nlp(self, kb: MockKnowledgeBase) -> spacy.language.Language:
         nlp = spacy.blank("en")
-        nlp.add_pipe("lela_simple", config={"min_len": 3})
-        nlp.add_pipe("lela_fuzzy_candidates", config={"top_k": 3})
-        component = nlp.add_pipe("lela_first_disambiguator")
+        nlp.add_pipe("simple_ner", config={"min_len": 3})
+        nlp.add_pipe("fuzzy_candidates", config={"top_k": 3})
+        component = nlp.add_pipe("first_disambiguator")
 
         # Initialize components with KB
         for name, proc in nlp.pipeline:
@@ -64,7 +64,7 @@ class TestFirstDisambiguatorComponent:
             ]
 
         # Get the disambiguator component and call it
-        disambiguator = nlp.get_pipe("lela_first_disambiguator")
+        disambiguator = nlp.get_pipe("first_disambiguator")
         doc = disambiguator(doc)
 
         # Should select first candidate
@@ -88,7 +88,7 @@ class TestFirstDisambiguatorComponent:
             doc.ents = [span]
             span._.candidates = []
 
-        disambiguator = nlp.get_pipe("lela_first_disambiguator")
+        disambiguator = nlp.get_pipe("first_disambiguator")
         doc = disambiguator(doc)
 
         if doc.ents:
@@ -109,7 +109,7 @@ class TestFirstDisambiguatorComponent:
             doc.ents = [span]
             span._.candidates = [Candidate(entity_id="Q2", description="Second entity")]
 
-        disambiguator = nlp.get_pipe("lela_first_disambiguator")
+        disambiguator = nlp.get_pipe("first_disambiguator")
         doc = disambiguator(doc)
 
         if doc.ents:
@@ -133,7 +133,7 @@ class TestFirstDisambiguatorComponent:
             doc.ents = [span]
             span._.candidates = [Candidate(entity_id="unknown_entity", description="Not in KB")]
 
-        disambiguator = nlp.get_pipe("lela_first_disambiguator")
+        disambiguator = nlp.get_pipe("first_disambiguator")
         doc = disambiguator(doc)
 
         if doc.ents:
@@ -155,7 +155,7 @@ class TestFirstDisambiguatorComponent:
             doc.ents = [span]
             span._.candidates = [Candidate(entity_id="Q1", description="First entity")]
 
-        disambiguator = nlp.get_pipe("lela_first_disambiguator")
+        disambiguator = nlp.get_pipe("first_disambiguator")
         doc = disambiguator(doc)
 
         if doc.ents:

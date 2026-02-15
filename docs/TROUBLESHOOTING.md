@@ -138,7 +138,7 @@ The chunking behavior is handled in `lela/spacy_components/ner.py` (lines 118-16
 
 ```python
 # In your custom code, you can configure chunk parameters
-nlp.add_pipe("lela_lela_gliner", config={
+nlp.add_pipe("chunked_gliner_ner", config={
     "threshold": 0.5,
     "labels": ["person", "organization", "location"]
 })
@@ -162,9 +162,9 @@ from lela import spacy_components
 from lela.knowledge_bases.jsonl import JSONLKnowledgeBase
 
 nlp = spacy.blank("en")
-nlp.add_pipe("lela_simple")
-cand = nlp.add_pipe("lela_fuzzy_candidates")
-disamb = nlp.add_pipe("lela_first_disambiguator")
+nlp.add_pipe("simple_ner")
+cand = nlp.add_pipe("fuzzy_candidates")
+disamb = nlp.add_pipe("first_disambiguator")
 
 # Initialize with knowledge base
 kb = JSONLKnowledgeBase(path="kb.jsonl")
@@ -212,7 +212,7 @@ When using `Lela`, initialization is automatic.
    ```json
    {
      "disambiguator": {
-       "name": "lela_vllm",
+       "name": "vllm",
        "params": {
          "model_name": "Qwen/Qwen3-4B"  // Instead of 8B
        }
@@ -228,7 +228,7 @@ When using `Lela`, initialization is automatic.
        "params": {"top_k": 32}  // Instead of 64
      },
      "reranker": {
-       "name": "lela_embedder_transformers",
+       "name": "embedder_transformers",
        "params": {"top_k": 5}  // Instead of 10
      }
    }
@@ -238,7 +238,7 @@ When using `Lela`, initialization is automatic.
    ```json
    {
      "disambiguator": {
-       "name": "lela_vllm",
+       "name": "vllm",
        "params": {
          "tensor_parallel_size": 2
        }
@@ -321,7 +321,7 @@ from lela import spacy_components
 
 nlp = spacy.blank("en")
 # List available factories
-print(nlp.factory_names)  # Should include lela_* factories
+print(nlp.factory_names)  # Should include LELA factories (simple_ner, fuzzy_candidates, etc.)
 ```
 
 ---

@@ -14,7 +14,7 @@ class TestSimpleNERComponent:
     @pytest.fixture
     def nlp(self) -> spacy.language.Language:
         nlp = spacy.blank("en")
-        nlp.add_pipe("lela_simple", config={"min_len": 3})
+        nlp.add_pipe("simple_ner", config={"min_len": 3})
         return nlp
 
     def test_extract_capitalized_words(self, nlp):
@@ -31,7 +31,7 @@ class TestSimpleNERComponent:
 
     def test_min_length_filter(self):
         nlp = spacy.blank("en")
-        nlp.add_pipe("lela_simple", config={"min_len": 5})
+        nlp.add_pipe("simple_ner", config={"min_len": 5})
         text = "Al is here. Barack is too."
         doc = nlp(text)
         texts = [ent.text for ent in doc.ents]
@@ -91,7 +91,7 @@ class TestSimpleNERComponent:
 
     def test_context_mode_parameter(self):
         nlp = spacy.blank("en")
-        nlp.add_pipe("lela_simple", config={"min_len": 3, "context_mode": "window"})
+        nlp.add_pipe("simple_ner", config={"min_len": 3, "context_mode": "window"})
         text = "aaa aaa aaa " + "Barack Obama" + " bbb bbb bbb"
         doc = nlp(text)
         obama_ents = [ent for ent in doc.ents if "Barack Obama" in ent.text]

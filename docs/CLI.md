@@ -92,26 +92,26 @@ The configuration names map to spaCy component factories:
 | Config Name | spaCy Factory | Description |
 |-------------|---------------|-------------|
 | **NER** | | |
-| `simple` | `lela_simple` | Regex-based NER |
+| `simple` | `simple_ner` | Regex-based NER |
 | `spacy` | Built-in + filter | spaCy's pretrained NER |
-| `gliner` | `lela_gliner` | GLiNER zero-shot |
+| `gliner` | `gliner_ner` | GLiNER zero-shot |
 | **Candidate Generators** | | |
-| `fuzzy` | `lela_fuzzy_candidates` | RapidFuzz matching |
-| `bm25` | `lela_bm25_candidates` | rank-bm25 retrieval |
-| `lela_dense` | `lela_lela_dense_candidates` | Dense retrieval |
+| `fuzzy` | `fuzzy_candidates` | RapidFuzz matching |
+| `bm25` | `bm25_candidates` | rank-bm25 retrieval |
+| `dense` | `dense_candidates` | Dense retrieval |
 | **Rerankers** | | |
-| `none` | `lela_noop_reranker` | No reranking |
-| `cross_encoder` | `lela_lela_cross_encoder_reranker` | Cross-encoder |
-| `lela_embedder_transformers` | `lela_lela_embedder_transformers_reranker` | Bi-encoder (SentenceTransformers) |
-| `lela_embedder_vllm` | `lela_lela_embedder_vllm_reranker` | Bi-encoder (vLLM embed) |
-| `lela_cross_encoder_vllm` | `lela_lela_cross_encoder_vllm_reranker` | Cross-encoder (vLLM score) |
-| `lela_vllm_api_client` | `lela_lela_vllm_api_client_reranker` | vLLM API client reranker |
-| `lela_llama_server` | `lela_lela_llama_server_reranker` | Llama server reranker |
+| `none` | `noop_reranker` | No reranking |
+| `cross_encoder` | `cross_encoder_reranker` | Cross-encoder |
+| `embedder_transformers` | `embedder_transformers_reranker` | Bi-encoder (SentenceTransformers) |
+| `embedder_vllm` | `embedder_vllm_reranker` | Bi-encoder (vLLM embed) |
+| `cross_encoder_vllm` | `cross_encoder_vllm_reranker` | Cross-encoder (vLLM score) |
+| `vllm_api_client` | `vllm_api_client_reranker` | vLLM API client reranker |
+| `llama_server` | `llama_server_reranker` | Llama server reranker |
 | **Disambiguators** | | |
-| `first` | `lela_first_disambiguator` | Select first |
-| `lela_vllm` | `lela_lela_vllm_disambiguator` | vLLM disambiguation |
-| `lela_transformers` | `lela_lela_transformers_disambiguator` | Transformers LLM disambiguation |
-| `lela_openai_api` | `lela_lela_openai_api_disambiguator` | OpenAI API disambiguation |
+| `first` | `first_disambiguator` | Select first |
+| `vllm` | `vllm_disambiguator` | vLLM disambiguation |
+| `transformers` | `transformers_disambiguator` | Transformers LLM disambiguation |
+| `openai_api` | `openai_api_disambiguator` | OpenAI API disambiguation |
 
 ### Example Configurations
 
@@ -164,18 +164,18 @@ The configuration names map to spaCy component factories:
     }
   },
   "candidate_generator": {
-    "name": "lela_dense",
+    "name": "dense",
     "params": {"top_k": 64, "use_context": true}
   },
   "reranker": {
-    "name": "lela_embedder_transformers",
+    "name": "embedder_transformers",
     "params": {
       "model_name": "Qwen/Qwen3-Embedding-4B",
       "top_k": 10
     }
   },
   "disambiguator": {
-    "name": "lela_vllm",
+    "name": "vllm",
     "params": {
       "model_name": "Qwen/Qwen3-8B",
       "tensor_parallel_size": 1,
@@ -196,7 +196,7 @@ The configuration names map to spaCy component factories:
 ```json
 {
   "reranker": {
-    "name": "lela_cross_encoder_vllm",
+    "name": "cross_encoder_vllm",
     "params": {
       "model_name": "tomaarsen/Qwen3-Reranker-4B-seq-cls",
       "top_k": 10,
@@ -204,7 +204,7 @@ The configuration names map to spaCy component factories:
     }
   },
   "disambiguator": {
-    "name": "lela_vllm",
+    "name": "vllm",
     "params": {
       "model_name": "Qwen/Qwen3-8B",
       "tensor_parallel_size": 1,
@@ -378,7 +378,7 @@ The CLI uses multi-level persistent caching to speed up subsequent runs:
 .ner_cache/
   <hash>.pkl                    # Document cache
   kb/<hash>.pkl                 # KB entity cache
-  index/lela_dense_<hash>/      # Dense (FAISS) index
+  index/dense_<hash>/           # Dense (FAISS) index
   index/bm25_<hash>.pkl         # rank-bm25 index
 ```
 

@@ -13,14 +13,14 @@
     "params": {"top_k": 64}
   },
   "reranker": {
-    "name": "lela_cross_encoder",
+    "name": "cross_encoder",
     "params": {
       "model_name": "tomaarsen/Qwen3-Reranker-4B-seq-cls",
       "top_k": 10
     }
   },
   "disambiguator": {
-    "name": "lela_transformers",
+    "name": "transformers",
     "params": {
       "model_name": "Qwen/Qwen3-8B",
       "disable_thinking": true,

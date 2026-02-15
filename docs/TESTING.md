@@ -82,18 +82,18 @@ tests/
 │   │   └── test_text_loader.py
 │   ├── ner/                        # NER component tests
 │   │   ├── test_simple_ner.py
-│   │   └── test_lela_gliner.py
+│   │   └── test_gliner_ner.py
 │   ├── candidates/                 # Candidate generator tests
 │   │   ├── test_fuzzy_candidate.py
-│   │   ├── test_lela_dense.py
+│   │   ├── test_dense.py
 │   │   └── test_candidate_cache.py
 │   ├── rerankers/                  # Reranker tests
 │   │   ├── test_lela_embedder.py
-│   │   ├── test_lela_embedder_vllm.py
-│   │   └── test_lela_cross_encoder_vllm.py
+│   │   ├── test_embedder_vllm.py
+│   │   └── test_cross_encoder_vllm.py
 │   ├── disambiguators/             # Disambiguator tests
 │   │   ├── test_first_disambiguator.py
-│   │   └── test_lela_vllm.py
+│   │   └── test_vllm.py
 │   ├── knowledge_bases/            # KB tests
 │   │   ├── test_custom_kb.py
 │   │   └── test_kb_cache.py
@@ -289,7 +289,7 @@ from lela import spacy_components
 def nlp_with_simple_ner():
     """Create a spaCy pipeline with simple NER."""
     nlp = spacy.blank("en")
-    nlp.add_pipe("lela_simple", config={"min_len": 3})
+    nlp.add_pipe("simple_ner", config={"min_len": 3})
     return nlp
 
 

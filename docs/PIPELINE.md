@@ -34,10 +34,10 @@ Input Files → Loader → Documents → spaCy Pipeline → Serialization → Ou
 | Stage | spaCy Component | Output | Purpose |
 |-------|-----------------|--------|---------|
 | Loader | Registry-based | Document(s) | Parse file format, extract text |
-| NER | `lela_*` | `doc.ents` | Identify entity mentions |
-| Candidate Gen | `lela_*_candidates` | `ent._.candidates` | Find KB matches |
-| Reranker | `lela_*_reranker` | `ent._.candidates` (reordered) | Reorder by relevance |
-| Disambiguator | `lela_*_disambiguator` | `ent._.resolved_entity` | Select final entity |
+| NER | `simple_ner`, `gliner_ner`, etc. | `doc.ents` | Identify entity mentions |
+| Candidate Gen | `*_candidates` | `ent._.candidates` | Find KB matches |
+| Reranker | `*_reranker` | `ent._.candidates` (reordered) | Reorder by relevance |
+| Disambiguator | `*_disambiguator` | `ent._.resolved_entity` | Select final entity |
 
 ## spaCy Integration
 
@@ -72,21 +72,21 @@ from lela import spacy_components  # Register all factories
 nlp = spacy.blank("en")
 
 # Add NER
-nlp.add_pipe("lela_lela_gliner", config={
+nlp.add_pipe("chunked_gliner_ner", config={
     "threshold": 0.5,
     "labels": ["person", "organization"]
 })
 
 # Add candidate generation
-cand = nlp.add_pipe("lela_lela_dense_candidates", config={
+cand = nlp.add_pipe("dense_candidates", config={
     "top_k": 64
 })
 
 # Add reranker
-nlp.add_pipe("lela_noop_reranker")
+nlp.add_pipe("noop_reranker")
 
 # Add disambiguator
-disamb = nlp.add_pipe("lela_first_disambiguator")
+disamb = nlp.add_pipe("first_disambiguator")
 
 # Initialize components with KB
 from lela.knowledge_bases.jsonl import JSONLKnowledgeBase
@@ -102,24 +102,24 @@ doc = nlp("Albert Einstein visited Paris.")
 
 | Config Name | spaCy Factory Name |
 |-------------|-------------------|
-| `simple` | `lela_simple` |
-| `gliner` | `lela_gliner` |
-| `lela_dense` | `lela_lela_dense_candidates` |
-| `fuzzy` | `lela_fuzzy_candidates` |
-| `bm25` | `lela_bm25_candidates` |
-| `lela_embedder_transformers` | `lela_lela_embedder_transformers_reranker` |
-| `lela_embedder_vllm` | `lela_lela_embedder_vllm_reranker` |
-| `lela_cross_encoder_vllm` | `lela_lela_cross_encoder_vllm_reranker` |
-| `cross_encoder` | `lela_lela_cross_encoder_reranker` |
-| `lela_vllm_api_client` | `lela_lela_vllm_api_client_reranker` |
-| `lela_llama_server` | `lela_lela_llama_server_reranker` |
-| `none` | `lela_noop_reranker` |
-| `lela_vllm` | `lela_lela_vllm_disambiguator` |
-| `lela_transformers` | `lela_lela_transformers_disambiguator` |
-| `lela_openai_api` | `lela_lela_openai_api_disambiguator` |
-| `first` | `lela_first_disambiguator` |
+| `simple` | `simple_ner` |
+| `gliner` | `gliner_ner` |
+| `dense` | `dense_candidates` |
+| `fuzzy` | `fuzzy_candidates` |
+| `bm25` | `bm25_candidates` |
+| `embedder_transformers` | `embedder_transformers_reranker` |
+| `embedder_vllm` | `embedder_vllm_reranker` |
+| `cross_encoder_vllm` | `cross_encoder_vllm_reranker` |
+| `cross_encoder` | `cross_encoder_reranker` |
+| `vllm_api_client` | `vllm_api_client_reranker` |
+| `llama_server` | `llama_server_reranker` |
+| `none` | `noop_reranker` |
+| `vllm` | `vllm_disambiguator` |
+| `transformers` | `transformers_disambiguator` |
+| `openai_api` | `openai_api_disambiguator` |
+| `first` | `first_disambiguator` |
 
-**Note:** The `lela_lela_gliner` factory is registered and can be used directly with `nlp.add_pipe()`, but is not yet available as a config name through `Lela`.
+**Note:** The `chunked_gliner_ner` factory is registered and can be used directly with `nlp.add_pipe()`, but is not yet available as a config name through `Lela`.
 
 ---
 
@@ -133,7 +133,7 @@ NER components populate `doc.ents` with detected entity spans and set `ent._.con
 
 Zero-shot GLiNER NER with LELA defaults.
 
-**Factory:** `lela_lela_gliner`
+**Factory:** `chunked_gliner_ner`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -157,7 +157,7 @@ Zero-shot GLiNER NER with LELA defaults.
 
 Lightweight regex-based NER.
 
-**Factory:** `lela_simple`
+**Factory:** `simple_ner`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -176,7 +176,7 @@ Lightweight regex-based NER.
 
 Standard GLiNER wrapper.
 
-**Factory:** `lela_gliner`
+**Factory:** `gliner_ner`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -190,14 +190,14 @@ Standard GLiNER wrapper.
 
 Post-filter for spaCy's built-in NER.
 
-**Component:** `lela_ner_filter` (not a factory, use `@Language.component`)
+**Component:** `ner_filter` (not a factory, use `@Language.component`)
 
 **Usage:**
 ```python
 # Use spaCy's built-in NER
 spacy_nlp = spacy.load("en_core_web_sm")
 nlp.add_pipe("ner", source=spacy_nlp)
-nlp.add_pipe("lela_ner_filter")
+nlp.add_pipe("ner_filter")
 ```
 
 **Behavior:**
@@ -212,7 +212,7 @@ NER components automatically handle documents that exceed model context limits t
 
 ### GLiNER Chunking
 
-The LELA GLiNER component (`lela_lela_gliner`) chunks long documents with overlap:
+The LELA GLiNER component (`chunked_gliner_ner`) chunks long documents with overlap:
 
 **Parameters:**
 - Chunk size: ~1500 characters
@@ -266,7 +266,7 @@ Candidate components populate `ent._.candidates` with `List[Candidate]` objects 
 
 Dense retrieval using embeddings and FAISS.
 
-**Factory:** `lela_lela_dense_candidates`
+**Factory:** `dense_candidates`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -289,7 +289,7 @@ Query: {mention_text}: {context}
 
 RapidFuzz string matching.
 
-**Factory:** `lela_fuzzy_candidates`
+**Factory:** `fuzzy_candidates`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -306,7 +306,7 @@ RapidFuzz string matching.
 
 Standard BM25 using rank-bm25 library.
 
-**Factory:** `lela_bm25_candidates`
+**Factory:** `bm25_candidates`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -327,7 +327,7 @@ Reranker components reorder `ent._.candidates` by relevance.
 
 Bi-encoder reranker using SentenceTransformers. Uses cosine similarity between query and candidate embeddings.
 
-**Factory:** `lela_lela_embedder_transformers_reranker`
+**Factory:** `embedder_transformers_reranker`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -340,7 +340,7 @@ Bi-encoder reranker using SentenceTransformers. Uses cosine similarity between q
 
 Bi-encoder reranker using vLLM with task="embed". Manual L2 normalization of embeddings.
 
-**Factory:** `lela_lela_embedder_vllm_reranker`
+**Factory:** `embedder_vllm_reranker`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -353,7 +353,7 @@ Bi-encoder reranker using vLLM with task="embed". Manual L2 normalization of emb
 
 Cross-encoder reranker using vLLM `.score()` API with the Qwen3-Reranker-seq-cls model variant.
 
-**Factory:** `lela_lela_cross_encoder_vllm_reranker`
+**Factory:** `cross_encoder_vllm_reranker`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -366,7 +366,7 @@ Cross-encoder reranker using vLLM `.score()` API with the Qwen3-Reranker-seq-cls
 
 Cross-encoder reranking using sentence-transformers.
 
-**Factory:** `lela_lela_cross_encoder_reranker`
+**Factory:** `cross_encoder_reranker`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -383,7 +383,7 @@ Cross-encoder reranking using sentence-transformers.
 
 Pass-through reranker.
 
-**Factory:** `lela_noop_reranker`
+**Factory:** `noop_reranker`
 
 **Config:** None
 
@@ -401,7 +401,7 @@ Disambiguator components set `ent._.resolved_entity` with the selected `Entity`.
 
 vLLM-based LLM disambiguation - sends all candidates at once.
 
-**Factory:** `lela_lela_vllm_disambiguator`
+**Factory:** `vllm_disambiguator`
 
 **Config:**
 | Parameter | Type | Default | Description |
@@ -435,7 +435,7 @@ Candidates:
 
 Select first candidate.
 
-**Factory:** `lela_first_disambiguator`
+**Factory:** `first_disambiguator`
 
 **Config:** None
 
@@ -557,7 +557,7 @@ The pipeline implements multi-level persistent caching to significantly reduce i
 .ner_cache/
   <hash>.pkl                          # Document parsing cache
   kb/<kb_hash>.pkl                    # KB entity data cache
-  index/lela_dense_<hash>/            # Dense index cache
+  index/dense_<hash>/            # Dense index cache
     index.faiss                       # FAISS index file
   index/bm25_<hash>.pkl               # rank-bm25 index cache
 ```
@@ -585,7 +585,7 @@ key = SHA256(f"kb:{path}:{mtime}:{size}".encode())
 **Index caches:**
 ```python
 # Dense
-key = SHA256(f"lela_dense:{kb.identity_hash}:{model_name}".encode())
+key = SHA256(f"dense:{kb.identity_hash}:{model_name}".encode())
 
 # rank-bm25
 key = SHA256(f"bm25:{kb.identity_hash}".encode())

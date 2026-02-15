@@ -82,23 +82,23 @@ def get_available_components() -> Dict[str, List[str]]:
     available_disambiguators = [
         "none",
         "first",
-        "lela_vllm",
-        "lela_transformers",
-        "lela_openai_api",
+        "vllm",
+        "transformers",
+        "openai_api",
     ]
 
     return {
         "loaders": ["text", "pdf", "docx", "html", "json", "jsonl"],
         "ner": ["simple", "spacy", "gliner"],
-        "candidates": ["none", "fuzzy", "bm25", "lela_dense", "lela_openai_api_dense"],
+        "candidates": ["none", "fuzzy", "bm25", "dense", "openai_api_dense"],
         "rerankers": [
             "none",
-            "lela_cross_encoder",
-            "lela_vllm_api_client",
-            "lela_llama_server",
-            # "lela_embedder_transformers",
-            # "lela_embedder_vllm",
-            "lela_cross_encoder_vllm",
+            "cross_encoder",
+            "vllm_api_client",
+            "llama_server",
+            # "embedder_transformers",
+            # "embedder_vllm",
+            "cross_encoder_vllm",
         ],
         "disambiguators": available_disambiguators,
         "knowledge_bases": ["jsonl"],
@@ -588,8 +588,8 @@ def run_pipeline(
     reranker_max_model_len: int,
     disambig_type: str,
     llm_model: str,
-    lela_thinking: bool,
-    lela_none_candidate: bool,
+    thinking: bool,
+    none_candidate: bool,
     disambig_gpu_mem_gb: float,
     disambig_max_model_len: int,
     disambig_api_base_url: str,
@@ -669,11 +669,11 @@ def run_pipeline(
 
     # Build candidate params
     cand_params = {"top_k": cand_top_k}
-    if cand_type == "lela_dense":
+    if cand_type == "dense":
         cand_params["use_context"] = cand_use_context
         cand_params["model_name"] = cand_embedding_model
         cand_params["estimated_vram_gb"] = get_model_vram_gb(cand_embedding_model)
-    elif cand_type == "lela_openai_api_dense":
+    elif cand_type == "openai_api_dense":
         cand_params["use_context"] = cand_use_context
         cand_params["model_name"] = cand_embedding_model
         cand_params["base_url"] = cand_api_base_url
@@ -681,36 +681,34 @@ def run_pipeline(
 
     # Build reranker params
     reranker_params = {"top_k": reranker_top_k}
-    if reranker_type == "lela_embedder":
+    if reranker_type in ("embedder_transformers", "embedder_vllm"):
         reranker_params["model_name"] = reranker_embedding_model
-    if reranker_type in ("lela_embedder_transformers", "lela_embedder_vllm"):
-        reranker_params["model_name"] = reranker_embedding_model
-    if reranker_type == "lela_cross_encoder_vllm":
+    if reranker_type == "cross_encoder_vllm":
         reranker_params["model_name"] = reranker_cross_encoder_model
-    if reranker_type == "lela_cross_encoder":
+    if reranker_type == "cross_encoder":
         reranker_params["model_name"] = reranker_cross_encoder_model
         reranker_params["estimated_vram_gb"] = get_model_vram_gb(reranker_cross_encoder_model)
-    if reranker_type == "lela_vllm_api_client":
+    if reranker_type == "vllm_api_client":
         reranker_params["base_url"] = reranker_api_url
         reranker_params["port"] = reranker_api_port
-    if reranker_type in ("lela_embedder_vllm", "lela_cross_encoder_vllm"):
+    if reranker_type in ("embedder_vllm", "cross_encoder_vllm"):
         reranker_params["gpu_memory_gb"] = reranker_gpu_mem_gb
         reranker_params["max_model_len"] = int(reranker_max_model_len)
-    if reranker_type == "lela_embedder_transformers":
+    if reranker_type == "embedder_transformers":
         reranker_params["estimated_vram_gb"] = get_model_vram_gb(reranker_embedding_model)
 
     # Build disambiguator params
     disambig_params = {}
-    if disambig_type in ("lela_vllm", "lela_transformers"):
+    if disambig_type in ("vllm", "transformers"):
         disambig_params["model_name"] = llm_model
-        disambig_params["disable_thinking"] = not lela_thinking
-        disambig_params["add_none_candidate"] = lela_none_candidate
-    if disambig_type == "lela_vllm":
+        disambig_params["disable_thinking"] = not thinking
+        disambig_params["add_none_candidate"] = none_candidate
+    if disambig_type == "vllm":
         disambig_params["gpu_memory_gb"] = disambig_gpu_mem_gb
         disambig_params["max_model_len"] = int(disambig_max_model_len)
-    if disambig_type == "lela_transformers":
+    if disambig_type == "transformers":
         disambig_params["estimated_vram_gb"] = get_model_vram_gb(llm_model)
-    if disambig_type == "lela_openai_api":
+    if disambig_type == "openai_api":
         disambig_params["base_url"] = disambig_api_base_url
         disambig_params["api_key"] = disambig_api_key or None
 
@@ -943,10 +941,10 @@ def update_cand_params(cand_choice: str):
             gr.update(visible=False),
             gr.update(visible=False),
         )
-    show_context = cand_choice in ("lela_dense", "lela_openai_api_dense")
-    show_embedding_model = cand_choice in ("lela_dense", "lela_openai_api_dense")
-    show_openai_api_dense_params = cand_choice == "lela_openai_api_dense"
-    show_vram_info = cand_choice == "lela_dense"
+    show_context = cand_choice in ("dense", "openai_api_dense")
+    show_embedding_model = cand_choice in ("dense", "openai_api_dense")
+    show_openai_api_dense_params = cand_choice == "openai_api_dense"
+    show_vram_info = cand_choice == "dense"
 
     return (
         gr.update(visible=show_embedding_model),
@@ -962,36 +960,36 @@ def update_cand_params(cand_choice: str):
 def update_reranker_params(reranker_choice: str):
     """Show/hide reranker-specific parameters based on selection."""
     show_cross_encoder_model = reranker_choice in (
-        "lela_cross_encoder",
-        "lela_cross_encoder_vllm",
+        "cross_encoder",
+        "cross_encoder_vllm",
     )
     show_embedding_model = reranker_choice in (
-        "lela_embedder_transformers",
-        "lela_embedder_vllm",
+        "embedder_transformers",
+        "embedder_vllm",
     )
-    show_lela_vllm_api_client = reranker_choice in ("lela_vllm_api_client", "lela_llama_server")
+    show_vllm_api_client = reranker_choice in ("vllm_api_client", "llama_server")
     # Slider only for vLLM backends
     show_gpu_mem_slider = reranker_choice in (
-        "lela_embedder_vllm",
-        "lela_cross_encoder_vllm",
+        "embedder_vllm",
+        "cross_encoder_vllm",
     )
     show_context_len_slider = reranker_choice in (
-        "lela_embedder_vllm",
-        "lela_cross_encoder_vllm",
+        "embedder_vllm",
+        "cross_encoder_vllm",
     )
     # VRAM info for transformers backends
     show_vram_info = reranker_choice in (
-        "lela_cross_encoder",
-        "lela_embedder_transformers",
+        "cross_encoder",
+        "embedder_transformers",
     )
-    if reranker_choice == "lela_cross_encoder":
+    if reranker_choice == "cross_encoder":
         vram_text = _format_vram_info("tomaarsen/Qwen3-Reranker-4B-seq-cls")
-    elif reranker_choice == "lela_embedder_transformers":
+    elif reranker_choice == "embedder_transformers":
         vram_text = _format_vram_info("Qwen/Qwen3-Embedding-4B")
     else:
         vram_text = ""
     # Use different model lists for vLLM vs transformers cross-encoder
-    if reranker_choice == "lela_cross_encoder_vllm":
+    if reranker_choice == "cross_encoder_vllm":
         ce_choices = [(m[1], m[0]) for m in VLLM_RERANKER_MODEL_CHOICES]
         ce_default = DEFAULT_VLLM_RERANKER_MODEL
     else:
@@ -1002,7 +1000,7 @@ def update_reranker_params(reranker_choice: str):
             visible=show_cross_encoder_model, choices=ce_choices, value=ce_default
         ),
         gr.update(visible=show_embedding_model),
-        gr.update(visible=show_lela_vllm_api_client),
+        gr.update(visible=show_vllm_api_client),
         gr.update(visible=show_gpu_mem_slider),
         gr.update(visible=show_context_len_slider),
         gr.update(visible=show_vram_info, value=vram_text),
@@ -1011,11 +1009,11 @@ def update_reranker_params(reranker_choice: str):
 
 def update_disambig_params(disambig_choice: str):
     """Show/hide disambiguator-specific parameters based on selection."""
-    show_llm = disambig_choice in ("lela_vllm", "lela_transformers")
-    show_gpu_mem_slider = disambig_choice == "lela_vllm"
-    show_context_len_slider = disambig_choice == "lela_vllm"
-    show_vram_info = disambig_choice == "lela_transformers"
-    show_openai_api = disambig_choice == "lela_openai_api"
+    show_llm = disambig_choice in ("vllm", "transformers")
+    show_gpu_mem_slider = disambig_choice == "vllm"
+    show_context_len_slider = disambig_choice == "vllm"
+    show_vram_info = disambig_choice == "transformers"
+    show_openai_api = disambig_choice == "openai_api"
     vram_text = _format_vram_info("Qwen/Qwen3-4B") if show_vram_info else ""
     return (
         gr.update(visible=show_llm),
@@ -1580,7 +1578,7 @@ if __name__ == "__main__":
                     )
                     with gr.Group(
                         visible=False
-                    ) as lela_openai_api_dense_cand_params:
+                    ) as openai_api_dense_cand_params:
                         cand_api_base_url = gr.Textbox(
                             label="Cand. OpenAI API Base URL",
                             value="http://localhost:8000/v1",
@@ -1633,7 +1631,7 @@ if __name__ == "__main__":
                         label="Embedding Model",
                         visible=False,
                     )
-                    with gr.Group(visible=False) as lela_vllm_api_client_params:
+                    with gr.Group(visible=False) as vllm_api_client_params:
                         reranker_api_url = gr.Textbox(
                             label="Reranker API URL",
                             value="http://localhost",
@@ -1687,12 +1685,12 @@ if __name__ == "__main__":
                         label="LLM Model",
                         visible=False,
                     )
-                    with gr.Group(visible=False) as lela_common_params:
-                        lela_thinking = gr.Checkbox(
+                    with gr.Group(visible=False) as common_disambig_params:
+                        thinking = gr.Checkbox(
                             label="Reasoning",
                             value=True,
                         )
-                        lela_none_candidate = gr.Checkbox(
+                        none_candidate = gr.Checkbox(
                             label="'None' Candidate",
                             value=True,
                         )
@@ -1715,7 +1713,7 @@ if __name__ == "__main__":
                     disambig_vram_info = gr.Markdown(
                         visible=False,
                     )
-                    with gr.Group(visible=False) as lela_openai_api_params:
+                    with gr.Group(visible=False) as openai_api_disambig_params:
                         disambig_api_base_url = gr.Textbox(
                             label="OpenAI API Base URL",
                             value="http://localhost:8000/v1",
@@ -1776,10 +1774,10 @@ if __name__ == "__main__":
 
             # Candidate params
             cand_params = {"top_k": cand_tk}
-            if cand_t == "lela_dense":
+            if cand_t == "dense":
                 cand_params["use_context"] = cand_ctx
                 cand_params["model_name"] = cand_emb_m
-            elif cand_t == "lela_openai_api_dense":
+            elif cand_t == "openai_api_dense":
                 cand_params["use_context"] = cand_ctx
                 cand_params["model_name"] = cand_emb_m
                 cand_params["base_url"] = cand_api_url
@@ -1787,27 +1785,27 @@ if __name__ == "__main__":
 
             # Reranker params
             reranker_params = {"top_k": reranker_tk}
-            if reranker_t in ("lela_embedder_transformers", "lela_embedder_vllm"):
+            if reranker_t in ("embedder_transformers", "embedder_vllm"):
                 reranker_params["model_name"] = reranker_emb_m
-            if reranker_t in ("lela_cross_encoder", "lela_cross_encoder_vllm"):
+            if reranker_t in ("cross_encoder", "cross_encoder_vllm"):
                 reranker_params["model_name"] = reranker_ce_m
-            if reranker_t in ("lela_vllm_api_client", "lela_llama_server"):
+            if reranker_t in ("vllm_api_client", "llama_server"):
                 reranker_params["base_url"] = reranker_url
                 reranker_params["port"] = reranker_port
-            if reranker_t in ("lela_embedder_vllm", "lela_cross_encoder_vllm"):
+            if reranker_t in ("embedder_vllm", "cross_encoder_vllm"):
                 reranker_params["gpu_memory_gb"] = reranker_gpu
                 reranker_params["max_model_len"] = int(reranker_ctx_len)
 
             # Disambiguator params
             disambig_params = {}
-            if disambig_t in ("lela_vllm", "lela_transformers"):
+            if disambig_t in ("vllm", "transformers"):
                 disambig_params["model_name"] = llm_m
                 disambig_params["disable_thinking"] = not thinking
                 disambig_params["add_none_candidate"] = none_cand
-            if disambig_t == "lela_vllm":
+            if disambig_t == "vllm":
                 disambig_params["gpu_memory_gb"] = disambig_gpu
                 disambig_params["max_model_len"] = int(disambig_ctx_len)
-            if disambig_t == "lela_openai_api":
+            if disambig_t == "openai_api":
                 disambig_params["base_url"] = disambig_url
                 disambig_params["api_key"] = disambig_key or None
 
@@ -1855,7 +1853,7 @@ if __name__ == "__main__":
                 reranker_type, reranker_embedding_model, reranker_cross_encoder_model,
                 reranker_api_url, reranker_api_port, reranker_top_k,
                 reranker_gpu_mem_gb, reranker_max_model_len,
-                disambig_type, llm_model, lela_thinking, lela_none_candidate,
+                disambig_type, llm_model, thinking, none_candidate,
                 disambig_gpu_mem_gb, disambig_max_model_len,
                 disambig_api_base_url, disambig_api_key,
                 kb_type, kb_file,
@@ -1978,7 +1976,7 @@ if __name__ == "__main__":
             outputs=[
                 cand_embedding_model,
                 cand_use_context,
-                lela_openai_api_dense_cand_params,
+                openai_api_dense_cand_params,
                 cand_vram_info,
             ],
         )
@@ -1989,7 +1987,7 @@ if __name__ == "__main__":
             outputs=[
                 reranker_cross_encoder_model,
                 reranker_embedding_model,
-                lela_vllm_api_client_params,
+                vllm_api_client_params,
                 reranker_gpu_mem_gb,
                 reranker_max_model_len,
                 reranker_vram_info,
@@ -1999,7 +1997,7 @@ if __name__ == "__main__":
         disambig_type.change(
             fn=update_disambig_params,
             inputs=[disambig_type],
-            outputs=[llm_model, lela_common_params, disambig_gpu_mem_gb, disambig_max_model_len, lela_openai_api_params, disambig_vram_info],
+            outputs=[llm_model, common_disambig_params, disambig_gpu_mem_gb, disambig_max_model_len, openai_api_disambig_params, disambig_vram_info],
         )
 
         # Update VRAM info when model selection changes
@@ -2091,8 +2089,8 @@ if __name__ == "__main__":
                     reranker_max_model_len,
                     disambig_type,
                     llm_model,
-                    lela_thinking,
-                    lela_none_candidate,
+                    thinking,
+                    none_candidate,
                     disambig_gpu_mem_gb,
                     disambig_max_model_len,
                     disambig_api_base_url,

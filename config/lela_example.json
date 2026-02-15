@@ -4,7 +4,7 @@
     "params": {}
   },
   "ner": {
-    "name": "lela_gliner",
+    "name": "gliner",
     "params": {
       "model_name": "numind/NuNER_Zero-span",
       "labels": ["person", "organization", "location"],
@@ -12,7 +12,7 @@
     }
   },
   "candidate_generator": {
-    "name": "lela_bm25",
+    "name": "bm25",
     "params": {
       "top_k": 64,
       "use_context": true,
@@ -20,14 +20,14 @@
     }
   },
   "reranker": {
-    "name": "lela_embedder",
+    "name": "embedder_transformers",
     "params": {
       "model_name": "Qwen/Qwen3-Embedding-4B",
       "top_k": 10
     }
   },
   "disambiguator": {
-    "name": "lela_vllm",
+    "name": "vllm",
     "params": {
       "model_name": "Qwen/Qwen3-4B",
       "tensor_parallel_size": 1,

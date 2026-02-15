@@ -78,7 +78,7 @@ class TestLELADenseCache:
         mock_faiss_module.write_index.assert_called_once()
         write_args = mock_faiss_module.write_index.call_args[0]
         assert write_args[0] is mock_index
-        assert "lela_dense_" in write_args[1]
+        assert "dense_" in write_args[1]
         assert write_args[1].endswith("index.faiss")
 
     @patch("lela.spacy_components.candidates._get_faiss")

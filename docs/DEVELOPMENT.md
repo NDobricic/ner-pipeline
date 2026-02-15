@@ -26,7 +26,7 @@ LELA uses two extension mechanisms:
 ├───────────────────────────────────────────────────────────────┤
 │  Registry Components          │  spaCy Components             │
 │  ├── Loaders                  │  ├── NER                      │
-│  │   (text, pdf, json...)     │  │   (lela_gliner, simple...) │
+│  │   (text, pdf, json...)     │  │   (gliner_ner, simple...)  │
 │  └── Knowledge Bases          │  ├── Candidates               │
 │      (custom...)              │  │   (bm25, fuzzy, dense...)  │
 │                               │  ├── Rerankers                │
@@ -500,7 +500,7 @@ import spacy
 import your_custom_components  # This registers the factories
 
 nlp = spacy.blank("en")
-nlp.add_pipe("lela_email_ner")  # Now available
+nlp.add_pipe("email_ner")  # Now available
 ```
 
 ---
@@ -532,9 +532,9 @@ All component types can be combined freely. Here are some recommended combinatio
 | Stage | Component | Notes |
 |-------|-----------|-------|
 | NER | `gliner` | Zero-shot NER |
-| Candidates | `lela_dense` | 64 candidates |
-| Reranker | `lela_embedder_transformers` | Reduce to 10 |
-| Disambiguator | `lela_vllm` | LLM disambiguation |
+| Candidates | `dense` | 64 candidates |
+| Reranker | `embedder_transformers` | Reduce to 10 |
+| Disambiguator | `vllm` | LLM disambiguation |
 
 ---
 
@@ -584,8 +584,8 @@ loader = LoaderClass(**params)
 ```python
 # In lela/pipeline.py
 NER_COMPONENT_MAP = {
-    "simple": "lela_simple",
-    "gliner": "lela_gliner",
+    "simple": "simple_ner",
+    "gliner": "gliner_ner",
     # ...
 }
 ```

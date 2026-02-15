@@ -53,7 +53,7 @@ def _get_gliner():
 
 
 @Language.factory(
-    "lela_lela_gliner",
+    "chunked_gliner_ner",
     default_config={
         "model_name": DEFAULT_GLINER_MODEL,
         "labels": list(NER_LABELS),
@@ -227,7 +227,7 @@ class LELAGLiNERComponent:
 
 
 @Language.factory(
-    "lela_simple",
+    "simple_ner",
     default_config={
         "min_len": 3,
         "context_mode": "sentence",
@@ -300,7 +300,7 @@ class SimpleNERComponent:
 
 
 @Language.factory(
-    "lela_gliner",
+    "gliner_ner",
     default_config={
         "model_name": "urchade/gliner_base",
         "labels": ["person", "organization", "location"],
@@ -418,7 +418,7 @@ class GLiNERComponent:
 # ============================================================================
 
 
-@Language.component("lela_ner_filter")
+@Language.component("ner_filter")
 def ner_filter_component(doc: Doc) -> Doc:
     """
     Post-filter for spaCy's built-in NER.

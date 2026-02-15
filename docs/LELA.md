@@ -75,9 +75,9 @@ Output: [Paris (city), Paris (novel), Paris (Texas), Paris Hilton, ...]
 ```
 
 LELA is retriever-agnostic and supports:
-- Dense retrieval (semantic embeddings) → `lela_lela_dense_candidates`
-- BM25 (keyword-based) → `lela_bm25_candidates`
-- Fuzzy matching (string similarity) → `lela_fuzzy_candidates`
+- Dense retrieval (semantic embeddings) → `dense_candidates`
+- BM25 (keyword-based) → `bm25_candidates`
+- Fuzzy matching (string similarity) → `fuzzy_candidates`
 
 #### Stage 2: Candidate Selection (Disambiguation)
 
@@ -89,7 +89,7 @@ LLM Reasoning: "The mention 'Paris' appears in context about Olympics in France.
 Output: Paris (city)
 ```
 
-Implemented via: `lela_lela_vllm_disambiguator`
+Implemented via: `vllm_disambiguator`
 
 ### LLM Prompt Structure
 
@@ -115,7 +115,7 @@ Answer:
 
 All LELA components are implemented as spaCy pipeline factories.
 
-### LELA NER: `lela_lela_gliner`
+### LELA NER: `chunked_gliner_ner`
 
 Zero-shot NER using GLiNER with LELA defaults.
 
@@ -128,7 +128,7 @@ Zero-shot NER using GLiNER with LELA defaults.
 
 **Configuration:**
 ```python
-nlp.add_pipe("lela_lela_gliner", config={
+nlp.add_pipe("chunked_gliner_ner", config={
     "model_name": "numind/NuNER_Zero-span",
     "labels": ["person", "organization", "location"],
     "threshold": 0.5,
@@ -148,11 +148,11 @@ nlp.add_pipe("lela_lela_gliner", config={
 }
 ```
 
-**Note:** The `lela_lela_gliner` factory uses LELA defaults and can be used directly with `nlp.add_pipe()`. Through `Lela`, use config name `"gliner"` with LELA model parameters.
+**Note:** The `chunked_gliner_ner` factory uses LELA defaults and can be used directly with `nlp.add_pipe()`. Through `Lela`, use config name `"gliner"` with LELA model parameters.
 
 ### LELA Candidate Generation
 
-#### `lela_lela_dense_candidates`
+#### `dense_candidates`
 
 Dense retrieval using SentenceTransformers and FAISS.
 
@@ -173,7 +173,7 @@ Query: {mention_text}
 
 **spaCy Usage:**
 ```python
-cand = nlp.add_pipe("lela_lela_dense_candidates", config={
+cand = nlp.add_pipe("dense_candidates", config={
     "model_name": "Qwen/Qwen3-Embedding-4B",
     "top_k": 64,
     "use_context": False
@@ -184,7 +184,7 @@ cand.initialize(kb)
 **JSON Config:**
 ```json
 {
-  "name": "lela_dense",
+  "name": "dense",
   "params": {
     "model_name": "Qwen/Qwen3-Embedding-4B",
     "top_k": 64
@@ -198,7 +198,7 @@ cand.initialize(kb)
 
 Two reranker variants are available: one using SentenceTransformers (local) and one using vLLM.
 
-#### `lela_lela_embedder_transformers_reranker`
+#### `embedder_transformers_reranker`
 
 Bi-encoder reranker using SentenceTransformers with cosine similarity.
 
@@ -224,7 +224,7 @@ Query: France hosted the Olympics in [Paris].
 
 **spaCy Usage:**
 ```python
-nlp.add_pipe("lela_lela_embedder_transformers_reranker", config={
+nlp.add_pipe("embedder_transformers_reranker", config={
     "model_name": "Qwen/Qwen3-Embedding-4B",
     "top_k": 10
 })
@@ -233,7 +233,7 @@ nlp.add_pipe("lela_lela_embedder_transformers_reranker", config={
 **JSON Config:**
 ```json
 {
-  "name": "lela_embedder_transformers",
+  "name": "embedder_transformers",
   "params": {
     "model_name": "Qwen/Qwen3-Embedding-4B",
     "top_k": 10
@@ -241,13 +241,13 @@ nlp.add_pipe("lela_lela_embedder_transformers_reranker", config={
 }
 ```
 
-#### `lela_lela_embedder_vllm_reranker`
+#### `embedder_vllm_reranker`
 
 Bi-encoder reranker using vLLM with task="embed". Uses manual L2 normalization of embeddings.
 
 **spaCy Usage:**
 ```python
-nlp.add_pipe("lela_lela_embedder_vllm_reranker", config={
+nlp.add_pipe("embedder_vllm_reranker", config={
     "model_name": "Qwen/Qwen3-Embedding-4B",
     "top_k": 10
 })
@@ -256,7 +256,7 @@ nlp.add_pipe("lela_lela_embedder_vllm_reranker", config={
 **JSON Config:**
 ```json
 {
-  "name": "lela_embedder_vllm",
+  "name": "embedder_vllm",
   "params": {
     "model_name": "Qwen/Qwen3-Embedding-4B",
     "top_k": 10
@@ -264,7 +264,7 @@ nlp.add_pipe("lela_lela_embedder_vllm_reranker", config={
 }
 ```
 
-### LELA vLLM Disambiguation: `lela_lela_vllm_disambiguator`
+### LELA vLLM Disambiguation: `vllm_disambiguator`
 
 LLM-based disambiguation using vLLM for fast batched inference.
 
@@ -277,7 +277,7 @@ LLM-based disambiguation using vLLM for fast batched inference.
 
 **spaCy Usage:**
 ```python
-disamb = nlp.add_pipe("lela_lela_vllm_disambiguator", config={
+disamb = nlp.add_pipe("vllm_disambiguator", config={
     "model_name": "Qwen/Qwen3-4B",
     "tensor_parallel_size": 1,
     "add_none_candidate": True,
@@ -291,7 +291,7 @@ disamb.initialize(kb)
 **JSON Config:**
 ```json
 {
-  "name": "lela_vllm",
+  "name": "vllm",
   "params": {
     "model_name": "Qwen/Qwen3-4B",
     "tensor_parallel_size": 1,
@@ -303,7 +303,7 @@ disamb.initialize(kb)
 }
 ```
 
-### LELA Transformers Disambiguation: `lela_lela_transformers_disambiguator`
+### LELA Transformers Disambiguation: `transformers_disambiguator`
 
 LLM-based disambiguation using HuggingFace Transformers directly.
 
@@ -315,7 +315,7 @@ LLM-based disambiguation using HuggingFace Transformers directly.
 
 **spaCy Usage:**
 ```python
-disamb = nlp.add_pipe("lela_lela_transformers_disambiguator", config={
+disamb = nlp.add_pipe("transformers_disambiguator", config={
     "model_name": "Qwen/Qwen3-4B",
     "add_none_candidate": True,
     "add_descriptions": True,
@@ -327,7 +327,7 @@ disamb.initialize(kb)
 **JSON Config:**
 ```json
 {
-  "name": "lela_transformers",
+  "name": "transformers",
   "params": {
     "model_name": "Qwen/Qwen3-4B",
     "add_none_candidate": true,
@@ -375,20 +375,20 @@ LELA components use the `jsonl` knowledge base.
     }
   },
   "candidate_generator": {
-    "name": "lela_dense",
+    "name": "dense",
     "params": {
       "top_k": 64
     }
   },
   "reranker": {
-    "name": "lela_embedder_transformers",
+    "name": "embedder_transformers",
     "params": {
       "model_name": "Qwen/Qwen3-Embedding-4B",
       "top_k": 10
     }
   },
   "disambiguator": {
-    "name": "lela_vllm",
+    "name": "vllm",
     "params": {
       "model_name": "Qwen/Qwen3-4B",
       "tensor_parallel_size": 1,
@@ -430,7 +430,7 @@ For faster processing without GPU requirements:
 
 ### NoOp Reranker
 
-The `"none"` reranker config name maps to `lela_noop_reranker`, which passes candidates through unchanged:
+The `"none"` reranker config name maps to `noop_reranker`, which passes candidates through unchanged:
 
 ```json
 {
@@ -453,7 +453,7 @@ The pipeline uses multi-level persistent caching for documents, knowledge bases,
 .ner_cache/
   <hash>.pkl                          # Document parsing cache
   kb/<kb_hash>.pkl                    # KB entity data cache
-  index/lela_dense_<hash>/            # Dense index
+  index/dense_<hash>/            # Dense index
     index.faiss                       # FAISS index
   index/bm25_<hash>.pkl               # rank-bm25 index
 ```
@@ -480,7 +480,7 @@ key = SHA256(f"kb:{path}:{mtime}:{size}".encode()).hexdigest()
 
 **Index caches (depend on KB identity):**
 ```python
-key = SHA256(f"lela_dense:{kb.identity_hash}:{model_name}".encode()).hexdigest()
+key = SHA256(f"dense:{kb.identity_hash}:{model_name}".encode()).hexdigest()
 key = SHA256(f"bm25:{kb.identity_hash}".encode()).hexdigest()
 ```
 
@@ -569,7 +569,7 @@ from lela import Lela
 lela = Lela({
     "loader": {"name": "text"},
     "ner": {"name": "gliner", "params": {"threshold": 0.5}},
-    "candidate_generator": {"name": "lela_dense", "params": {"top_k": 64}},
+    "candidate_generator": {"name": "dense", "params": {"top_k": 64}},
     "reranker": {"name": "none"},
     "disambiguator": {"name": "first"},
     "knowledge_base": {"name": "jsonl", "params": {"path": "kb.jsonl"}}
@@ -590,21 +590,21 @@ from lela.knowledge_bases.jsonl import JSONLKnowledgeBase
 nlp = spacy.blank("en")
 
 # Add LELA NER
-nlp.add_pipe("lela_lela_gliner", config={
+nlp.add_pipe("chunked_gliner_ner", config={
     "threshold": 0.5,
     "labels": ["person", "organization", "location"]
 })
 
 # Add dense candidates
-cand = nlp.add_pipe("lela_lela_dense_candidates", config={
+cand = nlp.add_pipe("dense_candidates", config={
     "top_k": 64
 })
 
 # Add reranker (optional)
-nlp.add_pipe("lela_noop_reranker")
+nlp.add_pipe("noop_reranker")
 
 # Add disambiguator
-disamb = nlp.add_pipe("lela_first_disambiguator")
+disamb = nlp.add_pipe("first_disambiguator")
 
 # Initialize with KB
 kb = JSONLKnowledgeBase(path="kb.jsonl")
@@ -633,10 +633,10 @@ python -m lela.cli \
 ### Web App with LELA
 
 1. Start the web app: `python app.py`
-2. Select "lela_gliner" or "gliner" for NER
-3. Select "lela_dense" or "bm25" for candidate generation
-4. Optionally enable "lela_embedder_transformers" or "lela_embedder_vllm" reranker
-5. Select "lela_vllm" or "lela_transformers" for disambiguation
+2. Select "gliner_ner" or "gliner" for NER
+3. Select "dense" or "bm25" for candidate generation
+4. Optionally enable "embedder_transformers" or "embedder_vllm" reranker
+5. Select "vllm" or "transformers" for disambiguation
 6. Upload your knowledge base and documents
 
 ## Performance Considerations
@@ -645,13 +645,13 @@ python -m lela.cli \
 
 | Component | GPU Recommended | Notes |
 |-----------|-----------------|-------|
-| lela_gliner | Yes | GLiNER model inference |
-| lela_dense | Yes | Embedding computation via SentenceTransformers |
-| lela_embedder_transformers | Yes | Embedding computation via SentenceTransformers |
-| lela_embedder_vllm | Yes (Required) | vLLM-based embedding |
-| lela_cross_encoder_vllm | Yes (Required) | vLLM-based cross-encoder |
-| lela_vllm | Yes (Required) | vLLM-based LLM inference |
-| lela_transformers | Yes | HuggingFace transformers (alternative to vLLM) |
+| gliner_ner | Yes | GLiNER model inference |
+| dense | Yes | Embedding computation via SentenceTransformers |
+| embedder_transformers | Yes | Embedding computation via SentenceTransformers |
+| embedder_vllm | Yes (Required) | vLLM-based embedding |
+| cross_encoder_vllm | Yes (Required) | vLLM-based cross-encoder |
+| vllm | Yes (Required) | vLLM-based LLM inference |
+| transformers | Yes | HuggingFace transformers (alternative to vLLM) |
 
 ### CUDA Compatibility
 

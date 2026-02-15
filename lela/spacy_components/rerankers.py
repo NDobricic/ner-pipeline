@@ -70,7 +70,7 @@ def _get_vllm():
 
 
 @Language.factory(
-    "lela_lela_cross_encoder_reranker",
+    "cross_encoder_reranker",
     default_config={
         "model_name": "Qwen/Qwen3-Reranker-4B-seq-cls",
         "top_k": 10,
@@ -224,7 +224,7 @@ class CrossEncoderRerankerComponent:
 
 
 @Language.factory(
-    "lela_lela_vllm_api_client_reranker",
+    "vllm_api_client_reranker",
     default_config={
         "top_k": 10,
         "base_url": "http://localhost",
@@ -347,7 +347,7 @@ class VLLMAPIClientReranker:
 
 
 @Language.factory(
-    "lela_noop_reranker",
+    "noop_reranker",
     default_config={"top_k": 10},
 )
 def create_noop_reranker_component(
@@ -386,7 +386,7 @@ class NoOpRerankerComponent:
 
 
 @Language.factory(
-    "lela_lela_llama_server_reranker",
+    "llama_server_reranker",
     default_config={
         "model_name": "qwen3-reranker",
         "top_k": 10,
@@ -527,7 +527,7 @@ class LlamaServerReranker:
 
 
 @Language.factory(
-    "lela_lela_embedder_transformers_reranker",
+    "embedder_transformers_reranker",
     default_config={
         "model_name": DEFAULT_EMBEDDER_MODEL,
         "top_k": RERANKER_TOP_K,
@@ -688,7 +688,7 @@ class LELAEmbedderRerankerComponent:
 
 
 @Language.factory(
-    "lela_lela_cross_encoder_vllm_reranker",
+    "cross_encoder_vllm_reranker",
     default_config={
         "model_name": DEFAULT_VLLM_RERANKER_MODEL,
         "top_k": RERANKER_TOP_K,
@@ -878,7 +878,7 @@ class LELACrossEncoderVLLMRerankerComponent:
 
 
 @Language.factory(
-    "lela_lela_embedder_vllm_reranker",
+    "embedder_vllm_reranker",
     default_config={
         "model_name": DEFAULT_EMBEDDER_MODEL,
         "top_k": RERANKER_TOP_K,

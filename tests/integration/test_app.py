@@ -302,9 +302,9 @@ class TestGetAvailableComponents:
         assert set(components.keys()) == expected_keys
 
     def test_disambiguators_includes_vllm(self):
-        """Disambiguators always includes lela_vllm."""
+        """Disambiguators always includes vllm."""
         components = get_available_components()
-        assert "lela_vllm" in components["disambiguators"]
+        assert "vllm" in components["disambiguators"]
 
     def test_ner_includes_expected_types(self):
         """NER includes expected types."""
@@ -362,8 +362,8 @@ class TestRunPipeline:
             reranker_max_model_len=4096,
             disambig_type="first",
             llm_model="Qwen/Qwen3-4B",
-            lela_thinking=False,
-            lela_none_candidate=True,
+            thinking=False,
+            none_candidate=True,
             disambig_gpu_mem_gb=10.0,
             disambig_max_model_len=4096,
             disambig_api_base_url="",
@@ -410,8 +410,8 @@ class TestRunPipeline:
             reranker_max_model_len=4096,
             disambig_type="first",
             llm_model="Qwen/Qwen3-4B",
-            lela_thinking=False,
-            lela_none_candidate=True,
+            thinking=False,
+            none_candidate=True,
             disambig_gpu_mem_gb=10.0,
             disambig_max_model_len=4096,
             disambig_api_base_url="",
@@ -453,8 +453,8 @@ class TestRunPipeline:
             reranker_max_model_len=4096,
             disambig_type="first",
             llm_model="Qwen/Qwen3-4B",
-            lela_thinking=False,
-            lela_none_candidate=True,
+            thinking=False,
+            none_candidate=True,
             disambig_gpu_mem_gb=10.0,
             disambig_max_model_len=4096,
             disambig_api_base_url="",
@@ -499,8 +499,8 @@ class TestRunPipeline:
                 reranker_max_model_len=4096,
                 disambig_type="first",
                 llm_model="Qwen/Qwen3-4B",
-                lela_thinking=False,
-                lela_none_candidate=True,
+                thinking=False,
+                none_candidate=True,
                 disambig_gpu_mem_gb=10.0,
                 disambig_max_model_len=4096,
                 disambig_api_base_url="",
@@ -542,8 +542,8 @@ class TestRunPipeline:
             reranker_max_model_len=4096,
             disambig_type="first",
             llm_model="Qwen/Qwen3-4B",
-            lela_thinking=False,
-            lela_none_candidate=True,
+            thinking=False,
+            none_candidate=True,
             disambig_gpu_mem_gb=10.0,
             disambig_max_model_len=4096,
             disambig_api_base_url="",
@@ -586,8 +586,8 @@ class TestRunPipeline:
             reranker_max_model_len=4096,
             disambig_type="first",
             llm_model="Qwen/Qwen3-4B",
-            lela_thinking=False,
-            lela_none_candidate=True,
+            thinking=False,
+            none_candidate=True,
             disambig_gpu_mem_gb=10.0,
             disambig_max_model_len=4096,
             disambig_api_base_url="",

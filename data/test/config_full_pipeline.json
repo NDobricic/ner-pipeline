@@ -16,14 +16,14 @@
     }
   },
   "reranker": {
-    "name": "lela_cross_encoder",
+    "name": "cross_encoder",
     "params": {
       "model_name": "Qwen/Qwen3-Reranker-4B-seq-cls",
       "top_k": 5
     }
   },
   "disambiguator": {
-    "name": "lela_transformers",
+    "name": "transformers",
     "params": {
       "model_name": "Qwen/Qwen3-4B",
       "add_none_candidate": true,

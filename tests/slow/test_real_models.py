@@ -82,10 +82,10 @@ class TestGLiNER:
         except ImportError:
             pytest.skip("GLiNER not installed")
 
-        # Update config to use lela_gliner
+        # Update config to use gliner
         config_dict = minimal_config_dict.copy()
         config_dict["ner"] = {
-            "name": "lela_gliner",
+            "name": "gliner",
             "params": {
                 "model_name": "urchade/gliner_small",
                 "labels": ["person", "organization", "location"],

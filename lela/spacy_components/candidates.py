@@ -78,7 +78,7 @@ def _get_faiss():
 
 
 @Language.factory(
-    "lela_lela_dense_candidates",
+    "dense_candidates",
     default_config={
         "model_name": DEFAULT_EMBEDDER_MODEL,
         "top_k": CANDIDATES_TOP_K,
@@ -176,9 +176,9 @@ class LELADenseCandidatesComponent:
         cache_hash = None
         index_file = None
         if cache_dir and hasattr(kb, "identity_hash"):
-            raw = f"lela_dense:{kb.identity_hash}:{self.model_name}".encode()
+            raw = f"dense:{kb.identity_hash}:{self.model_name}".encode()
             cache_hash = hashlib.sha256(raw).hexdigest()
-            index_dir = Path(cache_dir) / "index" / f"lela_dense_{cache_hash}"
+            index_dir = Path(cache_dir) / "index" / f"dense_{cache_hash}"
             index_file = index_dir / "index.faiss"
             try:
                 if index_file.exists():
@@ -329,7 +329,7 @@ class LELADenseCandidatesComponent:
 
 
 @Language.factory(
-    "lela_lela_openai_api_dense_candidates",
+    "openai_api_dense_candidates",
     default_config={
         "model_name": None,
         "base_url": "http://localhost:8000/v1",
@@ -436,11 +436,11 @@ class LELAOpenAIAPIDenseCandidatesComponent:
         index_file = None
         if cache_dir and hasattr(kb, "identity_hash"):
             raw = (
-                f"lela_dense_openai:{kb.identity_hash}:"
+                f"dense_openai:{kb.identity_hash}:"
                 f"{self.model_name}:{self.base_url}"
             ).encode()
             cache_hash = hashlib.sha256(raw).hexdigest()
-            index_dir = Path(cache_dir) / "index" / f"lela_dense_{cache_hash}"
+            index_dir = Path(cache_dir) / "index" / f"dense_{cache_hash}"
             index_file = index_dir / "index.faiss"
             try:
                 if index_file.exists():
@@ -630,7 +630,7 @@ class LELAOpenAIAPIDenseCandidatesComponent:
 
 
 @Language.factory(
-    "lela_fuzzy_candidates",
+    "fuzzy_candidates",
     default_config={
         "top_k": 20,
     },
@@ -789,7 +789,7 @@ class FuzzyCandidatesComponent:
 
 
 @Language.factory(
-    "lela_bm25_candidates",
+    "bm25_candidates",
     default_config={
         "top_k": 20,
     },

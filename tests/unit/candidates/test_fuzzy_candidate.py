@@ -31,8 +31,8 @@ class TestFuzzyCandidatesComponent:
     @pytest.fixture
     def nlp(self, kb: MockKnowledgeBase) -> spacy.language.Language:
         nlp = spacy.blank("en")
-        nlp.add_pipe("lela_simple", config={"min_len": 3})
-        component = nlp.add_pipe("lela_fuzzy_candidates", config={"top_k": 3})
+        nlp.add_pipe("simple_ner", config={"min_len": 3})
+        component = nlp.add_pipe("fuzzy_candidates", config={"top_k": 3})
         component.initialize(kb)
         return nlp
 
@@ -71,8 +71,8 @@ class TestFuzzyCandidatesComponent:
 
     def test_respects_top_k(self, kb: MockKnowledgeBase):
         nlp = spacy.blank("en")
-        nlp.add_pipe("lela_simple", config={"min_len": 3})
-        component = nlp.add_pipe("lela_fuzzy_candidates", config={"top_k": 2})
+        nlp.add_pipe("simple_ner", config={"min_len": 3})
+        component = nlp.add_pipe("fuzzy_candidates", config={"top_k": 2})
         component.initialize(kb)
 
         text = "United States."

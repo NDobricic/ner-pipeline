@@ -175,7 +175,7 @@ from lela import spacy_components  # Registers all factories
 import spacy
 
 nlp = spacy.blank("en")
-nlp.add_pipe("lela_simple")  # Now available
+nlp.add_pipe("simple_ner")  # Now available
 ```
 
 ### spaCy Extensions
@@ -193,7 +193,7 @@ Span.set_extension("resolved_entity", default=None)
 
 ### NER Components
 
-#### `lela_lela_gliner`
+#### `chunked_gliner_ner`
 
 Zero-shot GLiNER NER with LELA defaults.
 
@@ -207,13 +207,13 @@ Zero-shot GLiNER NER with LELA defaults.
 
 **Example:**
 ```python
-nlp.add_pipe("lela_lela_gliner", config={
+nlp.add_pipe("chunked_gliner_ner", config={
     "labels": ["person", "organization", "location"],
     "threshold": 0.4
 })
 ```
 
-#### `lela_simple`
+#### `simple_ner`
 
 Lightweight regex-based NER.
 
@@ -225,10 +225,10 @@ Lightweight regex-based NER.
 
 **Example:**
 ```python
-nlp.add_pipe("lela_simple", config={"min_len": 2})
+nlp.add_pipe("simple_ner", config={"min_len": 2})
 ```
 
-#### `lela_gliner`
+#### `gliner_ner`
 
 Standard GLiNER wrapper.
 
@@ -240,7 +240,7 @@ Standard GLiNER wrapper.
 | `threshold` | float | 0.5 | Detection threshold |
 | `context_mode` | str | "sentence" | Context extraction mode |
 
-#### `lela_ner_filter`
+#### `ner_filter`
 
 Post-filter for spaCy's built-in NER (adds context extension).
 
@@ -251,12 +251,12 @@ spacy_nlp = spacy.load("en_core_web_sm")
 
 # Copy NER and add filter
 nlp.add_pipe("ner", source=spacy_nlp)
-nlp.add_pipe("lela_ner_filter")
+nlp.add_pipe("ner_filter")
 ```
 
 ### Candidate Generation Components
 
-#### `lela_lela_dense_candidates`
+#### `dense_candidates`
 
 Dense retrieval using SentenceTransformers and FAISS.
 
@@ -268,7 +268,7 @@ Dense retrieval using SentenceTransformers and FAISS.
 | `device` | str | None | Device override (e.g., "cuda", "cpu") |
 | `use_context` | bool | False | Include context in query |
 
-#### `lela_fuzzy_candidates`
+#### `fuzzy_candidates`
 
 RapidFuzz string matching.
 
@@ -277,7 +277,7 @@ RapidFuzz string matching.
 |-----------|------|---------|-------------|
 | `top_k` | int | 20 | Maximum candidates |
 
-#### `lela_bm25_candidates`
+#### `bm25_candidates`
 
 Standard BM25 using rank-bm25 library.
 
@@ -288,7 +288,7 @@ Standard BM25 using rank-bm25 library.
 
 ### Reranker Components
 
-#### `lela_lela_embedder_transformers_reranker`
+#### `embedder_transformers_reranker`
 
 Bi-encoder reranker using SentenceTransformers. Uses cosine similarity between query and candidate embeddings.
 
@@ -299,7 +299,7 @@ Bi-encoder reranker using SentenceTransformers. Uses cosine similarity between q
 | `top_k` | int | 10 | Candidates to keep |
 | `device` | str | None | Device override (e.g., "cuda", "cpu") |
 
-#### `lela_lela_embedder_vllm_reranker`
+#### `embedder_vllm_reranker`
 
 Bi-encoder reranker using vLLM with task="embed". Manual L2 normalization of embeddings.
 
@@ -310,7 +310,7 @@ Bi-encoder reranker using vLLM with task="embed". Manual L2 normalization of emb
 | `top_k` | int | 10 | Candidates to keep |
 | `max_model_len` | int | None | vLLM context length cap |
 
-#### `lela_lela_cross_encoder_vllm_reranker`
+#### `cross_encoder_vllm_reranker`
 
 Cross-encoder reranker using vLLM `.score()` API with the Qwen3-Reranker-seq-cls model variant.
 
@@ -321,7 +321,7 @@ Cross-encoder reranker using vLLM `.score()` API with the Qwen3-Reranker-seq-cls
 | `top_k` | int | 10 | Candidates to keep |
 | `max_model_len` | int | None | vLLM context length cap |
 
-#### `lela_lela_cross_encoder_reranker`
+#### `cross_encoder_reranker`
 
 Cross-encoder reranking using sentence-transformers.
 
@@ -331,7 +331,7 @@ Cross-encoder reranking using sentence-transformers.
 | `model_name` | str | "cross-encoder/ms-marco-MiniLM-L-6-v2" | Model |
 | `top_k` | int | 10 | Candidates to keep |
 
-#### `lela_noop_reranker`
+#### `noop_reranker`
 
 Pass-through (no reranking).
 
@@ -339,7 +339,7 @@ Pass-through (no reranking).
 
 ### Disambiguator Components
 
-#### `lela_lela_vllm_disambiguator`
+#### `vllm_disambiguator`
 
 vLLM-based LLM disambiguation - sends all candidates at once.
 
@@ -358,13 +358,13 @@ vLLM-based LLM disambiguation - sends all candidates at once.
 
 **Requires initialization:**
 ```python
-component = nlp.add_pipe("lela_lela_vllm_disambiguator")
+component = nlp.add_pipe("vllm_disambiguator")
 component.initialize(kb)
 ```
 
 **See Also:** [Self-Consistency Voting](#self-consistency-voting), [NIL Linking](#nil-linking), [Qwen3 Thinking Mode](#qwen3-thinking-mode)
 
-#### `lela_lela_transformers_disambiguator`
+#### `transformers_disambiguator`
 
 Transformers-based LLM disambiguation (alternative to vLLM).
 
@@ -380,11 +380,11 @@ Transformers-based LLM disambiguation (alternative to vLLM).
 
 **Requires initialization:**
 ```python
-component = nlp.add_pipe("lela_lela_transformers_disambiguator")
+component = nlp.add_pipe("transformers_disambiguator")
 component.initialize(kb)
 ```
 
-**When to use:** Use this instead of `lela_vllm` when:
+**When to use:** Use this instead of `vllm` when:
 - vLLM installation fails or has compatibility problems
 - You need direct HuggingFace transformers integration
 
@@ -392,7 +392,7 @@ component.initialize(kb)
 ```json
 {
   "disambiguator": {
-    "name": "lela_transformers",
+    "name": "transformers",
     "params": {
       "model_name": "Qwen/Qwen3-4B",
       "disable_thinking": true
@@ -401,7 +401,7 @@ component.initialize(kb)
 }
 ```
 
-#### `lela_first_disambiguator`
+#### `first_disambiguator`
 
 Select first candidate.
 
@@ -485,28 +485,28 @@ candidate = Candidate(
 | Config Name | spaCy Factory |
 |-------------|---------------|
 | **NER** | |
-| `simple` | `lela_simple` |
-| `gliner` | `lela_gliner` |
-| `spacy` | Built-in NER + `lela_ner_filter` |
+| `simple` | `simple_ner` |
+| `gliner` | `gliner_ner` |
+| `spacy` | Built-in NER + `ner_filter` |
 | **Candidate Generators** | |
-| `lela_dense` | `lela_lela_dense_candidates` |
-| `fuzzy` | `lela_fuzzy_candidates` |
-| `bm25` | `lela_bm25_candidates` |
+| `dense` | `dense_candidates` |
+| `fuzzy` | `fuzzy_candidates` |
+| `bm25` | `bm25_candidates` |
 | **Rerankers** | |
-| `lela_embedder_transformers` | `lela_lela_embedder_transformers_reranker` |
-| `lela_embedder_vllm` | `lela_lela_embedder_vllm_reranker` |
-| `lela_cross_encoder_vllm` | `lela_lela_cross_encoder_vllm_reranker` |
-| `lela_cross_encoder` | `lela_lela_cross_encoder_reranker` |
-| `lela_vllm_api_client` | `lela_lela_vllm_api_client_reranker` |
-| `lela_llama_server` | `lela_lela_llama_server_reranker` |
-| `none` | `lela_noop_reranker` |
+| `embedder_transformers` | `embedder_transformers_reranker` |
+| `embedder_vllm` | `embedder_vllm_reranker` |
+| `cross_encoder_vllm` | `cross_encoder_vllm_reranker` |
+| `cross_encoder` | `cross_encoder_reranker` |
+| `vllm_api_client` | `vllm_api_client_reranker` |
+| `llama_server` | `llama_server_reranker` |
+| `none` | `noop_reranker` |
 | **Disambiguators** | |
-| `lela_vllm` | `lela_lela_vllm_disambiguator` |
-| `lela_transformers` | `lela_lela_transformers_disambiguator` |
-| `lela_openai_api` | `lela_lela_openai_api_disambiguator` |
-| `first` | `lela_first_disambiguator` |
+| `vllm` | `vllm_disambiguator` |
+| `transformers` | `transformers_disambiguator` |
+| `openai_api` | `openai_api_disambiguator` |
+| `first` | `first_disambiguator` |
 
-**Note:** The `lela_lela_gliner` factory is registered and can be used directly with `nlp.add_pipe()`, but is not yet available as a config name through `Lela`.
+**Note:** The `chunked_gliner_ner` factory is registered and can be used directly with `nlp.add_pipe()`, but is not yet available as a config name through `Lela`.
 
 #### Loaders (Registry-based)
 
@@ -609,9 +609,9 @@ lela = Lela(config_dict, progress_callback=init_callback)
 # Init 0%: Loading knowledge base...
 # Init 15%: Initializing document loader...
 # Init 20%: Building spaCy pipeline...
-# Init 25%: Loading NER model (lela_gliner)...
-# Init 45%: Loading candidate generator (lela_dense)...
-# Init 75%: Loading disambiguator (lela_vllm)...
+# Init 25%: Loading NER model (gliner)...
+# Init 45%: Loading candidate generator (dense)...
+# Init 75%: Loading disambiguator (vllm)...
 # Init 100%: Pipeline initialization complete
 ```
 
@@ -628,13 +628,13 @@ result = lela.process_document_with_progress(doc, progress_callback=process_call
 
 ### Self-Consistency Voting
 
-The `lela_vllm` disambiguator supports self-consistency voting for improved accuracy. When `self_consistency_k > 1`, the model generates multiple responses and selects the answer by majority vote.
+The `vllm` disambiguator supports self-consistency voting for improved accuracy. When `self_consistency_k > 1`, the model generates multiple responses and selects the answer by majority vote.
 
 **Configuration:**
 ```json
 {
   "disambiguator": {
-    "name": "lela_vllm",
+    "name": "vllm",
     "params": {
       "self_consistency_k": 5  // Generate 5 responses, take majority vote
     }
@@ -662,7 +662,7 @@ NIL linking allows the model to reject all candidates when none match the mentio
 ```json
 {
   "disambiguator": {
-    "name": "lela_vllm",
+    "name": "vllm",
     "params": {
       "add_none_candidate": true  // Enable NIL linking
     }
@@ -705,7 +705,7 @@ Qwen3 models support a "thinking mode" where the model shows chain-of-thought re
 ```json
 {
   "disambiguator": {
-    "name": "lela_vllm",
+    "name": "vllm",
     "params": {
       "disable_thinking": true  // Skip chain-of-thought reasoning
     }
@@ -774,9 +774,9 @@ from lela.knowledge_bases.jsonl import JSONLKnowledgeBase
 
 # Build custom pipeline
 nlp = spacy.blank("en")
-nlp.add_pipe("lela_simple", config={"min_len": 3})
-cand_component = nlp.add_pipe("lela_fuzzy_candidates", config={"top_k": 10})
-disamb_component = nlp.add_pipe("lela_first_disambiguator")
+nlp.add_pipe("simple_ner", config={"min_len": 3})
+cand_component = nlp.add_pipe("fuzzy_candidates", config={"top_k": 10})
+disamb_component = nlp.add_pipe("first_disambiguator")
 
 # Initialize with knowledge base
 kb = JSONLKnowledgeBase(path="kb.jsonl")
@@ -839,18 +839,18 @@ config_dict = {
         }
     },
     "candidate_generator": {
-        "name": "lela_dense",
+        "name": "dense",
         "params": {"top_k": 64, "use_context": True}
     },
     "reranker": {
-        "name": "lela_embedder_transformers",
+        "name": "embedder_transformers",
         "params": {
             "model_name": "Qwen/Qwen3-Embedding-4B",
             "top_k": 10
         }
     },
     "disambiguator": {
-        "name": "lela_vllm",
+        "name": "vllm",
         "params": {
             "model_name": "Qwen/Qwen3-8B",
             "tensor_parallel_size": 1,

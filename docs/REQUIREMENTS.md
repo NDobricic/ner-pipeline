@@ -252,7 +252,7 @@ python -c "
 from lela import Lela
 lela = Lela({
     'disambiguator': {
-        'name': 'lela_vllm',
+        'name': 'vllm',
         'params': {'tensor_parallel_size': 2}
     },
     # ... rest of config
@@ -297,7 +297,7 @@ def check_vllm():
         import vllm
         print(f"vLLM: {vllm.__version__}")
     except ImportError:
-        print("vLLM: NOT INSTALLED (optional, needed for lela_vllm)")
+        print("vLLM: NOT INSTALLED (optional, needed for vllm)")
 
 def check_spacy():
     try:

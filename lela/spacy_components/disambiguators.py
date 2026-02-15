@@ -76,7 +76,7 @@ def _ensure_extensions():
 
 
 @Language.factory(
-    "lela_lela_vllm_disambiguator",
+    "vllm_disambiguator",
     default_config={
         "model_name": DEFAULT_LLM_MODEL,
         "tensor_parallel_size": DEFAULT_TENSOR_PARALLEL_SIZE,
@@ -433,7 +433,7 @@ class LELAvLLMDisambiguatorComponent:
 
 
 @Language.factory(
-    "lela_lela_openai_api_disambiguator",
+    "openai_api_disambiguator",
     default_config={
         "model_name": None,
         "base_url": "http://localhost:8000/v1",
@@ -726,7 +726,7 @@ class LELAOpenAIAPIDisambiguatorComponent:
 
 
 @Language.factory(
-    "lela_lela_transformers_disambiguator",
+    "transformers_disambiguator",
     default_config={
         "model_name": DEFAULT_LLM_MODEL,
         "add_none_candidate": True,  # Enable NIL handling by default
@@ -997,7 +997,7 @@ class LELATransformersDisambiguatorComponent:
 
 
 @Language.factory(
-    "lela_first_disambiguator",
+    "first_disambiguator",
     default_config={},
 )
 def create_first_disambiguator_component(
